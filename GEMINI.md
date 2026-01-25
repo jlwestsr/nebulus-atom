@@ -1,16 +1,20 @@
 # GEMINI Project Context
 
 ## Project Overview
-This is a custom, lightweight CLI agent built to interact directly with a local Nebulus (Ollama) server, bypassing complex abstractions. Inspired by https://github.com/clawdbot/clawdbot.
+This is a custom, lightweight CLI agent built to interact directly with a local Nebulus (Ollama) server, bypassing complex abstractions.
 
 ## Technical Stack
-- **Runtime**: Node.js
-- **Libraries**: openai, inquirer, chalk, dotenv
+- **Language**: Python 3.12+
+- **Framework**: Typer (CLI)
+- **UI**: Rich
+- **LLM Client**: OpenAI Python Library
+- **Architecture**: Strict MVC (Model-View-Controller) with OOP best practices.
 - **Target Server**: http://nebulus:11434/v1
 - **Model**: qwen2.5-coder:latest
 
 ## Agent Instructions
 - Always work on the `develop` branch.
-- Follow the directives in `AI_DIRECTIVES.md`.
+- Follow the directives in `AI_DIRECTIVES.md` (includes strict OOP/SOLID mandates).
 - Follow the workflow in `WORKFLOW.md`.
-- The main entry point is `agent.js`.
+- The main entry point is `mini_nebulus/main.py`.
+- Run via: `python3 -m mini_nebulus.main start`.
