@@ -100,8 +100,8 @@ async function processTurn() {
         if (content) {
             fullResponse += content;
             const trimmed = fullResponse.trim();
-            const looksLikeJson = trimmed.startsWith('{');
-            const looksLikeCodeBlock = trimmed.includes('```') || trimmed.includes('run_shell_command');
+            const looksLikeJson = trimmed.startsWith('{') || trimmed.startsWith('```');
+            const looksLikeCodeBlock = trimmed.includes('run_shell_command');
 
             if (!looksLikeJson && !looksLikeCodeBlock) {
                 if (!hasStartedPrinting) {
@@ -132,9 +132,15 @@ async function processTurn() {
 
       let toolCalls = Object.values(toolCallsMap);
 
-      if (toolCalls.length === 0 && fullResponse.trim().startsWith('{')) {
+      // Clean fullResponse for fallback parsing
+      let cleanedResponse = fullResponse.trim();
+      if (cleanedResponse.startsWith('```')) {
+          cleanedResponse = cleanedResponse.replace(/^```\w*\n?/, '').replace(/\n?```$/, '').trim();
+      }
+
+      if (toolCalls.length === 0 && cleanedResponse.startsWith('{')) {
           try {
-              const potentialTool = JSON.parse(fullResponse.trim());
+              const potentialTool = JSON.parse(cleanedResponse);
               if (potentialTool.name && potentialTool.arguments) {
                   toolCalls = [{
                       id: `call_manual_${Date.now()}`,
@@ -182,7 +188,6 @@ async function processTurn() {
       if (toolCalls.length > 0) {
         if (hasStartedPrinting) console.log('');
         
-        // Deduplicate tool calls
         const uniqueToolCalls = [];
         const seenCalls = new Set();
         
