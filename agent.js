@@ -16,7 +16,6 @@ const client = new OpenAI({
 
 const model = process.env.NEBULUS_MODEL || 'qwen2.5-coder:latest';
 
-
 const tools = [
   {
     type: 'function',
@@ -40,14 +39,13 @@ const tools = [
 const history = [
   { 
     role: 'system', 
-    content: 'You are a helpful AI assistant running on a local Nebulus server. You have access to a local shell via the `run_shell_command` tool. Use it when asked to perform file system operations or system tasks. You are concise and expert-level.' 
+    content: 'You are a helpful AI assistant running on a local Nebulus server. You have access to a local shell via the \`run_shell_command\` tool. Use it when asked to perform file system operations or system tasks. IMPORTANT: Always use the structured \`run_shell_command\` tool call. You are concise and expert-level.' 
   }
 ];
 
 console.log(chalk.bold.cyan('🦞 Mini-Nebulus Agent'));
 console.log(chalk.gray(`Connected to ${process.env.NEBULUS_BASE_URL} using ${model}`));
 console.log('');
-
 
 async function chatLoop() {
   while (true) {
@@ -56,6 +54,7 @@ async function chatLoop() {
         type: 'input',
         name: 'prompt',
         message: chalk.green('You:'),
+        prefix: '',
       },
     ]);
 
@@ -71,7 +70,6 @@ async function chatLoop() {
   }
 }
 
-
 async function processTurn() {
   let finishedTurn = false;
   
@@ -82,6 +80,7 @@ async function processTurn() {
         messages: history,
         stream: true,
         tools: tools,
+        tool_choice: 'auto',
       });
 
       let fullResponse = '';
@@ -97,14 +96,14 @@ async function processTurn() {
             fullResponse += content;
         }
 
-        // Handle tool calls
+        // Handle structured tool calls
         if (delta?.tool_calls) {
           for (const tc of delta.tool_calls) {
              const index = tc.index;
              if (!toolCallsMap[index]) {
                toolCallsMap[index] = { 
                  index: index,
-                 id: tc.id || '',
+                 id: tc.id || `call_${Date.now()}_${index}`,
                  type: tc.type || 'function',
                  function: { name: '', arguments: '' } 
                };
@@ -117,27 +116,48 @@ async function processTurn() {
         }
       }
 
-      const toolCalls = Object.values(toolCallsMap);
+      let toolCalls = Object.values(toolCallsMap);
+
+      // Heuristic: If model sent JSON in content instead of tool_calls
+      if (toolCalls.length === 0 && fullResponse.trim().startsWith('{') && fullResponse.trim().includes('"name":')) {
+          try {
+              const potentialTool = JSON.parse(fullResponse.trim());
+              if (potentialTool.name && potentialTool.arguments) {
+                  toolCalls = [{
+                      id: `call_manual_${Date.now()}`,
+                      type: 'function',
+                      function: potentialTool
+                  }];
+                  // Clear fullResponse since it was just the tool call
+                  fullResponse = '';
+              }
+          } catch (e) {
+              // Not valid JSON tool call, ignore
+          }
+      }
 
       if (toolCalls.length > 0) {
-        // If we printed content, add a newline
         if (fullResponse) console.log('');
 
-        // Add assistant message with tool calls to history
         const assistantMessage = {
             role: 'assistant',
             content: fullResponse || null,
-            tool_calls: toolCalls
+            tool_calls: toolCalls.map(tc => ({
+                id: tc.id,
+                type: tc.type,
+                function: tc.function
+            }))
         };
         history.push(assistantMessage);
         
-        // Execute tools
         for (const tc of toolCalls) {
             if (tc.function.name === 'run_shell_command') {
                 let output;
                 let command;
                 try {
-                    const args = JSON.parse(tc.function.arguments);
+                    const args = typeof tc.function.arguments === 'string' 
+                        ? JSON.parse(tc.function.arguments) 
+                        : tc.function.arguments;
                     command = args.command;
                     console.log(chalk.gray(`> Executing: ${command}`));
                     
@@ -148,7 +168,6 @@ async function processTurn() {
                     output = `Error: ${e.message}`;
                 }
                 
-                // Add tool result to history
                 history.push({
                     role: 'tool',
                     tool_call_id: tc.id,
@@ -156,11 +175,14 @@ async function processTurn() {
                 });
             } else {
                 console.log(chalk.red(`Unknown tool: ${tc.function.name}`));
+                history.push({
+                    role: 'tool',
+                    tool_call_id: tc.id,
+                    content: `Error: Unknown tool ${tc.function.name}`
+                });
             }
         }
-        // Continue loop to get the final response based on tool outputs
       } else {
-        // No tool calls, we are done
         console.log('\n');
         history.push({ role: 'assistant', content: fullResponse });
         finishedTurn = true;
@@ -173,6 +195,4 @@ async function processTurn() {
   }
 }
 
-
 chatLoop();
-
