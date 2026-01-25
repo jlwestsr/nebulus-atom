@@ -1,0 +1,11 @@
+filelock==3.18.0
+virtualenv<20.27
+pytest
+black
+flake8
+pre-commit
+ansible
+ansible-lint
+yamllint
+aider-chat
+mkdocs-material

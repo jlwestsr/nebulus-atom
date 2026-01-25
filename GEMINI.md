@@ -18,3 +18,12 @@ This is a custom, lightweight CLI agent built to interact directly with a local 
 - Follow the workflow in `WORKFLOW.md`.
 - The main entry point is `mini_nebulus/main.py`.
 - Run via: `python3 -m mini_nebulus.main start`.
+
+## Project Influences
+- **Gemini CLI**: https://github.com/google-gemini/gemini-cli
+  - *Goal*: Mimic its terminal features and user experience.
+- **Get Shit Done**: https://github.com/glittercowboy/get-shit-done
+  - *Goal*: Mimic its features and task-oriented approach.
+- **Clawd**: https://clawd.bot/
+  - *Docs*: https://docs.clawd.bot/start/getting-started
+  - *Goal*: Enable autonomous agent capabilities.

@@ -51,3 +51,12 @@ python3 -m mini_nebulus.main start "Check disk usage"
 
 - **Linting**: `pre-commit run --all-files` (Uses `ruff`)
 - **Format**: `ruff format`
+
+## Feature Roadmap
+The following features are planned for future development. See `docs/features/` for detailed specifications.
+
+- **[Context Manager](docs/features/context_manager.md)**: File pinning for persistent context.
+- **[Smart Undo](docs/features/smart_undo.md)**: Transactional filesystem with rollback.
+- **[Interactive Clarification](docs/features/interactive_clarification.md)**: Human-in-the-loop support.
+- **[Skill Library](docs/features/skill_library.md)**: Persistent and global skill sharing.
+- **[Visual Task Graph](docs/features/visual_task_graph.md)**: Visualization of complex task dependencies.

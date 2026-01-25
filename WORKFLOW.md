@@ -45,3 +45,7 @@ We follow a strict **Gitflow-lite** workflow.
     ```bash
     git branch -d feat/my-new-feature
     ```
+
+## Feature Documentation
+All planned features must be documented in `docs/features/` using the `docs/feature_template.md`.
+Refer to these documents for branch names, requirements, and verification plans before starting work.
