@@ -40,7 +40,7 @@ const tools = [
 const history = [
   { 
     role: 'system', 
-    content: 'You are Mini-Nebulus, a professional AI engineer CLI. You have full access to the local system via the run_shell_command tool. When asked to perform a task, EXECUTE the command immediately. Your tool output will be visible to the user, so you don’t need to repeat it entirely, but you should provide expert context or move to the next step. If a command fails, suggest an alternative.' 
+    content: 'You are Mini-Nebulus, a professional AI engineer CLI. You have full access to the local system via the run_shell_command tool. When asked to perform a task, EXECUTE the command immediately using the tool. DO NOT write the tool call in markdown or text. DO NOT ask for confirmation. Just CALL the function.' 
   }
 ];
 
@@ -100,7 +100,10 @@ async function processTurn() {
             const trimmed = fullResponse.trim();
             const looksLikeJson = trimmed.startsWith('{');
             
-            if (!looksLikeJson) {
+            // Heuristic: If it looks like it's starting a code block for a tool, delay printing
+            const looksLikeCodeBlock = trimmed.includes('```') || trimmed.includes('run_shell_command');
+
+            if (!looksLikeJson && !looksLikeCodeBlock) {
                 if (!hasStartedPrinting) {
                     process.stdout.write(chalk.blue('Agent: '));
                     hasStartedPrinting = true;
@@ -129,6 +132,7 @@ async function processTurn() {
 
       let toolCalls = Object.values(toolCallsMap);
 
+      // 1. Check for pure JSON response (existing heuristic)
       if (toolCalls.length === 0 && fullResponse.trim().startsWith('{')) {
           try {
               const potentialTool = JSON.parse(fullResponse.trim());
@@ -143,13 +147,46 @@ async function processTurn() {
                   }];
                   fullResponse = ''; 
               }
-          } catch (e) {
-              if (!hasStartedPrinting) {
-                  process.stdout.write(chalk.blue('Agent: '));
-                  process.stdout.write(fullResponse);
-                  hasStartedPrinting = true;
+          } catch (e) {}
+      }
+
+      // 2. Check for Hallucinated Tool Calls in text (e.g. run_shell_command({...}))
+      // Regex looks for: run_shell_command ( { command: ... } )
+      if (toolCalls.length === 0) {
+          const regex = /run_shell_command\s*\(\s*(\{.*?\})\s*\)/s;
+          const match = fullResponse.match(regex);
+          if (match) {
+              try {
+                  const jsonArgs = match[1];
+                  const parsedArgs = JSON.parse(jsonArgs);
+                  if (parsedArgs.command) {
+                       toolCalls = [{
+                          id: `call_regex_${Date.now()}`,
+                          type: 'function',
+                          function: {
+                              name: 'run_shell_command',
+                              arguments: JSON.stringify(parsedArgs)
+                          }
+                      }];
+                      // We found the command, so we can suppress the hallucinated text
+                      // But if there was introductory text, we might want to keep it?
+                      // For now, let's keep the intro text but remove the code block if possible, 
+                      // or just clear it if it's mostly the command.
+                      if (fullResponse.length < 200) {
+                          fullResponse = ''; // Assume it was just the command wrapper
+                      }
+                  }
+              } catch (e) {
+                  // Regex matched but JSON parse failed
               }
           }
+      }
+
+      // If we still have content that wasn't a tool call, and we suppressed it earlier, print it now.
+      if (toolCalls.length === 0 && fullResponse && !hasStartedPrinting) {
+          process.stdout.write(chalk.blue('Agent: '));
+          process.stdout.write(fullResponse);
+          hasStartedPrinting = true;
       }
 
       if (toolCalls.length > 0) {
@@ -201,7 +238,6 @@ async function processTurn() {
 }
 
 async function main() {
-    // Handle command line arguments as initial prompt
     const initialPrompt = process.argv.slice(2).join(' ').trim();
     if (initialPrompt) {
         history.push({ role: 'user', content: initialPrompt });
@@ -209,7 +245,6 @@ async function main() {
         await processTurn();
     }
     
-    // Enter interactive loop
     await chatLoop();
 }
 
