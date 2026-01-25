@@ -22,7 +22,7 @@ const tools = [
     type: 'function',
     function: {
       name: 'run_shell_command',
-      description: 'Executes a shell command on the local machine. Use this to list files, read contents, or perform system tasks.',
+      description: 'Executes a shell command on the local machine. Use this for file operations (ls, cat, mkdir), git commands, or system info. DO NOT suggest commands in text; always execute them via this tool.',
       parameters: {
         type: 'object',
         properties: {
@@ -40,7 +40,7 @@ const tools = [
 const history = [
   { 
     role: 'system', 
-    content: 'You are a helpful AI assistant running on a local Nebulus server. You have access to a local shell via the \`run_shell_command\` tool. Use it when asked to perform file system operations or system tasks. You are concise and expert-level.' 
+    content: 'You are Mini-Nebulus, a professional AI engineer CLI. You have full access to the local system via the run_shell_command tool. When asked to perform a task (listing files, reading code, checking git), EXECUTE the command immediately using the tool. Do not ask for permission. Do not wrap commands in markdown code blocks if you intend to run them. If a command fails, try an alternative (e.g., if tree is missing, use ls -R).' 
   }
 ];
 
@@ -59,12 +59,13 @@ async function chatLoop() {
       },
     ]);
 
-    if (prompt.toLowerCase() === 'exit' || prompt.toLowerCase() === 'quit') {
+    const input = prompt.trim();
+    if (input.toLowerCase() === 'exit' || input.toLowerCase() === 'quit') {
       console.log(chalk.yellow('Goodbye!'));
       process.exit(0);
     }
 
-    history.push({ role: 'user', content: prompt });
+    history.push({ role: 'user', content: input });
     await processTurn();
   }
 }
@@ -84,21 +85,30 @@ async function processTurn() {
       });
 
       spinner.stop();
-      process.stdout.write(chalk.blue('Agent: '));
 
       let fullResponse = '';
       let toolCallsMap = {};
-      let isFirstChunk = true;
+      let hasStartedPrinting = false;
 
       for await (const chunk of stream) {
         const delta = chunk.choices[0]?.delta;
         
         const content = delta?.content || '';
         if (content) {
-            // Very basic heuristic: if it looks like JSON tool call starting, maybe don't stream it?
-            // For now, we stream everything to keep it responsive.
-            process.stdout.write(content);
+            // Buffer-and-check: If response starts with '{', it might be a tool call in content.
+            // We delay printing if we suspect it's JSON.
             fullResponse += content;
+            
+            const trimmed = fullResponse.trim();
+            const looksLikeJson = trimmed.startsWith('{');
+            
+            if (!looksLikeJson) {
+                if (!hasStartedPrinting) {
+                    process.stdout.write(chalk.blue('Agent: '));
+                    hasStartedPrinting = true;
+                }
+                process.stdout.write(content);
+            }
         }
 
         if (delta?.tool_calls) {
@@ -121,8 +131,9 @@ async function processTurn() {
 
       let toolCalls = Object.values(toolCallsMap);
 
-      // Heuristic fallback for models that output JSON in content
-      if (toolCalls.length === 0 && fullResponse.trim().startsWith('{') && fullResponse.trim().includes('"name":')) {
+      // Fallback: If we didn't print anything because we thought it was JSON, 
+      // check if it actually WAS a valid tool call.
+      if (toolCalls.length === 0 && fullResponse.trim().startsWith('{')) {
           try {
               const potentialTool = JSON.parse(fullResponse.trim());
               if (potentialTool.name && potentialTool.arguments) {
@@ -134,15 +145,20 @@ async function processTurn() {
                           arguments: typeof potentialTool.arguments === 'string' ? potentialTool.arguments : JSON.stringify(potentialTool.arguments)
                       }
                   }];
-                  // If we detected it was a tool call, we clear the content for history
-                  // so the model doesn't see redundant data.
                   fullResponse = ''; 
               }
-          } catch (e) {}
+          } catch (e) {
+              // Not valid JSON tool call after all, print it now
+              if (!hasStartedPrinting) {
+                  process.stdout.write(chalk.blue('Agent: '));
+                  process.stdout.write(fullResponse);
+                  hasStartedPrinting = true;
+              }
+          }
       }
 
       if (toolCalls.length > 0) {
-        console.log(''); // Ensure newline after streamed content
+        if (hasStartedPrinting) console.log('');
 
         history.push({
             role: 'assistant',
@@ -169,6 +185,9 @@ async function processTurn() {
             history.push({ role: 'tool', tool_call_id: tc.id, content: output });
         }
       } else {
+        if (!hasStartedPrinting && fullResponse) {
+             process.stdout.write(chalk.blue('Agent: ') + fullResponse);
+        }
         console.log('\n');
         history.push({ role: 'assistant', content: fullResponse });
         finishedTurn = true;
