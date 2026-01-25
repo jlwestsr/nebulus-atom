@@ -61,7 +61,8 @@ async function chatLoop() {
 
     const input = prompt.trim();
     if (!input) continue;
-    if (input.toLowerCase() === 'exit' || input.toLowerCase() === 'quit') {
+    const exitCommands = ['exit', 'quit', '/exit', '/quit'];
+    if (exitCommands.includes(input.toLowerCase())) {
       console.log(chalk.yellow('Goodbye!'));
       process.exit(0);
     }
