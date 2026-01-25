@@ -20,3 +20,10 @@ We adhere to the **MVC (Model-View-Controller)** pattern for this Node.js CLI ap
 - **Classes**: Encapsulate logic in classes.
 - **Configuration**: Use `Config` model for env vars and constants.
 - **State**: Manage state via the `History` model, not global variables.
+
+## Source Control Standards
+
+- **Strict Branching**: Always create a specific branch (`feat/`, `fix/`, `docs/`, `chore/`) for your work.
+- **Local-Only Policy**: Do not push feature branches to remote. Merge them into `develop` locally, then push `develop`.
+- **Commit Messages**: Strictly follow [Conventional Commits](https://www.conventionalcommits.org/) (e.g., `feat: ...`, `fix: ...`).
+- **Verification**: Ensure `npm start` runs successfully before merging to `develop`.
