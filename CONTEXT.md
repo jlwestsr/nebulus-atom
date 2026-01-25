@@ -1,29 +1,24 @@
-# Project Context & Coding Standards
+# Project Context & Rules
 
-> **[IMPORTANCE: CRITICAL] AI AGENT DIRECTIVE**:
-> You MUST read and adhere to [rules/ai_behavior.md](rules/ai_behavior.md) at the start of every session. It contains strict operational guardrails, "Ansible-First" policies, and Git branching rules that supersede general instructions.
+This file serves as the primary context injection point for the Mini-Nebulus autonomous agent.
+The agent MUST read this file upon startup to understand the project environment, rules, and workflow.
 
-## Project Overview
-This is a production-grade AI engineering project.
+## Core Documentation
+The following files define the project's strict operating procedures. The agent must adhere to them at all times.
 
-## Coding Standards
-1. **Unit Tests**: ALL changes must have accompanying unit tests in the `tests/` directory.
-2. **Modular Code**: Do not put business logic in notebooks. Move logic to `src/` modules.
-3. **Type Hinting**: Use Python type hints for all function definitions.
-4. **Documentation**: All public functions must have docstrings (Google style).
+- **[AI Directives](AI_DIRECTIVES.md)**: Coding standards, architecture (MVC), and commit conventions.
+- **[Workflow](WORKFLOW.md)**: Branching strategy (Gitflow-lite) and development lifecycle.
+- **[Project Goals](GEMINI.md)**: High-level objectives and influences (Clawd, Gemini CLI).
 
-## Git Workflow
-1. We use Git Flow.
-2. Direct commits to `main` are forbidden.
-3. Work on feature branches off `develop`.
-4. Ensure `git init` and `.gitignore` are respected.
+## Feature Roadmap
+Active feature specifications are located in `docs/features/`.
+Always check this directory before starting new work.
 
-## File Structure
-- `data/`: Contains raw and processed data. **Ignored by git** to prevent leaking sensitive information.
-- `docs/`: Project documentation, including feature specs (in `features/`) and architectural decisions.
-- `models/`: Binary model files and weights. **Ignored by git**.
-- `notebooks/`: Jupyter notebooks for experimentation and analysis. Logic MUST be moved to `src/` before production.
-- `rules/`: AI compliance and behavior rules (e.g., `ai_behavior.md`).
-- `src/`: The core source code of the project. Organized by feature or module.
-- `tests/`: Unit tests mirroring the `src/` structure.
-- `.github/`: CI/CD pipelines and GitHub Actions workflows.
+## System Prompt Injection
+*The following instructions are part of your core identity:*
+
+1. **Role**: You are a Senior AI Engineer working on Mini-Nebulus.
+2. **Constraint**: You must strictly follow the **MVC** architecture defined in `AI_DIRECTIVES.md`.
+3. **Constraint**: All file modifications must be safe and verifiable.
+4. **Constraint**: You must operate autonomously using the `Task` and `Plan` system.
+5. **Constraint**: Check `WORKFLOW.md` for proper branching before making changes.

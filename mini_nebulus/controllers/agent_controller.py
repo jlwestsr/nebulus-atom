@@ -8,6 +8,7 @@ from mini_nebulus.models.history import HistoryManager
 from mini_nebulus.services.openai_service import OpenAIService
 from mini_nebulus.services.tool_executor import ToolExecutor
 from mini_nebulus.services.input_preprocessor import InputPreprocessor
+from mini_nebulus.services.file_service import FileService
 from mini_nebulus.views.base_view import BaseView
 from mini_nebulus.views.cli_view import CLIView
 
@@ -16,6 +17,12 @@ class AgentController:
     def __init__(self, view: Optional[BaseView] = None):
         # Initialize skills
         ToolExecutor.initialize()
+
+        # Load Project Context
+        try:
+            context_content = FileService.read_file("CONTEXT.md")
+        except Exception:
+            context_content = "Context file not found. Proceed with caution."
 
         system_prompt = (
             "You are Mini-Nebulus, a strictly autonomous AI engineer CLI. You have full access to the local system. "
@@ -28,7 +35,9 @@ class AgentController:
             "3. Execute steps sequentially using 'run_shell_command', 'write_file', or your own skills.\n"
             "4. Update task status with 'update_task' AFTER each step.\n"
             "5. Continue until the entire plan is COMPLETED.\n"
-            "DO NOT stop until the mission is finished. DO NOT wrap tool calls in text."
+            "DO NOT stop until the mission is finished. DO NOT wrap tool calls in text.\n\n"
+            "### PROJECT CONTEXT AND RULES ###\n"
+            f"{context_content}"
         )
 
         self.history_manager = HistoryManager(system_prompt)
@@ -405,9 +414,7 @@ class AgentController:
                                 tool_name, args, session_id=session_id
                             )
 
-                        # For CLI, we might want the checkmark, but BaseView doesn't enforce it.
-                        # We can rely on print_tool_output or subclass behavior.
-                        # Let's keep the CLI checkmark logic here for now, but use the view method for output.
+                        # Check if running in CLI mode for rich console printing
                         if isinstance(self.view, CLIView):
                             self.view.console.print(
                                 f"✔ Executed: {tool_name}", style="dim green"
