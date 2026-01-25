@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 import dotenv from 'dotenv';
 import inquirer from 'inquirer';
 import chalk from 'chalk';
+import ora from 'ora';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 
@@ -39,7 +40,7 @@ const tools = [
 const history = [
   { 
     role: 'system', 
-    content: 'You are a helpful AI assistant running on a local Nebulus server. You have access to a local shell via the \`run_shell_command\` tool. Use it when asked to perform file system operations or system tasks. IMPORTANT: Always use the structured \`run_shell_command\` tool call. You are concise and expert-level.' 
+    content: 'You are a helpful AI assistant running on a local Nebulus server. You have access to a local shell via the \`run_shell_command\` tool. Use it when asked to perform file system operations or system tasks. You are concise and expert-level.' 
   }
 ];
 
@@ -64,8 +65,6 @@ async function chatLoop() {
     }
 
     history.push({ role: 'user', content: prompt });
-    process.stdout.write(chalk.blue('Agent: '));
-
     await processTurn();
   }
 }
@@ -74,6 +73,7 @@ async function processTurn() {
   let finishedTurn = false;
   
   while (!finishedTurn) {
+    const spinner = ora({ text: 'Thinking...', color: 'blue' }).start();
     try {
       const stream = await client.chat.completions.create({
         model: model,
@@ -83,20 +83,24 @@ async function processTurn() {
         tool_choice: 'auto',
       });
 
+      spinner.stop();
+      process.stdout.write(chalk.blue('Agent: '));
+
       let fullResponse = '';
       let toolCallsMap = {};
+      let isFirstChunk = true;
 
       for await (const chunk of stream) {
         const delta = chunk.choices[0]?.delta;
         
-        // Handle content
         const content = delta?.content || '';
         if (content) {
+            // Very basic heuristic: if it looks like JSON tool call starting, maybe don't stream it?
+            // For now, we stream everything to keep it responsive.
             process.stdout.write(content);
             fullResponse += content;
         }
 
-        // Handle structured tool calls
         if (delta?.tool_calls) {
           for (const tc of delta.tool_calls) {
              const index = tc.index;
@@ -108,7 +112,6 @@ async function processTurn() {
                  function: { name: '', arguments: '' } 
                };
              }
-             
              if (tc.id) toolCallsMap[index].id = tc.id;
              if (tc.function?.name) toolCallsMap[index].function.name += tc.function.name;
              if (tc.function?.arguments) toolCallsMap[index].function.arguments += tc.function.arguments;
@@ -118,7 +121,7 @@ async function processTurn() {
 
       let toolCalls = Object.values(toolCallsMap);
 
-      // Heuristic: If model sent JSON in content instead of tool_calls
+      // Heuristic fallback for models that output JSON in content
       if (toolCalls.length === 0 && fullResponse.trim().startsWith('{') && fullResponse.trim().includes('"name":')) {
           try {
               const potentialTool = JSON.parse(fullResponse.trim());
@@ -128,62 +131,42 @@ async function processTurn() {
                       type: 'function',
                       function: {
                           name: potentialTool.name,
-                          arguments: JSON.stringify(potentialTool.arguments) // Ensure arguments is a string
+                          arguments: typeof potentialTool.arguments === 'string' ? potentialTool.arguments : JSON.stringify(potentialTool.arguments)
                       }
                   }];
-                  // Clear fullResponse since it was just the tool call
-                  fullResponse = '';
+                  // If we detected it was a tool call, we clear the content for history
+                  // so the model doesn't see redundant data.
+                  fullResponse = ''; 
               }
-          } catch (e) {
-              // Not valid JSON tool call, ignore
-          }
+          } catch (e) {}
       }
 
       if (toolCalls.length > 0) {
-        if (fullResponse) console.log('');
+        console.log(''); // Ensure newline after streamed content
 
-        const assistantMessage = {
+        history.push({
             role: 'assistant',
-            content: fullResponse || null,
-            tool_calls: toolCalls.map(tc => ({
-                id: tc.id,
-                type: tc.type,
-                function: tc.function
-            }))
-        };
-        history.push(assistantMessage);
+            content: fullResponse.trim() || null,
+            tool_calls: toolCalls.map(tc => ({ id: tc.id, type: tc.type, function: tc.function }))
+        });
         
         for (const tc of toolCalls) {
-            if (tc.function.name === 'run_shell_command') {
-                let output;
-                let command;
-                try {
-                    const args = typeof tc.function.arguments === 'string' 
-                        ? JSON.parse(tc.function.arguments) 
-                        : tc.function.arguments;
-                    command = args.command;
-                    console.log(chalk.gray(`> Executing: ${command}`));
-                    
-                    const { stdout, stderr } = await execAsync(command);
-                    output = stdout || stderr;
-                    if (!output) output = '(no output)';
-                } catch (e) {
-                    output = `Error: ${e.message}`;
-                }
+            const cmdSpinner = ora({ text: `Executing: ${tc.function.name}`, color: 'gray' }).start();
+            let output;
+            try {
+                const args = typeof tc.function.arguments === 'string' ? JSON.parse(tc.function.arguments) : tc.function.arguments;
+                const command = args.command;
+                cmdSpinner.text = `Executing: ${command}`;
                 
-                history.push({
-                    role: 'tool',
-                    tool_call_id: tc.id,
-                    content: output
-                });
-            } else {
-                console.log(chalk.red(`Unknown tool: ${tc.function.name}`));
-                history.push({
-                    role: 'tool',
-                    tool_call_id: tc.id,
-                    content: `Error: Unknown tool ${tc.function.name}`
-                });
+                const { stdout, stderr } = await execAsync(command);
+                output = stdout || stderr || '(no output)';
+                cmdSpinner.succeed(`Executed: ${command}`);
+            } catch (e) {
+                output = `Error: ${e.message}`;
+                cmdSpinner.fail(`Failed: ${e.message}`);
             }
+            
+            history.push({ role: 'tool', tool_call_id: tc.id, content: output });
         }
       } else {
         console.log('\n');
@@ -192,7 +175,8 @@ async function processTurn() {
       }
 
     } catch (error) {
-      console.error(chalk.red('\nError connecting to Nebulus:'), error.message);
+      spinner.stop();
+      console.error(chalk.red('\nError:'), error.message);
       finishedTurn = true;
     }
   }
