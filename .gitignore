@@ -1,3 +1,29 @@
-node_modules\n.env\npackage-lock.json
-.gemini/
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+
+# Python
 venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+
+# Environment / Secrets
+.env
+.env.local
+.env.*.local
+
+# Local / IDE
+.vscode/
+.idea/
+.DS_Store
+.gemini/
+
+# Project Specific
+logs/
+tmp/
