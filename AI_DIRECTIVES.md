@@ -21,6 +21,14 @@ We adhere to the **MVC (Model-View-Controller)** pattern for this Python CLI app
 - **AsyncIO**: Use `async`/`await` for I/O operations.
 - **Configuration**: Use `config.py` for env vars.
 
+## Python OOP Best Practices
+- **SOLID Principles**: Adhere to Single Responsibility, Open/Closed, Liskov Substitution, Interface Segregation, and Dependency Inversion.
+- **Composition over Inheritance**: Prefer object composition to achieve code reuse and flexibility.
+- **Dependency Injection**: Inject dependencies (e.g., services, config) via `__init__` rather than instantiating them internally or using globals.
+- **Encapsulation**: Protect internal state. Use `_variable` naming convention for internal/private members. Use properties (`@property`) for controlled access.
+- **Data Models**: Use `@dataclass` (standard library) or `Pydantic` models for data-centric classes. Avoid raw dictionaries for internal state.
+- **Interfaces**: Use `abc.ABC` and `abc.abstractmethod` to define clear interfaces for Services and interchangeable components.
+
 ## Source Control Standards
 
 - **Strict Branching**: Always create a specific branch (`feat/`, `fix/`, `docs/`, `chore/`) for your work.
