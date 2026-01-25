@@ -17,6 +17,8 @@ const client = new OpenAI({
 
 const model = process.env.NEBULUS_MODEL || 'qwen2.5-coder:latest';
 
+const exitCommands = ['exit', 'quit', '/exit', '/quit'];
+
 const tools = [
   {
     type: 'function',
@@ -61,7 +63,6 @@ async function chatLoop() {
 
     const input = prompt.trim();
     if (!input) continue;
-    const exitCommands = ['exit', 'quit', '/exit', '/quit'];
     if (exitCommands.includes(input.toLowerCase())) {
       console.log(chalk.yellow('Goodbye!'));
       process.exit(0);
@@ -100,8 +101,6 @@ async function processTurn() {
             fullResponse += content;
             const trimmed = fullResponse.trim();
             const looksLikeJson = trimmed.startsWith('{');
-            
-            // Heuristic: If it looks like it's starting a code block for a tool, delay printing
             const looksLikeCodeBlock = trimmed.includes('```') || trimmed.includes('run_shell_command');
 
             if (!looksLikeJson && !looksLikeCodeBlock) {
@@ -133,7 +132,6 @@ async function processTurn() {
 
       let toolCalls = Object.values(toolCallsMap);
 
-      // 1. Check for pure JSON response (existing heuristic)
       if (toolCalls.length === 0 && fullResponse.trim().startsWith('{')) {
           try {
               const potentialTool = JSON.parse(fullResponse.trim());
@@ -151,8 +149,6 @@ async function processTurn() {
           } catch (e) {}
       }
 
-      // 2. Check for Hallucinated Tool Calls in text (e.g. run_shell_command({...}))
-      // Regex looks for: run_shell_command ( { command: ... } )
       if (toolCalls.length === 0) {
           const regex = /run_shell_command\s*\(\s*(\{.*?\})\s*\)/s;
           const match = fullResponse.match(regex);
@@ -169,21 +165,14 @@ async function processTurn() {
                               arguments: JSON.stringify(parsedArgs)
                           }
                       }];
-                      // We found the command, so we can suppress the hallucinated text
-                      // But if there was introductory text, we might want to keep it?
-                      // For now, let's keep the intro text but remove the code block if possible, 
-                      // or just clear it if it's mostly the command.
                       if (fullResponse.length < 200) {
-                          fullResponse = ''; // Assume it was just the command wrapper
+                          fullResponse = ''; 
                       }
                   }
-              } catch (e) {
-                  // Regex matched but JSON parse failed
-              }
+              } catch (e) {}
           }
       }
 
-      // If we still have content that wasn't a tool call, and we suppressed it earlier, print it now.
       if (toolCalls.length === 0 && fullResponse && !hasStartedPrinting) {
           process.stdout.write(chalk.blue('Agent: '));
           process.stdout.write(fullResponse);
@@ -192,14 +181,26 @@ async function processTurn() {
 
       if (toolCalls.length > 0) {
         if (hasStartedPrinting) console.log('');
+        
+        // Deduplicate tool calls
+        const uniqueToolCalls = [];
+        const seenCalls = new Set();
+        
+        for (const tc of toolCalls) {
+            const key = `${tc.function.name}:${tc.function.arguments}`;
+            if (!seenCalls.has(key)) {
+                seenCalls.add(key);
+                uniqueToolCalls.push(tc);
+            }
+        }
 
         history.push({
             role: 'assistant',
             content: fullResponse.trim() || null,
-            tool_calls: toolCalls.map(tc => ({ id: tc.id, type: tc.type, function: tc.function }))
+            tool_calls: uniqueToolCalls.map(tc => ({ id: tc.id, type: tc.type, function: tc.function }))
         });
         
-        for (const tc of toolCalls) {
+        for (const tc of uniqueToolCalls) {
             const cmdSpinner = ora({ text: `Executing: ${tc.function.name}`, color: 'gray' }).start();
             let output;
             try {
