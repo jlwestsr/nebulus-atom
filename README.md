@@ -1,70 +1,53 @@
 # Mini-Nebulus
 
-A lightweight, custom AI agent CLI for Nebulus, designed with a strict MVC architecture and robust local tool integration.
-
-## Features
-
-- **Local Execution**: Runs entirely on your machine, connecting to a local Nebulus/Ollama server.
-- **System Tools**: Can execute shell commands (`ls`, `git`, etc.) autonomously.
-- **Smart CLI**:
-  - Interactive chat mode.
-  - "Fire and forget" initial prompt via arguments.
-  - Spinner feedback (`ora`) and colored output (`chalk`).
-- **Robustness**: Advanced JSON extraction to handle various LLM output formats.
+A professional, lightweight AI agent CLI built with Python.
 
 ## Architecture
 
-This project follows a strict **Model-View-Controller (MVC)** pattern:
+Built on the **Nebulus Gantry** standards using a strict **MVC** architecture.
 
-```text
-src/
-├── controllers/   # AgentController (Orchestration)
-├── models/        # Config, History, ToolRegistry
-├── services/      # OpenAIService, ToolExecutor
-├── views/         # CLIView (Input/Output)
-└── index.js       # Entry Point
-```
+- **Models**: `mini_nebulus/models/`
+- **Views**: `mini_nebulus/views/`
+- **Controllers**: `mini_nebulus/controllers/`
+- **Services**: `mini_nebulus/services/`
 
-## Setup & Development
+## Prerequisites
 
-### Prerequisites
-- Node.js (v18+)
-- Python 3.12+ (for pre-commit hooks)
-- Local Nebulus/Ollama instance running on `http://nebulus:11434`
+- Python 3.12+
+- `venv` or `uv`
+- Local Nebulus/Ollama server running
 
-### Installation
+## Setup
 
-1.  **Install Node dependencies:**
-    ```bash
-    npm install
-    ```
+1. Create and activate a virtual environment:
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate
+   ```
+2. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+3. Configure `.env`:
+   ```env
+   NEBULUS_BASE_URL=http://nebulus:11434/v1
+   NEBULUS_API_KEY=any
+   NEBULUS_MODEL=qwen2.5-coder:latest
+   ```
 
-2.  **Setup Development Environment (Python Venv & Pre-commit):**
-    ```bash
-    python3 -m venv venv
-    source venv/bin/activate
-    pip install pre-commit
-    pre-commit install
-    ```
+## Usage
 
-### Running
-
-**Interactive Mode:**
+Start the agent:
 ```bash
-npm start
+python3 -m mini_nebulus.main start
 ```
 
-**Single Command Mode:**
+Or with an initial prompt:
 ```bash
-npm start -- "List files in the current directory"
+python3 -m mini_nebulus.main start "Check disk usage"
 ```
 
-## Source Control Workflow
+## Development
 
-- **Branching**: All work happens on local `feat/`, `fix/`, or `chore/` branches.
-- **Merging**: Merge into `develop`.
-- **Commits**: Follow [Conventional Commits](https://www.conventionalcommits.org/).
-
-## References
-- [Nebulus (Ollama) Local Server](http://nebulus:11434)
-- [Clawdbot](https://github.com/clawdbot/clawdbot) (Inspiration)
+- **Linting**: `pre-commit run --all-files` (Uses `ruff`)
+- **Format**: `ruff format`
