@@ -1,3 +1,4 @@
+import { InputPreprocessor } from '../services/InputPreprocessor.js';
 import { Config } from '../models/Config.js';
 import { History } from '../models/History.js';
 import { ToolRegistry } from '../models/ToolRegistry.js';
@@ -22,7 +23,8 @@ export class AgentController {
         // Handle command line arguments as initial prompt
         const initialPrompt = process.argv.slice(2).join(' ').trim();
         if (initialPrompt) {
-            this.history.add('user', initialPrompt);
+            const processed = await InputPreprocessor.process(initialPrompt);
+            this.history.add('user', processed);
             console.log('You: ' + initialPrompt);
             await this.processTurn();
         }
@@ -40,7 +42,8 @@ export class AgentController {
                 process.exit(0);
             }
 
-            this.history.add('user', input);
+            const processed = await InputPreprocessor.process(input);
+            this.history.add('user', processed);
             await this.processTurn();
         }
     }
