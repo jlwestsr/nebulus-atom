@@ -1,2 +1,3 @@
 node_modules\n.env\npackage-lock.json
 .gemini/
+venv/
