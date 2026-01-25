@@ -173,7 +173,6 @@ async function processTurn() {
                 output = stdout || stderr || '(no output)';
                 cmdSpinner.succeed(`Executed: ${command}`);
                 
-                // Show output to user (indented and dimmed)
                 const formattedOutput = output.trim().split('\n').map(line => `  ${line}`).join('\n');
                 console.log(chalk.gray(formattedOutput));
                 
@@ -201,4 +200,17 @@ async function processTurn() {
   }
 }
 
-chatLoop();
+async function main() {
+    // Handle command line arguments as initial prompt
+    const initialPrompt = process.argv.slice(2).join(' ').trim();
+    if (initialPrompt) {
+        history.push({ role: 'user', content: initialPrompt });
+        console.log(chalk.green('You: ') + initialPrompt);
+        await processTurn();
+    }
+    
+    // Enter interactive loop
+    await chatLoop();
+}
+
+main();
