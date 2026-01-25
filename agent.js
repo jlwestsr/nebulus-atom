@@ -24,7 +24,7 @@ const tools = [
     type: 'function',
     function: {
       name: 'run_shell_command',
-      description: 'Executes a shell command on the local machine. Use this for file operations (ls, cat, mkdir), git commands, or system info.',
+      description: 'Executes a shell command on the local machine.',
       parameters: {
         type: 'object',
         properties: {
@@ -73,6 +73,46 @@ async function chatLoop() {
   }
 }
 
+function extractJson(text) {
+    // 1. Try stripping markdown code blocks
+    let clean = text.replace(/```\w*\n?/g, '').replace(/```$/g, '').trim();
+    if (clean.startsWith('{') && clean.endsWith('}')) {
+        try { return JSON.parse(clean); } catch(e) {}
+    }
+
+    // 2. Try regex for run_shell_command pattern
+    const regex = /run_shell_command\s*\(\s*(\{[\s\S]*?\})\s*\)/;
+    const match = text.match(regex);
+    if (match) {
+        try { return JSON.parse(match[1]); } catch(e) {}
+    }
+
+    // 3. Brute force JSON object search (first valid object with 'command')
+    let startIndex = text.indexOf('{');
+    while (startIndex !== -1) {
+        let balance = 0;
+        for (let i = startIndex; i < text.length; i++) {
+            if (text[i] === '{') balance++;
+            else if (text[i] === '}') balance--;
+            
+            if (balance === 0) {
+                const jsonCand = text.substring(startIndex, i + 1);
+                try {
+                    const obj = JSON.parse(jsonCand);
+                    if (obj.command || (obj.arguments && obj.arguments.command)) {
+                        return obj; // Found it!
+                    }
+                    if (obj.name === 'run_shell_command') return obj;
+                } catch (e) {}
+                break; // Move to next starting brace
+            }
+        }
+        startIndex = text.indexOf('{', startIndex + 1);
+    }
+    
+    return null;
+}
+
 async function processTurn() {
   let finishedTurn = false;
   
@@ -87,32 +127,13 @@ async function processTurn() {
         tool_choice: 'auto',
       });
 
-      spinner.stop();
-
       let fullResponse = '';
       let toolCallsMap = {};
-      let hasStartedPrinting = false;
 
       for await (const chunk of stream) {
         const delta = chunk.choices[0]?.delta;
-        const content = delta?.content || '';
+        if (delta?.content) fullResponse += delta.content;
         
-        if (content) {
-            fullResponse += content;
-            const trimmed = fullResponse.trim();
-            
-            // Only suppress if it really looks like a tool call starting
-            const isToolJson = trimmed.startsWith('{') || trimmed.startsWith('```json') || trimmed.startsWith('```\n{');
-
-            if (!isToolJson) {
-                if (!hasStartedPrinting) {
-                    process.stdout.write(chalk.blue('Agent: '));
-                    hasStartedPrinting = true;
-                }
-                process.stdout.write(content);
-            }
-        }
-
         if (delta?.tool_calls) {
           for (const tc of delta.tool_calls) {
              const index = tc.index;
@@ -131,61 +152,59 @@ async function processTurn() {
         }
       }
 
+      spinner.stop();
+
       let toolCalls = Object.values(toolCallsMap);
 
-      // --- Greedy Fallback Logic ---
+      // Heuristic extraction if no structured calls found
       if (toolCalls.length === 0) {
-          // Look for JSON-like objects in the response
-          const jsonRegex = /\{.*?\}/gs;
-          let match;
-          while ((match = jsonRegex.exec(fullResponse)) !== null) {
-              try {
-                  const potential = JSON.parse(match[0].replace(/\}$/, '}')); // Handle trailing } issue
-                  if (potential.name && (potential.arguments || potential.parameters)) {
-                      toolCalls = [{
-                          id: `call_extract_${Date.now()}`,
-                          type: 'function',
-                          function: {
-                              name: potential.name,
-                              arguments: typeof (potential.arguments || potential.parameters) === 'string' 
-                                  ? (potential.arguments || potential.parameters) 
-                                  : JSON.stringify(potential.arguments || potential.parameters)
-                          }
-                      }];
-                      break;
-                  }
-              } catch (e) {}
-          }
-      }
-
-      // Final check for run_shell_command style text
-      if (toolCalls.length === 0) {
-          const regex = /run_shell_command\s*\(\s*(\{.*?\})\s*\)/s;
-          const match = fullResponse.match(regex);
-          if (match) {
-              try {
-                  const parsedArgs = JSON.parse(match[1]);
-                  if (parsedArgs.command) {
-                       toolCalls = [{
-                          id: `call_regex_${Date.now()}`,
-                          type: 'function',
-                          function: { name: 'run_shell_command', arguments: JSON.stringify(parsedArgs) }
-                      }];
-                  }
-              } catch (e) {}
+          const extracted = extractJson(fullResponse);
+          if (extracted) {
+             // Normalize the extracted object
+             let args = extracted.arguments || extracted;
+             // If it has 'command' at top level, treat as args
+             if (extracted.command && !extracted.arguments) args = extracted;
+             
+             toolCalls = [{
+                 id: `call_manual_${Date.now()}`,
+                 type: 'function',
+                 function: {
+                     name: extracted.name || 'run_shell_command',
+                     arguments: typeof args === 'string' ? args : JSON.stringify(args)
+                 }
+             }];
+             // If we found a tool, we generally want to suppress the wrapper text 
+             // unless it's very long/explanatory.
+             if (fullResponse.length < 300) fullResponse = ''; 
           }
       }
 
       if (toolCalls.length > 0) {
-        if (hasStartedPrinting) console.log('');
-
+        // Deduplicate
+        const uniqueToolCalls = [];
+        const seenCalls = new Set();
+        for (const tc of toolCalls) {
+            const key = `${tc.function.name}:${tc.function.arguments}`;
+            if (!seenCalls.has(key)) {
+                seenCalls.add(key);
+                uniqueToolCalls.push(tc);
+            }
+        }
+        
+        // Add assistant response to history
         history.push({
             role: 'assistant',
             content: fullResponse.trim() || null,
-            tool_calls: toolCalls.map(tc => ({ id: tc.id, type: tc.type, function: tc.function }))
+            tool_calls: uniqueToolCalls.map(tc => ({ id: tc.id, type: tc.type, function: tc.function }))
         });
+
+        // Print text response if it exists (and wasn't suppressed)
+        if (fullResponse.trim()) {
+            console.log(chalk.blue('Agent: ') + fullResponse.trim());
+        }
         
-        for (const tc of toolCalls) {
+        // Execute tools
+        for (const tc of uniqueToolCalls) {
             const cmdSpinner = ora({ text: `Executing: ${tc.function.name}`, color: 'gray' }).start();
             let output;
             try {
@@ -207,10 +226,11 @@ async function processTurn() {
             history.push({ role: 'tool', tool_call_id: tc.id, content: output });
         }
       } else {
-        if (!hasStartedPrinting && fullResponse) {
-             process.stdout.write(chalk.blue('Agent: ') + fullResponse);
+        // No tools, just print response
+        if (fullResponse.trim()) {
+             console.log(chalk.blue('Agent: ') + fullResponse.trim());
         }
-        console.log('\n');
+        console.log('');
         history.push({ role: 'assistant', content: fullResponse });
         finishedTurn = true;
       }
