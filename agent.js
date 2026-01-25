@@ -42,7 +42,7 @@ const tools = [
 const history = [
   { 
     role: 'system', 
-    content: 'You are Mini-Nebulus, a professional AI engineer CLI. You have full access to the local system via the run_shell_command tool. When asked to perform a task, EXECUTE the command immediately. Prefer detailed output (e.g., \`ls -la\`). If tree is missing, use \`find . -maxdepth 2 -not -path "*/.*"\`. DO NOT wrap tool calls in text; use the provided tool structure.' 
+    content: 'You are Mini-Nebulus, a professional AI engineer CLI. You have full access to the local system via the run_shell_command tool. When asked to perform a task, EXECUTE the command immediately. Prefer detailed output (e.g., \`ls -la\`). If tree is missing, use \`find . -maxdepth 2 -not -path "*/.*"\`. DO NOT wrap tool calls in text; use the provided tool structure. CALL THE TOOL NOW.' 
   }
 ];
 
@@ -95,8 +95,8 @@ async function processTurn() {
 
       for await (const chunk of stream) {
         const delta = chunk.choices[0]?.delta;
-        
         const content = delta?.content || '';
+        
         if (content) {
             fullResponse += content;
             const trimmed = fullResponse.trim();
@@ -133,77 +133,59 @@ async function processTurn() {
 
       let toolCalls = Object.values(toolCallsMap);
 
-      // Clean fullResponse for fallback parsing (strip markdown)
-      let cleanedResponse = fullResponse.trim();
-      if (cleanedResponse.startsWith('```')) {
-          cleanedResponse = cleanedResponse.replace(/^```\w*\n?/, '').replace(/\n?```$/, '').trim();
-      }
-
-      if (toolCalls.length === 0 && cleanedResponse.startsWith('{')) {
-          try {
-              const potentialTool = JSON.parse(cleanedResponse);
-              if (potentialTool.name && potentialTool.arguments) {
-                  toolCalls = [{
-                      id: `call_manual_${Date.now()}`,
-                      type: 'function',
-                      function: {
-                          name: potentialTool.name,
-                          arguments: typeof potentialTool.arguments === 'string' ? potentialTool.arguments : JSON.stringify(potentialTool.arguments)
-                      }
-                  }];
-                  fullResponse = ''; 
-              }
-          } catch (e) {}
-      }
-
+      // --- Greedy Fallback Logic ---
       if (toolCalls.length === 0) {
-          const regex = /run_shell_command\s*\(\s*(\{.*?\})\s*\)/s;
-          const match = fullResponse.match(regex);
-          if (match) {
+          // Look for JSON-like objects in the response
+          const jsonRegex = /\{.*?\}/gs;
+          let match;
+          while ((match = jsonRegex.exec(fullResponse)) !== null) {
               try {
-                  const jsonArgs = match[1];
-                  const parsedArgs = JSON.parse(jsonArgs);
-                  if (parsedArgs.command) {
-                       toolCalls = [{
-                          id: `call_regex_${Date.now()}`,
+                  const potential = JSON.parse(match[0].replace(/\}$/, '}')); // Handle trailing } issue
+                  if (potential.name && (potential.arguments || potential.parameters)) {
+                      toolCalls = [{
+                          id: `call_extract_${Date.now()}`,
                           type: 'function',
                           function: {
-                              name: 'run_shell_command',
-                              arguments: JSON.stringify(parsedArgs)
+                              name: potential.name,
+                              arguments: typeof (potential.arguments || potential.parameters) === 'string' 
+                                  ? (potential.arguments || potential.parameters) 
+                                  : JSON.stringify(potential.arguments || potential.parameters)
                           }
                       }];
-                      if (fullResponse.length < 200) fullResponse = ''; 
+                      break;
                   }
               } catch (e) {}
           }
       }
 
-      if (toolCalls.length === 0 && fullResponse && !hasStartedPrinting) {
-          process.stdout.write(chalk.blue('Agent: '));
-          process.stdout.write(fullResponse);
-          hasStartedPrinting = true;
+      // Final check for run_shell_command style text
+      if (toolCalls.length === 0) {
+          const regex = /run_shell_command\s*\(\s*(\{.*?\})\s*\)/s;
+          const match = fullResponse.match(regex);
+          if (match) {
+              try {
+                  const parsedArgs = JSON.parse(match[1]);
+                  if (parsedArgs.command) {
+                       toolCalls = [{
+                          id: `call_regex_${Date.now()}`,
+                          type: 'function',
+                          function: { name: 'run_shell_command', arguments: JSON.stringify(parsedArgs) }
+                      }];
+                  }
+              } catch (e) {}
+          }
       }
 
       if (toolCalls.length > 0) {
         if (hasStartedPrinting) console.log('');
-        
-        const uniqueToolCalls = [];
-        const seenCalls = new Set();
-        for (const tc of toolCalls) {
-            const key = `${tc.function.name}:${tc.function.arguments}`;
-            if (!seenCalls.has(key)) {
-                seenCalls.add(key);
-                uniqueToolCalls.push(tc);
-            }
-        }
 
         history.push({
             role: 'assistant',
             content: fullResponse.trim() || null,
-            tool_calls: uniqueToolCalls.map(tc => ({ id: tc.id, type: tc.type, function: tc.function }))
+            tool_calls: toolCalls.map(tc => ({ id: tc.id, type: tc.type, function: tc.function }))
         });
         
-        for (const tc of uniqueToolCalls) {
+        for (const tc of toolCalls) {
             const cmdSpinner = ora({ text: `Executing: ${tc.function.name}`, color: 'gray' }).start();
             let output;
             try {
@@ -222,7 +204,6 @@ async function processTurn() {
                 output = `Error: ${e.message}`;
                 cmdSpinner.fail(`Failed: ${e.message}`);
             }
-            
             history.push({ role: 'tool', tool_call_id: tc.id, content: output });
         }
       } else {
