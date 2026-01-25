@@ -126,7 +126,10 @@ async function processTurn() {
                   toolCalls = [{
                       id: `call_manual_${Date.now()}`,
                       type: 'function',
-                      function: potentialTool
+                      function: {
+                          name: potentialTool.name,
+                          arguments: JSON.stringify(potentialTool.arguments) // Ensure arguments is a string
+                      }
                   }];
                   // Clear fullResponse since it was just the tool call
                   fullResponse = '';
