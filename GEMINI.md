@@ -1,7 +1,7 @@
 # GEMINI Project Context
 
 ## Project Overview
-This is a custom, lightweight CLI agent built to interact directly with a local Nebulus (Ollama) server, bypassing complex abstractions.
+This is a custom, lightweight CLI agent built to interact directly with a local Nebulus (Ollama) server, bypassing complex abstractions. Inspired by https://github.com/clawdbot/clawdbot.
 
 ## Technical Stack
 - **Runtime**: Node.js
