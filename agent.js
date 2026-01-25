@@ -22,7 +22,7 @@ const tools = [
     type: 'function',
     function: {
       name: 'run_shell_command',
-      description: 'Executes a shell command on the local machine. Use this for file operations (ls, cat, mkdir), git commands, or system info. DO NOT suggest commands in text; always execute them via this tool.',
+      description: 'Executes a shell command on the local machine. Use this for file operations (ls, cat, mkdir), git commands, or system info.',
       parameters: {
         type: 'object',
         properties: {
@@ -40,7 +40,7 @@ const tools = [
 const history = [
   { 
     role: 'system', 
-    content: 'You are Mini-Nebulus, a professional AI engineer CLI. You have full access to the local system via the run_shell_command tool. When asked to perform a task (listing files, reading code, checking git), EXECUTE the command immediately using the tool. Do not ask for permission. Do not wrap commands in markdown code blocks if you intend to run them. If a command fails, try an alternative (e.g., if tree is missing, use ls -R).' 
+    content: 'You are Mini-Nebulus, a professional AI engineer CLI. You have full access to the local system via the run_shell_command tool. When asked to perform a task, EXECUTE the command immediately. Your tool output will be visible to the user, so you don’t need to repeat it entirely, but you should provide expert context or move to the next step. If a command fails, suggest an alternative.' 
   }
 ];
 
@@ -60,6 +60,7 @@ async function chatLoop() {
     ]);
 
     const input = prompt.trim();
+    if (!input) continue;
     if (input.toLowerCase() === 'exit' || input.toLowerCase() === 'quit') {
       console.log(chalk.yellow('Goodbye!'));
       process.exit(0);
@@ -95,10 +96,7 @@ async function processTurn() {
         
         const content = delta?.content || '';
         if (content) {
-            // Buffer-and-check: If response starts with '{', it might be a tool call in content.
-            // We delay printing if we suspect it's JSON.
             fullResponse += content;
-            
             const trimmed = fullResponse.trim();
             const looksLikeJson = trimmed.startsWith('{');
             
@@ -131,8 +129,6 @@ async function processTurn() {
 
       let toolCalls = Object.values(toolCallsMap);
 
-      // Fallback: If we didn't print anything because we thought it was JSON, 
-      // check if it actually WAS a valid tool call.
       if (toolCalls.length === 0 && fullResponse.trim().startsWith('{')) {
           try {
               const potentialTool = JSON.parse(fullResponse.trim());
@@ -148,7 +144,6 @@ async function processTurn() {
                   fullResponse = ''; 
               }
           } catch (e) {
-              // Not valid JSON tool call after all, print it now
               if (!hasStartedPrinting) {
                   process.stdout.write(chalk.blue('Agent: '));
                   process.stdout.write(fullResponse);
@@ -177,6 +172,11 @@ async function processTurn() {
                 const { stdout, stderr } = await execAsync(command);
                 output = stdout || stderr || '(no output)';
                 cmdSpinner.succeed(`Executed: ${command}`);
+                
+                // Show output to user (indented and dimmed)
+                const formattedOutput = output.trim().split('\n').map(line => `  ${line}`).join('\n');
+                console.log(chalk.gray(formattedOutput));
+                
             } catch (e) {
                 output = `Error: ${e.message}`;
                 cmdSpinner.fail(`Failed: ${e.message}`);
