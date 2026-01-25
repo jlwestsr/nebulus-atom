@@ -42,7 +42,7 @@ const tools = [
 const history = [
   { 
     role: 'system', 
-    content: 'You are Mini-Nebulus, a professional AI engineer CLI. You have full access to the local system via the run_shell_command tool. When asked to perform a task, EXECUTE the command immediately using the tool. Prefer detailed output (e.g., use \`ls -la\` instead of just \`ls\` for listing files). DO NOT write the tool call in markdown or text. DO NOT ask for confirmation. Just CALL the function.' 
+    content: 'You are Mini-Nebulus, a professional AI engineer CLI. You have full access to the local system via the run_shell_command tool. When asked to perform a task, EXECUTE the command immediately. Prefer detailed output (e.g., \`ls -la\`). If tree is missing, use \`find . -maxdepth 2 -not -path "*/.*"\`. DO NOT wrap tool calls in text; use the provided tool structure.' 
   }
 ];
 
@@ -100,10 +100,11 @@ async function processTurn() {
         if (content) {
             fullResponse += content;
             const trimmed = fullResponse.trim();
-            const looksLikeJson = trimmed.startsWith('{') || trimmed.startsWith('```');
-            const looksLikeCodeBlock = trimmed.includes('run_shell_command');
+            
+            // Only suppress if it really looks like a tool call starting
+            const isToolJson = trimmed.startsWith('{') || trimmed.startsWith('```json') || trimmed.startsWith('```\n{');
 
-            if (!looksLikeJson && !looksLikeCodeBlock) {
+            if (!isToolJson) {
                 if (!hasStartedPrinting) {
                     process.stdout.write(chalk.blue('Agent: '));
                     hasStartedPrinting = true;
@@ -132,7 +133,7 @@ async function processTurn() {
 
       let toolCalls = Object.values(toolCallsMap);
 
-      // Clean fullResponse for fallback parsing
+      // Clean fullResponse for fallback parsing (strip markdown)
       let cleanedResponse = fullResponse.trim();
       if (cleanedResponse.startsWith('```')) {
           cleanedResponse = cleanedResponse.replace(/^```\w*\n?/, '').replace(/\n?```$/, '').trim();
@@ -171,9 +172,7 @@ async function processTurn() {
                               arguments: JSON.stringify(parsedArgs)
                           }
                       }];
-                      if (fullResponse.length < 200) {
-                          fullResponse = ''; 
-                      }
+                      if (fullResponse.length < 200) fullResponse = ''; 
                   }
               } catch (e) {}
           }
@@ -190,7 +189,6 @@ async function processTurn() {
         
         const uniqueToolCalls = [];
         const seenCalls = new Set();
-        
         for (const tc of toolCalls) {
             const key = `${tc.function.name}:${tc.function.arguments}`;
             if (!seenCalls.has(key)) {
@@ -251,7 +249,6 @@ async function main() {
         console.log(chalk.green('You: ') + initialPrompt);
         await processTurn();
     }
-    
     await chatLoop();
 }
 
