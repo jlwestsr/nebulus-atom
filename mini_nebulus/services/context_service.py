@@ -4,6 +4,9 @@ from mini_nebulus.services.file_service import FileService
 
 
 class ContextService:
+    # Approx 8000 tokens * 4 chars/token = 32000 chars
+    MAX_CONTEXT_CHARS = 32000
+
     def __init__(self):
         self.pinned_files: List[str] = []
 
@@ -31,12 +34,40 @@ class ContextService:
             return ""
 
         context_parts = ["\n### PINNED FILES (Active Context) ###"]
+        current_length = len(context_parts[0])
+
         for path in self.pinned_files:
             try:
                 content = FileService.read_file(path)
-                context_parts.append(
-                    f"\n--- BEGIN FILE: {path} ---\n{content}\n--- END FILE: {path} ---"
-                )
+                header = f"\n--- BEGIN FILE: {path} ---\n"
+                footer = f"\n--- END FILE: {path} ---"
+
+                # Check if adding this file exceeds limit
+                added_len = len(header) + len(content) + len(footer)
+
+                if current_length + added_len > self.MAX_CONTEXT_CHARS:
+                    # Truncate content
+                    available_space = (
+                        self.MAX_CONTEXT_CHARS
+                        - current_length
+                        - len(header)
+                        - len(footer)
+                    )
+                    if available_space > 0:
+                        content = (
+                            content[:available_space]
+                            + "\n... [TRUNCATED DUE TO LENGTH LIMIT] ..."
+                        )
+                        part = f"{header}{content}{footer}"
+                        context_parts.append(part)
+                    else:
+                        context_parts.append(f"\n[Skipped {path} due to context limit]")
+
+                    break  # Stop adding files
+
+                context_parts.append(f"{header}{content}{footer}")
+                current_length += added_len
+
             except Exception as e:
                 context_parts.append(f"\n[Error reading pinned file {path}: {str(e)}]")
 
