@@ -1,0 +1,3 @@
+[console_scripts]
+mini-nebulus = mini_nebulus.main:app
+mn = mini_nebulus.main:app

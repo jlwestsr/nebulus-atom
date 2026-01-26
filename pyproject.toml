@@ -3,48 +3,26 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "ai_project"
+name = "mini-nebulus"
 version = "0.1.0"
-description = "Production-grade AI Project"
-authors = [{name = "User", email = "labs@example.com"}]
-requires-python = ">=3.10"
-license = {text = "MIT"}
+description = "A professional, autonomous AI engineer CLI."
+readme = "README.md"
+authors = [
+  { name = "J.L. West", email = "jlwestsr@example.com" },
+]
+requires-python = ">=3.12"
 dependencies = [
-    "numpy",
-    "pandas",
-    "scikit-learn",
+    "openai>=1.0.0",
+    "python-dotenv>=1.0.0",
+    "typer>=0.9.0",
+    "rich>=13.0.0",
+    "discord.py>=2.3.0",
 ]
 
+[project.scripts]
+mini-nebulus = "mini_nebulus.main:app"
+mn = "mini_nebulus.main:app"
 
-
-# --- Black Configuration ---
-[tool.black]
-line-length = 88
-target-version = ['py310', 'py311']
-include = '\.pyi?$'
-exclude = '''
-/(
-    \.git
-  | \.hg
-  | \.mypy_cache
-  | \.tox
-  | \.venv
-  | _build
-  | buck-out
-  | build
-  | dist
-  | models
-  | data
-)/
-'''
-
-# --- Pytest Configuration ---
-[tool.pytest.ini_options]
-minversion = "6.0"
-addopts = "-ra -q"
-testpaths = [
-    "tests",
-]
-pythonpath = [
-    "src"
-]
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["mini_nebulus*"]
