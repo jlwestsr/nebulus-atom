@@ -5,6 +5,7 @@ from mini_nebulus.services.task_service import TaskServiceManager
 from mini_nebulus.services.skill_service import SkillService
 from mini_nebulus.services.context_service import ContextServiceManager
 from mini_nebulus.services.checkpoint_service import CheckpointServiceManager
+from mini_nebulus.services.rag_service import RagServiceManager
 from mini_nebulus.models.task import TaskStatus
 
 
@@ -13,6 +14,7 @@ class ToolExecutor:
     context_manager = ContextServiceManager()
     skill_service = SkillService()
     checkpoint_manager = CheckpointServiceManager()
+    rag_manager = RagServiceManager()
 
     @staticmethod
     def initialize():
@@ -25,6 +27,7 @@ class ToolExecutor:
             task_service = ToolExecutor.task_manager.get_service(session_id)
             context_service = ToolExecutor.context_manager.get_service(session_id)
             checkpoint_service = ToolExecutor.checkpoint_manager.get_service(session_id)
+            rag_service = ToolExecutor.rag_manager.get_service(session_id)
 
             # Auto-Checkpoint for destructive operations
             if tool_name == "write_file":
@@ -58,12 +61,20 @@ class ToolExecutor:
             elif tool_name == "list_checkpoints":
                 return checkpoint_service.list_checkpoints()
 
+            # RAG Tools
+            elif tool_name == "index_codebase":
+                return rag_service.index_codebase()
+            elif tool_name == "search_code":
+                return str(rag_service.search_code(args.get("query")))
+
             # Task Tools
             elif tool_name == "create_plan":
                 plan = task_service.create_plan(args.get("goal"))
                 return f"Plan created for goal: {plan.goal}. ID: {plan.id}"
-            elif tool_name == "add_task":
-                task = task_service.add_task(args.get("description"))
+            elif tool_name == "add_task" or tool_name == "create_task":
+                task = task_service.add_task(
+                    args.get("description"), args.get("dependencies")
+                )
                 return f"Task added: {task.description}. ID: {task.id}"
             elif tool_name == "update_task":
                 status_str = args.get("status", "").upper()
@@ -87,7 +98,8 @@ class ToolExecutor:
                 FileService.write_file(filename, code)
                 ToolExecutor.skill_service.load_skills()  # Hot reload
                 return f"Skill {name} created and loaded from {filename}"
-
+            elif tool_name == "publish_skill":
+                return ToolExecutor.skill_service.publish_skill(args.get("name"))
             elif tool_name == "refresh_skills":
                 ToolExecutor.skill_service.load_skills()
                 return "Skills reloaded."

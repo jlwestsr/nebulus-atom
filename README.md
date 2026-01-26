@@ -31,3 +31,8 @@ Skills created via `create_skill` can be shared across projects.
 The agent now visualizes the plan execution flow as a dependency tree in the terminal.
 - **Dependencies**: Tasks can have dependencies (e.g., Task B depends on Task A).
 - **Visualization**: The plan is displayed as a hierarchical tree, showing which tasks are blocked by others.
+
+## Semantic Code Search (RAG)
+The agent can now semantically search the codebase using embeddings.
+- **Index**: Use `index_codebase` to scan and index all project files.
+- **Search**: Use `search_code(query="...")` to find relevant code snippets based on meaning.

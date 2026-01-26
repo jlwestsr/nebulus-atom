@@ -22,3 +22,19 @@ Always check this directory before starting new work.
 3. **Constraint**: All file modifications must be safe and verifiable.
 4. **Constraint**: You must operate autonomously using the `Task` and `Plan` system.
 5. **Constraint**: Check `WORKFLOW.md` for proper branching before making changes.
+
+## Library Implementation Tips
+- **ChromaDB**: Use . Create collections with . Add with  and search with .
+- **Sentence Transformers**: Use  and .
+
+
+## Library Implementation Tips
+- **ChromaDB**: Use `chromadb.PersistentClient(path="./.mini_nebulus/db")`. Create collections with `client.get_or_create_collection("codebase")`. Add with `collection.add()` and search with `collection.query()`.
+- **Sentence Transformers**: Use `model = SentenceTransformer("all-Min
+## Library Implementation Tips
+- **ChromaDB**: Use . Create collections with . Add with  and search with .
+- **Sentence Transformers**: Use  and .
+
+## Library Implementation Tips
+- **ChromaDB**: Use `chromadb.PersistentClient(path="./.mini_nebulus/db")`. Create collections with `client.get_or_create_collection("codebase")`. Add with `collection.add()` and search with `collection.query()`.
+- **Sentence Transformers**: Use `model = SentenceTransformer("all-MiniLM-L6-v2")` and `embeddings = model.encode(texts)`.

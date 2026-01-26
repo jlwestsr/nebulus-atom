@@ -1,5 +1,10 @@
 # AI Directives for Mini-Nebulus
 
+# Autonomy Mandates
+1. **Autonomous Implementation**: Once a task is IN_PROGRESS, execute it immediately.
+2. **No Permission needed**: Do NOT ask for permission to write individual files or run standard shell commands if they are part of the active plan.
+3. **JSON Tool Output**: ALWAYS output tool calls in JSON. NEVER just print code blocks without using a tool to save them.
+
 1. **Commit Messages**: Use Conventional Commits.
 2. **Branching**: All work happens on `develop`. `main` is for stable releases.
 3. **Coding Style**: Python 3.12+ with Type Hinting.
