@@ -8,6 +8,7 @@ app = typer.Typer(invoke_without_command=True)
 
 @app.callback()
 def main(
+    ctx: typer.Context,
     prompt: Optional[List[str]] = typer.Argument(
         None, help="Initial prompt to execute immediately"
     ),
@@ -15,19 +16,12 @@ def main(
     """
     Mini-Nebulus: A professional, autonomous AI engineer CLI.
     """
-    # If no subcommand is used (like 'start'), this callback runs.
-    # Typer handles subcommands by checking if a command was invoked.
-    # But since we only have 'start', we can just make this the main entry.
+    # If a subcommand (like "start") is invoked, we do nothing here.
+    if ctx.invoked_subcommand is not None:
+        return
 
-    # Check if the first argument was 'start' to avoid double execution if someone still uses it
-    if prompt and prompt[0] == "start":
-        return  # Typer will call the 'start' command automatically
-
-    # If prompt is provided directly or no command used
+    # If no subcommand, we run the default behavior (interactive mode)
     initial_prompt = " ".join(prompt) if prompt else None
-
-    # We only run if we aren't about to run a subcommand
-    # Actually, with only one command, we can just simplify main.py entirely.
     controller = AgentController()
     asyncio.run(controller.start(initial_prompt))
 
