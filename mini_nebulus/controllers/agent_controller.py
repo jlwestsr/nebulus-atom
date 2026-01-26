@@ -184,6 +184,38 @@ class AgentController:
                     },
                 },
             },
+            {
+                "type": "function",
+                "function": {
+                    "name": "create_checkpoint",
+                    "description": "Create a file system checkpoint (backup).",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {"label": {"type": "string"}},
+                        "required": ["label"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "rollback_checkpoint",
+                    "description": "Restore files from a checkpoint.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {"id": {"type": "string"}},
+                        "required": ["id"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "list_checkpoints",
+                    "description": "List available checkpoints.",
+                    "parameters": {"type": "object", "properties": {}, "required": []},
+                },
+            },
         ]
 
     async def start(self, initial_prompt: Optional[str] = None):

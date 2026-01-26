@@ -4,6 +4,7 @@ from mini_nebulus.services.file_service import FileService
 from mini_nebulus.services.task_service import TaskServiceManager
 from mini_nebulus.services.skill_service import SkillService
 from mini_nebulus.services.context_service import ContextServiceManager
+from mini_nebulus.services.checkpoint_service import CheckpointServiceManager
 from mini_nebulus.models.task import TaskStatus
 
 
@@ -11,6 +12,7 @@ class ToolExecutor:
     task_manager = TaskServiceManager()
     context_manager = ContextServiceManager()
     skill_service = SkillService()
+    checkpoint_manager = CheckpointServiceManager()
 
     @staticmethod
     def initialize():
@@ -22,6 +24,11 @@ class ToolExecutor:
         try:
             task_service = ToolExecutor.task_manager.get_service(session_id)
             context_service = ToolExecutor.context_manager.get_service(session_id)
+            checkpoint_service = ToolExecutor.checkpoint_manager.get_service(session_id)
+
+            # Auto-Checkpoint for destructive operations
+            if tool_name == "write_file":
+                checkpoint_service.create_checkpoint(label=f"auto_before_{tool_name}")
 
             # Shell Tools
             if tool_name == "run_shell_command":
@@ -42,6 +49,14 @@ class ToolExecutor:
                 return context_service.unpin_file(args.get("path"))
             elif tool_name == "list_context":
                 return str(context_service.list_context())
+
+            # Checkpoint Tools
+            elif tool_name == "create_checkpoint":
+                return checkpoint_service.create_checkpoint(args.get("label", "manual"))
+            elif tool_name == "rollback_checkpoint":
+                return checkpoint_service.rollback_checkpoint(args.get("id"))
+            elif tool_name == "list_checkpoints":
+                return checkpoint_service.list_checkpoints()
 
             # Task Tools
             elif tool_name == "create_plan":
