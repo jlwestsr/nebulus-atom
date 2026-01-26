@@ -14,8 +14,13 @@ class BaseView(ABC):
         pass
 
     @abstractmethod
+    def ask_user_input(self, question: str) -> str:
+        """Prompts the user for specific input requested by the agent."""
+        pass
+
+    @abstractmethod
     async def print_agent_response(self, text: str):
-        """Displays the agent's text response."""
+        """Displays the agent s text response."""
         pass
 
     @abstractmethod

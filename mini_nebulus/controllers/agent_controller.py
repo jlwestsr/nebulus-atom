@@ -172,6 +172,18 @@ class AgentController:
                     },
                 },
             },
+            {
+                "type": "function",
+                "function": {
+                    "name": "ask_user",
+                    "description": "Ask the user for clarification or input.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {"question": {"type": "string"}},
+                        "required": ["question"],
+                    },
+                },
+            },
         ]
 
     async def start(self, initial_prompt: Optional[str] = None):
@@ -360,10 +372,17 @@ class AgentController:
                                 )
                                 continue
 
-                            with self.view.create_spinner(f"Executing {name}"):
-                                output = await ToolExecutor.dispatch(
-                                    name, args, session_id=session_id
-                                )
+                            if name == "ask_user":
+                                question = args.get("question", "")
+                                if question:
+                                    output = self.view.ask_user_input(question)
+                                else:
+                                    output = "Error: No question provided."
+                            else:
+                                with self.view.create_spinner(f"Executing {name}"):
+                                    output = await ToolExecutor.dispatch(
+                                        name, args, session_id=session_id
+                                    )
                             if isinstance(self.view, CLIView):
                                 self.view.console.print(
                                     f"✔ Executed: {name}", style="dim green"

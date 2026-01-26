@@ -10,3 +10,6 @@ The Context Manager allows users to "pin" files to the agent s active context. T
 
 ### Token Limits
 The system automatically manages context size. If pinned files exceed the token limit (approx 32,000 characters), content will be truncated to ensure the agent functions correctly.
+
+## Interactive Clarification
+The agent can now pause execution to ask for user input using the `ask_user` tool. This enables a Human-in-the-Loop workflow where the agent can resolve ambiguities dynamically.

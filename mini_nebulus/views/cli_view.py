@@ -20,6 +20,7 @@ custom_theme = Theme(
         "task.in_progress": "yellow",
         "task.completed": "green",
         "task.failed": "red",
+        "question": "bold magenta",
     }
 )
 
@@ -38,6 +39,10 @@ class CLIView(BaseView):
 
     def prompt_user(self) -> str:
         return Prompt.ask("[user]You[/user]")
+
+    def ask_user_input(self, question: str) -> str:
+        self.console.print(f"[question]Agent asks:[/question] {question}")
+        return Prompt.ask("[question]Answer[/question]")
 
     async def print_agent_response(self, text: str):
         if text.strip():
