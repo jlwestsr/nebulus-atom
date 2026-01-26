@@ -216,6 +216,18 @@ class AgentController:
                     "parameters": {"type": "object", "properties": {}, "required": []},
                 },
             },
+            {
+                "type": "function",
+                "function": {
+                    "name": "publish_skill",
+                    "description": "Publish a local skill to the global library.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {"name": {"type": "string"}},
+                        "required": ["name"],
+                    },
+                },
+            },
         ]
 
     async def start(self, initial_prompt: Optional[str] = None):

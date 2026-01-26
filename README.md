@@ -21,3 +21,8 @@ The agent protects your files by automatically creating checkpoints before risky
     - `create_checkpoint(label)`: Snapshot the project.
     - `rollback_checkpoint(id)`: Restore project to a previous state.
     - `list_checkpoints()`: View available backups.
+
+## Persistent Skill Library
+Skills created via `create_skill` can be shared across projects.
+- **Publishing**: Use `publish_skill(name)` to move a local skill to your global library (`~/.mini_nebulus/skills`).
+- **Global Skills**: Global skills are automatically loaded in every project and prefixed with `global.` (e.g., `global.my_function`).

@@ -9,3 +9,4 @@ class Config:
     NEBULUS_API_KEY = os.getenv("NEBULUS_API_KEY")
     NEBULUS_MODEL = os.getenv("NEBULUS_MODEL", "qwen2.5-coder:latest")
     EXIT_COMMANDS = ["exit", "quit", "/exit", "/quit"]
+    GLOBAL_SKILLS_PATH = os.path.expanduser("~/.mini_nebulus/skills")

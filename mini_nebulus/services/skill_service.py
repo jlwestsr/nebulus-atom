@@ -1,54 +1,92 @@
 import os
 import pkgutil
 import importlib
+import importlib.util
 import inspect
+import shutil
+import sys
 from typing import List, Dict, Callable, Any
+from mini_nebulus.config import Config
 
 
 class SkillService:
     def __init__(self, skills_dir: str = "mini_nebulus/skills"):
         self.skills_dir = skills_dir
+        self.global_skills_dir = Config.GLOBAL_SKILLS_PATH
         self.skills: Dict[str, Callable] = {}
         self.tool_definitions: List[Dict] = []
 
     def load_skills(self):
-        """Scans the skills directory and loads all valid skill functions."""
+        """Scans local and global skills directories and loads all valid skill functions."""
         self.skills = {}
         self.tool_definitions = []
 
-        # Ensure directory exists
-        if not os.path.exists(self.skills_dir):
-            os.makedirs(self.skills_dir)
+        # Ensure directories exist
+        for d in [self.skills_dir, self.global_skills_dir]:
+            if not os.path.exists(d):
+                os.makedirs(d, exist_ok=True)
 
-        # Iterate over all modules in the skills package
-        # We assume the package is reachable as mini_nebulus.skills
-        package_name = self.skills_dir.replace("/", ".")
+        # 1. Load Local Skills
+        self._load_from_path(self.skills_dir, package_prefix="mini_nebulus.skills")
 
-        # Check if the path is actually importable or just a file path
-        # If running from root, mini_nebulus.skills is correct
+        # 2. Load Global Skills
+        self._load_from_path(self.global_skills_dir, namespace="global")
+
+    def _load_from_path(
+        self, path: str, package_prefix: str = None, namespace: str = None
+    ):
+        """Helper to load modules from a specific path."""
+        try:
+            importlib.invalidate_caches()
+            for _, name, _ in pkgutil.iter_modules([path]):
+                try:
+                    module = None
+                    if package_prefix:
+                        try:
+                            module_name = f"{package_prefix}.{name}"
+                            module = importlib.import_module(module_name)
+                            importlib.reload(module)
+                        except (ImportError, ModuleNotFoundError):
+                            pass
+
+                    if not module:
+                        file_path = os.path.join(path, f"{name}.py")
+                        spec = importlib.util.spec_from_file_location(name, file_path)
+                        if spec and spec.loader:
+                            module = importlib.util.module_from_spec(spec)
+                            sys.modules[name] = module
+                            spec.loader.exec_module(module)
+
+                    if module:
+                        for attr_name, attr_value in inspect.getmembers(module):
+                            if inspect.isfunction(
+                                attr_value
+                            ) and not attr_name.startswith("_"):
+                                reg_name = (
+                                    f"{namespace}.{attr_name}"
+                                    if namespace
+                                    else attr_name
+                                )
+                                self._register_skill(reg_name, attr_value)
+                except Exception as e:
+                    print(f"Failed to load skill module {name} from {path}: {e}")
+        except Exception as e:
+            print(f"Error scanning path {path}: {e}")
+
+    def publish_skill(self, name: str) -> str:
+        """Moves a local skill to the global library."""
+        local_path = os.path.join(self.skills_dir, f"{name}.py")
+        global_path = os.path.join(self.global_skills_dir, f"{name}.py")
+
+        if not os.path.exists(local_path):
+            return f"Error: Local skill {name} not found at {local_path}"
 
         try:
-            # Reload existing modules to support hot-reloading
-            importlib.invalidate_caches()
-
-            for _, name, _ in pkgutil.iter_modules([self.skills_dir]):
-                module_name = f"{package_name}.{name}"
-                try:
-                    module = importlib.import_module(module_name)
-                    importlib.reload(module)  # Force reload
-
-                    # Inspect module for functions
-                    for attr_name, attr_value in inspect.getmembers(module):
-                        if inspect.isfunction(attr_value):
-                            # We look for functions that don't start with _
-                            # In a real system, we might use a @skill decorator
-                            if not attr_name.startswith("_"):
-                                self._register_skill(attr_name, attr_value)
-                except Exception as e:
-                    print(f"Failed to load skill module {name}: {e}")
-
+            shutil.copy2(local_path, global_path)
+            self.load_skills()  # Refresh
+            return f"Skill {name} published to global library at {global_path}"
         except Exception as e:
-            print(f"Error loading skills: {e}")
+            return f"Error publishing skill: {str(e)}"
 
     def _register_skill(self, name: str, func: Callable):
         """Parses a function to create a tool definition."""
@@ -58,13 +96,12 @@ class SkillService:
         params = {"type": "object", "properties": {}, "required": []}
 
         for param_name, param in sig.parameters.items():
-            param_type = "string"  # Default
+            param_type = "string"
             if param.annotation == int:
                 param_type = "integer"
             elif param.annotation == bool:
                 param_type = "boolean"
 
-            # Basic parsing, can be improved with Pydantic
             params["properties"][param_name] = {
                 "type": param_type,
                 "description": f"Parameter {param_name}",
