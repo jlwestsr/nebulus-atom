@@ -24,6 +24,11 @@ class BaseView(ABC):
         pass
 
     @abstractmethod
+    def print_telemetry(self, metrics: Dict[str, Any]):
+        """Displays performance telemetry."""
+        pass
+
+    @abstractmethod
     async def print_tool_output(self, output: str, tool_name: str = ""):
         """Displays the output of a tool execution."""
         pass

@@ -29,6 +29,26 @@ class AgentController:
             "Your ONLY goal is to execute tasks. NEVER explain what you are going to do.\n"
             "NEVER use markdown code blocks like ```python unless you are calling a tool.\n"
             "ALWAYS use tools to perform actions.\n\n"
+            "### AUTONOMY RULES ###\n"
+            "1. You are AUTONOMOUS. Do NOT ask the user for input (e.g., via ask_user) to define tasks or plans.\n"
+            "2. Infer the goal and task description yourself based on the user's initial prompt and the current context.\n"
+            "3. Only use ask_user if there is a critical ambiguity that completely stops you from proceeding.\n"
+            "4. If you have executed the user's request, STOP immediately. Do NOT create plans, add tasks, write files, or pin files.\n"
+            "5. Do NOT hallucinate that you need to implement features just because you see them in the context files.\n"
+            "### AUTONOMY RULES ###\n"
+            "1. You are AUTONOMOUS. Do NOT ask the user for input (e.g., via ask_user) to define tasks or plans.\n"
+            "2. Infer the goal and task description yourself based on the user's initial prompt and the current context.\n"
+            "3. Only use ask_user if there is a critical ambiguity that completely stops you from proceeding.\n"
+            "4. If you have executed the user's request, STOP immediately. Do NOT create plans, add tasks, write files, or pin files.\n"
+            "5. Do NOT hallucinate that you need to implement features just because you see them in the context files.\n"
+            "6. Simple requests (like 'list files', 'read file', 'check size') do NOT require `create_plan` or `add_task`. Just run the command and stop.\n"
+            "7. Do NOT try to `update_task` if you haven't created a plan first. If there is no plan, there are no tasks to update.\n"
+            "8. Do NOT create a plan AFTER doing the work just to mark it as done. If the work is done, you are done.\n"
+            "9. Do NOT pin files or read files 'just to check' or 'get context' unless the user asked you to analyze those specific files.\n"
+            "10. If the request is 'search for X', run `search_code` and then report the results based on the tool output. Do NOT read the source files to 'verify' unless explicitly asked.\n\n"
+            "### TOOL USAGE RULES ###\n"
+            "1. You MUST ONLY use the tools provided in the `tools` list. Do NOT invent new tools (e.g., 'find_file' does NOT exist).\n"
+            "2. To list files, use `run_shell_command` with `ls` or `FileService.list_dir` if available.\n\n"
             "### HOW TO CALL TOOLS ###\n"
             "To perform an action, output ONLY a JSON tool call using DOUBLE QUOTES.\n"
             'Example: {"name": "write_file", "arguments": {"path": "test.py", "content": "print(\'hi\')"}}\n\n'
@@ -371,7 +391,9 @@ class AgentController:
                     full_response = ""
                     tool_calls = []
                     tool_calls_map = {}
-                    for chunk in response_stream:
+                    async for chunk in response_stream:
+                        if not chunk.choices:
+                            continue
                         delta = chunk.choices[0].delta
                         if delta.content:
                             full_response += delta.content
@@ -479,6 +501,9 @@ class AgentController:
                             ).strip()
                             if full_response:
                                 await self.view.print_agent_response(full_response)
+                                self.view.print_telemetry(
+                                    getattr(self.openai, "last_telemetry", {})
+                                )
                                 history.add("assistant", full_response)
                         finished_turn = True
                 except Exception as e:

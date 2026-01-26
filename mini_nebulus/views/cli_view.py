@@ -53,6 +53,29 @@ class CLIView(BaseView):
             else:
                 self.console.print(f"[agent]Agent:[/agent] {text.strip()}")
 
+    def print_telemetry(self, metrics: Dict[str, Any]):
+        """Displays performance telemetry in a footer."""
+        if not metrics:
+            return
+
+        ttft = f"{metrics.get('ttft', 0):.2f}s" if metrics.get("ttft") else "N/A"
+        total = (
+            f"{metrics.get('total_time', 0):.2f}s"
+            if metrics.get("total_time")
+            else "N/A"
+        )
+        usage = metrics.get("usage", {})
+
+        # Format: Latency: 0.12s / 2.3s | Tokens: 50 / 120 (170) | Model: qwen3...
+        status = (
+            f"[dim]"
+            f"⏱️  {ttft} / {total}  |  "
+            f"🪙  {usage.get('prompt_tokens', '?')} + {usage.get('completion_tokens', '?')} = {usage.get('total_tokens', '?')}  |  "
+            f"🤖 {metrics.get('model', 'Unknown')}"
+            f"[/dim]"
+        )
+        self.console.print(Panel(status, style="dim white", border_style="dim"))
+
     async def print_tool_output(self, output: str, tool_name: str = ""):
         if not output:
             return
