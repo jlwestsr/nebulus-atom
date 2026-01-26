@@ -3,11 +3,13 @@ import asyncio
 from mini_nebulus.services.file_service import FileService
 from mini_nebulus.services.task_service import TaskServiceManager
 from mini_nebulus.services.skill_service import SkillService
+from mini_nebulus.services.context_service import ContextServiceManager
 from mini_nebulus.models.task import TaskStatus
 
 
 class ToolExecutor:
     task_manager = TaskServiceManager()
+    context_manager = ContextServiceManager()
     skill_service = SkillService()
 
     @staticmethod
@@ -19,6 +21,7 @@ class ToolExecutor:
     async def dispatch(tool_name: str, args: dict, session_id: str = "default"):
         try:
             task_service = ToolExecutor.task_manager.get_service(session_id)
+            context_service = ToolExecutor.context_manager.get_service(session_id)
 
             # Shell Tools
             if tool_name == "run_shell_command":
@@ -31,6 +34,14 @@ class ToolExecutor:
                 return FileService.write_file(args.get("path"), args.get("content"))
             elif tool_name == "list_dir":
                 return str(FileService.list_dir(args.get("path", ".")))
+
+            # Context Tools
+            elif tool_name == "pin_file":
+                return context_service.pin_file(args.get("path"))
+            elif tool_name == "unpin_file":
+                return context_service.unpin_file(args.get("path"))
+            elif tool_name == "list_context":
+                return str(context_service.list_context())
 
             # Task Tools
             elif tool_name == "create_plan":
