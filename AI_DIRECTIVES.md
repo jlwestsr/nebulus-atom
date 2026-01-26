@@ -40,3 +40,11 @@ We adhere to the **MVC (Model-View-Controller)** pattern for this Python CLI app
 - **Local-Only Policy**: Do not push feature branches to remote. Merge them into `develop` locally, then push `develop`.
 - **Commit Messages**: Strictly follow [Conventional Commits](https://www.conventionalcommits.org/).
 - **Verification**: Ensure `pre-commit run --all-files` passes.
+
+# Strict Execution Protocol
+1. **Stop Talking, Start Coding**: If you describe a technical step, you MUST execute it in the same turn using a tool.
+2. **Assume Approval**: Once a plan is confirmed, you have full approval to implement all tasks. Do not ask "Should I proceed?" or "Is this okay?". Just do it.
+
+# Strict Execution Protocol
+1. **Stop Talking, Start Coding**: If you describe a technical step, you MUST execute it in the same turn using a tool.
+2. **Assume Approval**: Once a plan is confirmed, you have full approval to implement all tasks. Do not ask "Should I proceed?" or "Is this okay?". Just do it.

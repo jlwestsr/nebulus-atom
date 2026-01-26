@@ -21,11 +21,13 @@ mini_nebulus/services/context_service.py
 mini_nebulus/services/file_service.py
 mini_nebulus/services/input_preprocessor.py
 mini_nebulus/services/openai_service.py
+mini_nebulus/services/rag_service.py
 mini_nebulus/services/skill_service.py
 mini_nebulus/services/task_service.py
 mini_nebulus/services/tool_executor.py
 mini_nebulus/skills/__init__.py
 mini_nebulus/skills/context_tools.py
+mini_nebulus/skills/file_info.py
 mini_nebulus/views/__init__.py
 mini_nebulus/views/base_view.py
 mini_nebulus/views/cli_view.py

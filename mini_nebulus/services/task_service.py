@@ -13,6 +13,8 @@ class TaskService:
     def add_task(self, description: str, dependencies: List[str] = None) -> Task:
         if not self.current_plan:
             raise ValueError("No active plan. Create a plan first.")
+        if isinstance(dependencies, str):
+            dependencies = [dependencies]
         return self.current_plan.add_task(description, dependencies)
 
     def get_task(self, task_id: str) -> Optional[Task]:

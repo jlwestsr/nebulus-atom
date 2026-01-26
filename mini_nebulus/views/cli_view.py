@@ -97,7 +97,7 @@ class CLIView(BaseView):
                 elif status == "failed":
                     icon = "✖"
 
-                label = f"[{status_style}]{icon} {task['description']} ({task[id][:8]})[/{status_style}]"
+                label = f"[{status_style}]{icon} {task['description']} ({task['id'][:8]})[/{status_style}]"
                 node = parent_node.add(label)
 
                 # Find tasks that depend on THIS task

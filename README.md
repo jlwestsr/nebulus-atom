@@ -18,14 +18,14 @@ The agent can now pause execution to ask for user input using the `ask_user` too
 The agent protects your files by automatically creating checkpoints before risky operations (like `write_file`).
 - **Auto-Checkpoint**: Triggered before file overwrites.
 - **Manual Tools**:
-    - `create_checkpoint(label)`: Snapshot the project.
-    - `rollback_checkpoint(id)`: Restore project to a previous state.
-    - `list_checkpoints()`: View available backups.
+    - \`create_checkpoint(label)\`: Snapshot the project.
+    - \`rollback_checkpoint(id)\`: Restore project to a previous state.
+    - \`list_checkpoints()\`: View available backups.
 
 ## Persistent Skill Library
 Skills created via `create_skill` can be shared across projects.
-- **Publishing**: Use `publish_skill(name)` to move a local skill to your global library (`~/.mini_nebulus/skills`).
-- **Global Skills**: Global skills are automatically loaded in every project and prefixed with `global.` (e.g., `global.my_function`).
+- **Publishing**: Use \`publish_skill(name)\` to move a local skill to your global library (`~/.mini_nebulus/skills`).
+- **Global Skills**: Global skills are automatically loaded in every project and prefixed with `global.` (e.g., \`global.my_function\`).
 
 ## Visual Task Graph
 The agent now visualizes the plan execution flow as a dependency tree in the terminal.
