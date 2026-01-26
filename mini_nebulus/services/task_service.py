@@ -1,4 +1,4 @@
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 from mini_nebulus.models.task import Plan, Task, TaskStatus
 
 
@@ -10,10 +10,10 @@ class TaskService:
         self.current_plan = Plan(goal=goal)
         return self.current_plan
 
-    def add_task(self, description: str) -> Task:
+    def add_task(self, description: str, dependencies: List[str] = None) -> Task:
         if not self.current_plan:
             raise ValueError("No active plan. Create a plan first.")
-        return self.current_plan.add_task(description)
+        return self.current_plan.add_task(description, dependencies)
 
     def get_task(self, task_id: str) -> Optional[Task]:
         if not self.current_plan:
@@ -41,7 +41,12 @@ class TaskService:
         return {
             "goal": self.current_plan.goal,
             "tasks": [
-                {"id": t.id, "description": t.description, "status": t.status.value}
+                {
+                    "id": t.id,
+                    "description": t.description,
+                    "status": t.status.value,
+                    "dependencies": t.dependencies,
+                }
                 for t in self.current_plan.tasks
             ],
         }
@@ -51,7 +56,7 @@ class TaskService:
         if not data:
             return "No active plan."
 
-        summary = [f"Goal: {data['goal']}"]
+        summary = [f"Goal: {data["goal"]}"]
         for i, task in enumerate(data["tasks"]):
             icon = " "
             if task["status"] == "completed":
@@ -61,7 +66,14 @@ class TaskService:
             elif task["status"] == "failed":
                 icon = "!"
 
-            summary.append(f"{i+1}. [{icon}] {task['description']} (ID: {task['id']})")
+            deps = (
+                f" [Deps: {", ".join(task["dependencies"])}]"
+                if task["dependencies"]
+                else ""
+            )
+            summary.append(
+                f"{i+1}. [{icon}] {task["description"]} (ID: {task["id"]}){deps}"
+            )
         return "\n".join(summary)
 
 

@@ -26,3 +26,8 @@ The agent protects your files by automatically creating checkpoints before risky
 Skills created via `create_skill` can be shared across projects.
 - **Publishing**: Use `publish_skill(name)` to move a local skill to your global library (`~/.mini_nebulus/skills`).
 - **Global Skills**: Global skills are automatically loaded in every project and prefixed with `global.` (e.g., `global.my_function`).
+
+## Visual Task Graph
+The agent now visualizes the plan execution flow as a dependency tree in the terminal.
+- **Dependencies**: Tasks can have dependencies (e.g., Task B depends on Task A).
+- **Visualization**: The plan is displayed as a hierarchical tree, showing which tasks are blocked by others.

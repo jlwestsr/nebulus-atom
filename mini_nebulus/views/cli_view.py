@@ -3,7 +3,7 @@ from rich.console import Console
 from rich.prompt import Prompt
 from rich.theme import Theme
 from rich.panel import Panel
-from rich.table import Table
+from rich.tree import Tree
 from rich.syntax import Syntax
 from mini_nebulus.config import Config
 from mini_nebulus.views.base_view import BaseView
@@ -46,7 +46,6 @@ class CLIView(BaseView):
 
     async def print_agent_response(self, text: str):
         if text.strip():
-            # Use a panel for longer agent responses to give it that "Gemini CLI" feel
             if len(text) > 200:
                 self.console.print(
                     Panel(text.strip(), title="Mini-Nebulus", border_style="blue")
@@ -58,7 +57,6 @@ class CLIView(BaseView):
         if not output:
             return
 
-        # If output looks like code/file content, use Syntax highlighting
         if tool_name == "read_file":
             syntax = Syntax(output, "python", theme="monokai", line_numbers=True)
             self.console.print(Panel(syntax, title="File Content", border_style="dim"))
@@ -67,32 +65,49 @@ class CLIView(BaseView):
             self.console.print(f"[tool]{formatted}[/tool]")
 
     async def print_plan(self, plan_data: Dict[str, Any]):
-        """Displays the current plan in a Table."""
-        table = Table(
-            title=f"Plan: {plan_data.get('goal', 'Unknown Goal')}", border_style="cyan"
-        )
-        table.add_column("ID", justify="right", style="dim", no_wrap=True)
-        table.add_column("Status", justify="center")
-        table.add_column("Task")
+        """Displays the current plan as a dependency tree."""
+        goal = plan_data.get("goal", "Unknown Goal")
+        tree = Tree(f"[bold cyan]Plan: {goal}[/bold cyan]")
 
-        for task in plan_data.get("tasks", []):
-            status = task.get("status", "pending").lower()
-            status_style = f"task.{status}"
-            icon = "○"
-            if status == "completed":
-                icon = "✔"
-            elif status == "in_progress":
-                icon = "▶"
-            elif status == "failed":
-                icon = "✖"
+        tasks = plan_data.get("tasks", [])
+        if not tasks:
+            self.console.print(tree)
+            return
 
-            table.add_row(
-                task.get("id", "")[:8],
-                f"[{status_style}]{icon} {status.upper()}[/{status_style}]",
-                task.get("description", ""),
-            )
+        # Map tasks by ID for easy lookup
 
-        self.console.print(table)
+        # Identify "roots" of the dependency graph (tasks with no dependencies)
+        # Note: If A depends on B, B comes first.
+        # But for visualizing "Execution Flow", we might want to show B -> A
+        # Roots = Tasks that depend on NOTHING (start here)
+
+        roots = [t for t in tasks if not t.get("dependencies")]
+
+        # Helper to recursively add nodes
+        # This handles a Tree structure. If it is a DAG (A->C, B->C), C appears twice.
+        def add_nodes(parent_node, current_tasks):
+            for task in current_tasks:
+                status = task.get("status", "pending").lower()
+                status_style = f"task.{status}"
+                icon = "○"
+                if status == "completed":
+                    icon = "✔"
+                elif status == "in_progress":
+                    icon = "▶"
+                elif status == "failed":
+                    icon = "✖"
+
+                label = f"[{status_style}]{icon} {task['description']} ({task[id][:8]})[/{status_style}]"
+                node = parent_node.add(label)
+
+                # Find tasks that depend on THIS task
+                dependents = [
+                    t for t in tasks if task["id"] in t.get("dependencies", [])
+                ]
+                add_nodes(node, dependents)
+
+        add_nodes(tree, roots)
+        self.console.print(tree)
 
     async def print_error(self, message: str):
         self.console.print(f"[error]\nError: {message}[/error]")

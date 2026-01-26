@@ -19,6 +19,7 @@ class Task:
     status: TaskStatus = TaskStatus.PENDING
     result: Optional[str] = None
     subtasks: List["Task"] = field(default_factory=list)
+    dependencies: List[str] = field(default_factory=list)  # List of Task IDs
 
     def mark_complete(self, result: str = ""):
         self.status = TaskStatus.COMPLETED
@@ -38,7 +39,7 @@ class Plan:
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     tasks: List[Task] = field(default_factory=list)
 
-    def add_task(self, description: str) -> Task:
-        task = Task(description=description)
+    def add_task(self, description: str, dependencies: List[str] = None) -> Task:
+        task = Task(description=description, dependencies=dependencies or [])
         self.tasks.append(task)
         return task

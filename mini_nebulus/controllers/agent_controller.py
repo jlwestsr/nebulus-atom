@@ -100,7 +100,13 @@ class AgentController:
                     "description": "Add a task.",
                     "parameters": {
                         "type": "object",
-                        "properties": {"description": {"type": "string"}},
+                        "properties": {
+                            "description": {"type": "string"},
+                            "dependencies": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                            },
+                        },
                         "required": ["description"],
                     },
                 },
@@ -234,7 +240,10 @@ class AgentController:
         self.view.print_welcome()
         if isinstance(self.view, CLIView):
             if self.context_loaded:
-                self.view.console.print("✔ Project Context Loaded", style="dim green")
+                self.view.console.print("✔ Loaded @CONTEXT.md", style="dim green")
+                self.view.console.print(
+                    "  • Adhering to AI Directives & MVC", style="dim green"
+                )
 
         session_id = "default"
         if initial_prompt:
