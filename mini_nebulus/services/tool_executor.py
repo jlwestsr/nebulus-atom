@@ -6,6 +6,7 @@ from mini_nebulus.services.skill_service import SkillService
 from mini_nebulus.services.context_service import ContextServiceManager
 from mini_nebulus.services.checkpoint_service import CheckpointServiceManager
 from mini_nebulus.services.rag_service import RagServiceManager
+from mini_nebulus.services.mcp_service import MCPService
 from mini_nebulus.models.task import TaskStatus
 from mini_nebulus.utils.logger import setup_logger
 
@@ -18,6 +19,7 @@ class ToolExecutor:
     skill_service = SkillService()
     checkpoint_manager = CheckpointServiceManager()
     rag_manager = RagServiceManager()
+    mcp_service = MCPService()
 
     @staticmethod
     def initialize():
@@ -109,6 +111,17 @@ class ToolExecutor:
             elif tool_name == "refresh_skills":
                 ToolExecutor.skill_service.load_skills()
                 return "Skills reloaded."
+
+            # MCP Tools
+            elif tool_name == "connect_mcp_server":
+                return await ToolExecutor.mcp_service.connect_server(
+                    args.get("name"),
+                    args.get("command"),
+                    args.get("args", []),
+                    args.get("env"),
+                )
+            elif tool_name.startswith("mcp__"):
+                return await ToolExecutor.mcp_service.call_tool(tool_name, args)
 
             # Dynamic Skills
             elif tool_name in ToolExecutor.skill_service.skills:

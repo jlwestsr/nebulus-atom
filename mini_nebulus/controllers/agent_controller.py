@@ -69,6 +69,26 @@ class AgentController:
             {
                 "type": "function",
                 "function": {
+                    "name": "connect_mcp_server",
+                    "description": "Connects to an MCP server via stdio.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "name": {"type": "string"},
+                            "command": {"type": "string"},
+                            "args": {"type": "array", "items": {"type": "string"}},
+                            "env": {
+                                "type": "object",
+                                "additionalProperties": {"type": "string"},
+                            },
+                        },
+                        "required": ["name", "command"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
                     "name": "run_shell_command",
                     "description": "Executes a shell command.",
                     "parameters": {
@@ -382,9 +402,10 @@ class AgentController:
         return results
 
     def get_current_tools(self):
-        """Merges base tools with dynamically loaded skills."""
+        """Merges base tools, dynamic skills, and MCP tools."""
         skill_defs = ToolExecutor.skill_service.get_tool_definitions()
-        return self.base_tools + skill_defs
+        mcp_defs = ToolExecutor.mcp_service.get_tools()
+        return self.base_tools + skill_defs + mcp_defs
 
     async def process_turn(self, session_id: str = "default"):
         finished_turn = False
@@ -408,9 +429,7 @@ class AgentController:
             messages.append({"role": "system", "content": pinned_content})
 
         while not finished_turn:
-            current_tools = (
-                self.base_tools + ToolExecutor.skill_service.get_tool_definitions()
-            )
+            current_tools = self.get_current_tools()
             with self.view.create_spinner("Thinking..."):
                 try:
                     response_stream = self.openai.create_chat_completion(
