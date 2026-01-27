@@ -7,6 +7,9 @@ from mini_nebulus.services.context_service import ContextServiceManager
 from mini_nebulus.services.checkpoint_service import CheckpointServiceManager
 from mini_nebulus.services.rag_service import RagServiceManager
 from mini_nebulus.models.task import TaskStatus
+from mini_nebulus.utils.logger import setup_logger
+
+logger = setup_logger(__name__)
 
 
 class ToolExecutor:
@@ -23,6 +26,9 @@ class ToolExecutor:
 
     @staticmethod
     async def dispatch(tool_name: str, args: dict, session_id: str = "default"):
+        logger.info(
+            f"Dispatching tool '{tool_name}' with args: {str(args)[:200]}..."
+        )  # Truncate args for log safety
         try:
             task_service = ToolExecutor.task_manager.get_service(session_id)
             context_service = ToolExecutor.context_manager.get_service(session_id)
@@ -109,8 +115,10 @@ class ToolExecutor:
                 return ToolExecutor.skill_service.execute_skill(tool_name, args)
 
             else:
+                logger.warning(f"Attempted to execute unknown tool: {tool_name}")
                 return f"Unknown tool: {tool_name}"
         except Exception as e:
+            logger.error(f"Error executing {tool_name}: {str(e)}", exc_info=True)
             return f"Error executing {tool_name}: {str(e)}"
 
     @staticmethod

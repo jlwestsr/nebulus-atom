@@ -11,3 +11,8 @@ class Config:
     NEBULUS_MODEL = os.getenv("NEBULUS_MODEL", "qwen3:30b-a3b")
     EXIT_COMMANDS = ["exit", "quit", "/exit", "/quit"]
     GLOBAL_SKILLS_PATH = os.path.expanduser("~/.mini_nebulus/skills")
+
+    # Logging Configuration
+    LOG_DIR = os.path.join(os.getcwd(), "logs")
+    LOG_FILE = os.path.join(LOG_DIR, "mini_nebulus.log")
+    LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")

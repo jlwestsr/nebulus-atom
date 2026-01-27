@@ -11,10 +11,14 @@ from mini_nebulus.services.tool_executor import ToolExecutor
 from mini_nebulus.services.file_service import FileService
 from mini_nebulus.views.base_view import BaseView
 from mini_nebulus.views.cli_view import CLIView
+from mini_nebulus.utils.logger import setup_logger
+
+logger = setup_logger(__name__)
 
 
 class AgentController:
     def __init__(self, view: Optional[BaseView] = None):
+        logger.info("Initializing AgentController")
         ToolExecutor.initialize()
 
         self.context_loaded = False
@@ -385,6 +389,7 @@ class AgentController:
     async def process_turn(self, session_id: str = "default"):
         finished_turn = False
         history = self.history_manager.get_session(session_id)
+        logger.info(f"Processing turn for session {session_id}")
 
         # Inject Pinned Context dynamically into each turn
         context_service = ToolExecutor.context_manager.get_service(session_id)
@@ -530,5 +535,6 @@ class AgentController:
                                 history.add("assistant", full_response)
                         finished_turn = True
                 except Exception as e:
+                    logger.error(f"Error in process_turn: {str(e)}", exc_info=True)
                     await self.view.print_error(str(e))
                     finished_turn = True
