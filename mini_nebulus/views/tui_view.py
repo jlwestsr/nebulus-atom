@@ -3,7 +3,7 @@ from contextlib import contextmanager
 
 from textual.app import App, ComposeResult
 from textual.containers import Grid, Container, Vertical
-from textual.widgets import Footer, Input, Log, Tree, Label
+from textual.widgets import Footer, Log, Tree, Label, TextArea
 from textual.binding import Binding
 from rich.text import Text
 
@@ -69,9 +69,9 @@ class MiniNebulusApp(App):
         padding: 1;
     }
 
-    Input {
+    TextArea {
         dock: bottom;
-        height: 3;
+        height: 5;
         border-top: solid $accent;
     }
     """
@@ -79,6 +79,7 @@ class MiniNebulusApp(App):
     BINDINGS = [
         Binding("ctrl+c", "quit", "Quit", show=True),
         Binding("ctrl+l", "clear_log", "Clear Log", show=True),
+        Binding("ctrl+s", "submit_message", "Submit", show=True),
     ]
 
     controller = None  # To be set via TUIView
@@ -88,19 +89,21 @@ class MiniNebulusApp(App):
             yield Sidebar()
             with Vertical(id="main-area"):
                 yield ChatPanel()
-                yield Input(placeholder="Type your command...", id="input-area")
+                yield TextArea(id="input-area", show_line_numbers=False)
         yield Footer()
 
     def action_clear_log(self):
         log = self.query_one("#chat-log", Log)
         log.clear()
 
-    async def on_input_submitted(self, message: Input.Submitted):
-        if not message.value.strip():
+    async def action_submit_message(self):
+        input_area = self.query_one("#input-area", TextArea)
+        user_input = input_area.text
+
+        if not user_input.strip():
             return
 
-        user_input = message.value
-        message.input.value = ""  # Clear input
+        input_area.text = ""  # Clear input
 
         # Display user message immediately
         log = self.query_one("#chat-log", Log)
@@ -108,6 +111,15 @@ class MiniNebulusApp(App):
 
         if self.controller:
             await self.controller.handle_tui_input(user_input)
+
+    async def on_key(self, event) -> None:
+        # Check specifically for "enter" without modifiers (modifiers would make it "shift+enter" etc)
+        # However, Textual TextArea handles Enter as newline by default.
+        # We want: Enter -> Submit, Shift+Enter -> Newline
+        # But overriding TextArea's default binding is tricky without a custom widget subclass.
+        # Simpler approach for now: Ctrl+S to submit (bound above), Enter is newline.
+        # Or we can try to intercept Enter.
+        pass
 
 
 class TUIView(BaseView):
