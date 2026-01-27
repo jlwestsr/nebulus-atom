@@ -31,12 +31,25 @@ def start(
     prompt: Optional[List[str]] = typer.Argument(
         None, help="Initial prompt to execute immediately"
     ),
+    tui: bool = typer.Option(False, help="Enable Interactive Dashboard (TUI)"),
 ):
     """
     Start the Mini-Nebulus AI Agent.
     """
     initial_prompt = " ".join(prompt) if prompt else None
-    controller = AgentController()
+
+    view = None
+    if tui:
+        from mini_nebulus.views.tui_view import TUIView
+
+        view = TUIView()
+
+    controller = AgentController(view=view)
+
+    if tui:
+        # Link controller to view for event callbacks
+        view.set_controller(controller)
+
     asyncio.run(controller.start(initial_prompt))
 
 

@@ -289,7 +289,23 @@ class AgentController:
         if initial_prompt:
             self.history_manager.get_session(session_id).add("user", initial_prompt)
             await self.process_turn(session_id)
-        await self.chat_loop(session_id)
+
+        # Check if we are using TUI
+        if hasattr(self.view, "start_app"):
+            # In TUI mode, we hand over control to the View's event loop
+            await self.view.start_app()
+        else:
+            # CLI mode uses the standard loop
+            await self.chat_loop(session_id)
+
+    async def handle_tui_input(self, user_input: str, session_id: str = "default"):
+        """Callback for TUI to push input to the controller."""
+        if user_input.lower() in Config.EXIT_COMMANDS:
+            self.view.print_goodbye()
+            return
+
+        self.history_manager.get_session(session_id).add("user", user_input)
+        await self.process_turn(session_id)
 
     async def chat_loop(self, session_id: str = "default"):
         while True:
@@ -373,6 +389,13 @@ class AgentController:
         # Inject Pinned Context dynamically into each turn
         context_service = ToolExecutor.context_manager.get_service(session_id)
         pinned_content = context_service.get_context_string()
+
+        # Update TUI Context View
+        if hasattr(self.view, "print_context"):
+            # Assuming list_context returns a list of strings
+            context_list = context_service.list_context()
+            if isinstance(context_list, list):
+                await self.view.print_context(context_list)
 
         messages = history.get()
         if pinned_content:

@@ -1,4 +1,0 @@
-Create a comprehensive plan to audit the 'mini_nebulus' directory.
-FIRST, use a shell command to list the files in that directory.
-SECOND, use the 'file_info' skill to inspect the 'mini_nebulus/main.py' file.
-FINALLY, write a summary of what you found to 'audit_summary.txt'.
