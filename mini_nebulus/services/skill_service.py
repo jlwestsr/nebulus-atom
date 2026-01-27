@@ -97,9 +97,9 @@ class SkillService:
 
         for param_name, param in sig.parameters.items():
             param_type = "string"
-            if param.annotation == int:
+            if param.annotation is int:
                 param_type = "integer"
-            elif param.annotation == bool:
+            elif param.annotation is bool:
                 param_type = "boolean"
 
             params["properties"][param_name] = {

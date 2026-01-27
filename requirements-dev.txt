@@ -9,3 +9,4 @@ ansible-lint
 yamllint
 aider-chat
 mkdocs-material
+pytest-asyncio
