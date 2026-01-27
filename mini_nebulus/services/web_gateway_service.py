@@ -1,4 +1,4 @@
-from .web_gateway import WebGateway
+from mini_nebulus.models.web_gateway import WebGateway
 
 
 class WebGatewayService:
