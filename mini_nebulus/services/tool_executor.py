@@ -7,6 +7,7 @@ from mini_nebulus.services.context_service import ContextServiceManager
 from mini_nebulus.services.checkpoint_service import CheckpointServiceManager
 from mini_nebulus.services.rag_service import RagServiceManager
 from mini_nebulus.services.mcp_service import MCPService
+from mini_nebulus.services.preference_service import PreferenceServiceManager
 from mini_nebulus.models.task import TaskStatus
 from mini_nebulus.utils.logger import setup_logger
 
@@ -20,6 +21,7 @@ class ToolExecutor:
     checkpoint_manager = CheckpointServiceManager()
     rag_manager = RagServiceManager()
     mcp_service = MCPService()
+    preference_manager = PreferenceServiceManager()
 
     @staticmethod
     def initialize():
@@ -99,6 +101,20 @@ class ToolExecutor:
                 return f"Task {args.get('task_id')} updated to {status.value}"
             elif tool_name == "get_plan":
                 return task_service.get_plan_data()
+
+            # Preference Tools
+            elif tool_name == "set_preference":
+                preference_service = ToolExecutor.preference_manager.get_service(
+                    session_id
+                )
+                return preference_service.set_preference(
+                    args.get("key"), args.get("value")
+                )
+            elif tool_name == "get_preference":
+                preference_service = ToolExecutor.preference_manager.get_service(
+                    session_id
+                )
+                return str(preference_service.get_preference(args.get("key")))
 
             # Skill Tools
             elif tool_name == "create_skill":

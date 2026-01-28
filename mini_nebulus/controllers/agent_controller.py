@@ -185,6 +185,33 @@ class AgentController:
             {
                 "type": "function",
                 "function": {
+                    "name": "set_preference",
+                    "description": "Set a user preference.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "key": {"type": "string"},
+                            "value": {"type": "string"},
+                        },
+                        "required": ["key", "value"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_preference",
+                    "description": "Get a user preference.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {"key": {"type": "string"}},
+                        "required": ["key"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
                     "name": "create_skill",
                     "description": "Create a new skill.",
                     "parameters": {
@@ -512,7 +539,9 @@ class AgentController:
         # Inject Pinned Context dynamically into each turn
         context_service = ToolExecutor.context_manager.get_service(session_id)
         rag_service = ToolExecutor.rag_manager.get_service(session_id)
+        preference_service = ToolExecutor.preference_manager.get_service(session_id)
         pinned_content = context_service.get_context_string()
+        pinned_content += preference_service.get_context_string()
 
         # Update TUI Context View
         if hasattr(self.view, "print_context"):
