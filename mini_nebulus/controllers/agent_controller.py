@@ -32,17 +32,12 @@ class AgentController:
         except Exception:
             context_content = "Context file not found."
 
+        self.pending_tdd_goal = None
         system_prompt = (
             "You are Mini-Nebulus, an autonomous AI engineer. You have full system access.\n"
             "Your ONLY goal is to execute tasks. NEVER explain what you are going to do.\n"
             "NEVER use markdown code blocks like ```python unless you are calling a tool.\n"
             "ALWAYS use tools to perform actions.\n\n"
-            "### AUTONOMY RULES ###\n"
-            "1. You are AUTONOMOUS. Do NOT ask the user for input (e.g., via ask_user) to define tasks or plans.\n"
-            "2. Infer the goal and task description yourself based on the user's initial prompt and the current context.\n"
-            "3. Only use ask_user if there is a critical ambiguity that completely stops you from proceeding.\n"
-            "4. If you have executed the user's request, STOP immediately. Do NOT create plans, add tasks, write files, or pin files.\n"
-            "5. Do NOT hallucinate that you need to implement features just because you see them in the context files.\n"
             "### AUTONOMY RULES ###\n"
             "1. You are AUTONOMOUS. Do NOT ask the user for input (e.g., via ask_user) to define tasks or plans.\n"
             "2. Infer the goal and task description yourself based on the user's initial prompt and the current context.\n"
@@ -65,7 +60,6 @@ class AgentController:
             "### PROJECT CONTEXT ###\n"
             f"{context_content}"
         )
-
         self.history_manager = HistoryManager(system_prompt)
         ToolExecutor.history_manager = self.history_manager
         self.openai = OpenAIService()
@@ -118,7 +112,7 @@ class AgentController:
             {
                 "type": "function",
                 "function": {
-                    "name": "write_file",
+                    "name": "{write_file}",
                     "description": "Writes content to a file.",
                     "parameters": {
                         "type": "object",
@@ -438,6 +432,23 @@ class AgentController:
                     },
                 },
             },
+            {
+                "type": "function",
+                "function": {
+                    "name": "start_tdd",
+                    "description": "Start an autonomous TDD loop for a given goal.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "goal": {
+                                "type": "string",
+                                "description": "The coding goal (e.g. Implement add function)",
+                            }
+                        },
+                        "required": ["goal"],
+                    },
+                },
+            },
         ]
 
     async def start(self, initial_prompt: Optional[str] = None):
@@ -476,6 +487,9 @@ class AgentController:
 
     async def chat_loop(self, session_id: str = "default"):
         while True:
+            if self.pending_tdd_goal:
+                await self.run_tdd_cycle(self.pending_tdd_goal, session_id)
+                continue
             try:
                 if self.auto_mode:
                     # Autonomous Logic
@@ -565,6 +579,36 @@ class AgentController:
             except (KeyboardInterrupt, EOFError):
                 await self.view.print_goodbye()
                 break
+
+    async def run_tdd_cycle(self, goal: str, session_id: str):
+        await self.view.print_agent_response(f"🔄 Starting TDD Cycle for: {goal}")
+
+        # 1. Generate Test
+        prompt_test = (
+            f"TDD Step 1: Write a failing pytest file for the goal: '{goal}'. "
+            "Use '{write_file}' to create it in 'tests/'. "
+            "Do NOT implement the logic yet."
+        )
+        self.history_manager.get_session(session_id).add("user", prompt_test)
+        await self.process_turn(session_id)
+
+        # 2. Run Test (Expect Fail)
+        prompt_run_fail = "Now run the test you just created using 'run_shell_command' with pytest. It should fail."
+        self.history_manager.get_session(session_id).add("user", prompt_run_fail)
+        await self.process_turn(session_id)
+
+        # 3. Implement
+        prompt_impl = "TDD Step 2: Write the implementation file to satisfy the test. Use '{write_file}'."
+        self.history_manager.get_session(session_id).add("user", prompt_impl)
+        await self.process_turn(session_id)
+
+        # 4. Run Test (Expect Pass)
+        prompt_run_pass = "Now run the test again. It should pass."
+        self.history_manager.get_session(session_id).add("user", prompt_run_pass)
+        await self.process_turn(session_id)
+
+        self.pending_tdd_goal = None
+        await self.view.print_agent_response("✅ TDD Cycle Completed.")
 
     def extract_json(self, text: str) -> List[dict]:
         text = re.sub(r"<\|.*?\|>", "", text).strip()
@@ -745,6 +789,12 @@ class AgentController:
                                     output = await self.view.ask_user_input(question)
                                 else:
                                     output = "Error: No question provided."
+                            elif name == "start_tdd":
+                                self.pending_tdd_goal = args.get("goal")
+                                output = (
+                                    f"TDD Loop scheduled for: {self.pending_tdd_goal}"
+                                )
+                                finished_turn = True
                             elif name == "execute_plan":
                                 self.auto_mode = True
                                 output = "Autonomous execution started. I will now proceed to execute tasks one by one."
