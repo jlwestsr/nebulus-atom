@@ -47,12 +47,14 @@ class DiscordView(BaseView):
         await self.channel.send(formatted)
 
     async def print_plan(self, plan_data: Dict[str, Any]):
+        # 1. Send detailed list as Embed
         embed = discord.Embed(
             title=f"Plan: {plan_data.get("goal", "Unknown")}",
             color=discord.Color.blue(),
         )
         description = ""
-        for task in plan_data.get("tasks", []):
+        tasks = plan_data.get("tasks", [])
+        for task in tasks:
             status = task.get("status", "pending").lower()
             icon = "○"
             if status == "completed":
@@ -64,6 +66,59 @@ class DiscordView(BaseView):
             description += f"{icon} **{status.upper()}**: {task.get("description")}\n"
         embed.description = description
         await self.channel.send(embed=embed)
+
+        # 2. Send Visual Graph (Mermaid)
+        try:
+            mermaid = ["graph TD"]
+
+            # Class definitions
+            mermaid.append(
+                "    classDef completed fill:#9f9,stroke:#333,stroke-width:2px,color:black;"
+            )
+            mermaid.append(
+                "    classDef inprogress fill:#ff9,stroke:#333,stroke-width:2px,color:black;"
+            )
+            mermaid.append(
+                "    classDef failed fill:#f99,stroke:#333,stroke-width:2px,color:black;"
+            )
+            mermaid.append(
+                "    classDef pending fill:#fff,stroke:#333,stroke-width:1px,color:black;"
+            )
+
+            # Nodes
+            for task in tasks:
+                safe_id = "T" + task["id"].replace("-", "")[:8]
+                desc = (
+                    task["description"][:25]
+                    .replace('"', "")
+                    .replace("(", "")
+                    .replace(")", "")
+                )
+
+                status = task.get("status", "pending").lower()
+                style = ":::pending"
+                if status == "completed":
+                    style = ":::completed"
+                elif status == "in_progress":
+                    style = ":::inprogress"
+                elif status == "failed":
+                    style = ":::failed"
+
+                mermaid.append(f'    {safe_id}["{desc}"]{style}')
+
+            # Edges
+            for task in tasks:
+                safe_id = "T" + task["id"].replace("-", "")[:8]
+                for dep in task.get("dependencies", []):
+                    safe_dep = "T" + dep.replace("-", "")[:8]
+                    # Only add edge if both nodes exist (sanity check)
+                    mermaid.append(f"    {safe_dep} --> {safe_id}")
+
+            mermaid_str = "\n".join(mermaid)
+            if len(mermaid_str) < 1900:
+                await self.channel.send(f"```mermaid\n{mermaid_str}\n```")
+        except Exception:
+            pass  # Fail silently on graph generation errors
 
     async def print_error(self, message: str):
         await self.channel.send(f"❌ **Error:** {message}")
