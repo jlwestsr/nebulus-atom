@@ -5,7 +5,7 @@
 - CLI commands: `task add`, `task complete`, `task list`
 - Integrates with MVC architecture (Model: task persistence, View: Rich CLI interface)
 
-## 2. Autonomous Execution Engine (Clawd-Inspired)
+## 2. Autonomous Execution Engine (Moltbot-Inspired)
 - Self-executing tasks after initial setup
 - Uses controller logic to handle task delegation
 - Configurable rules for task priority and timing
@@ -15,7 +15,7 @@
 - Real-time suggestions based on current terminal context
 - Leverages `search_code` and `index_codebase` tools
 
-## 4. Adaptive Preference Learning (Clawd/Gemini Fusion)
+## 4. Adaptive Preference Learning (Moltbot/Gemini Fusion)
 - Learns user patterns from command history
 - Auto-adjusts default behavior based on usage
 - Implements `all-MiniLM-L6-v2` sentence transformers

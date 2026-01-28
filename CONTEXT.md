@@ -8,7 +8,7 @@ The following files define the project s strict operating procedures. The agent 
 
 - **[AI Directives](AI_DIRECTIVES.md)**: Coding standards, architecture (MVC), and commit conventions.
 - **[Workflow](WORKFLOW.md)**: Branching strategy (Gitflow-lite) and development lifecycle.
-- **[Project Goals](GEMINI.md)**: High-level objectives and influences (Clawd, Gemini CLI).
+- **[Project Goals](GEMINI.md)**: High-level objectives and influences (Moltbot, Gemini CLI).
 
 ## Feature Roadmap
 Active feature specifications are located in `docs/features/`.

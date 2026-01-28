@@ -24,6 +24,6 @@ This is a custom, lightweight CLI agent built to interact directly with a local 
   - *Goal*: Mimic its terminal features and user experience.
 - **Get Shit Done**: https://github.com/glittercowboy/get-shit-done
   - *Goal*: Mimic its features and task-oriented approach.
-- **Clawd**: https://clawd.bot/
-  - *Docs*: https://docs.clawd.bot/start/getting-started
+- **Moltbot**: https://molt.bot/
+  - *Docs*: https://docs.molt.bot/start/getting-started
   - *Goal*: Enable autonomous agent capabilities.
