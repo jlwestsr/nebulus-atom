@@ -67,6 +67,7 @@ class AgentController:
         )
 
         self.history_manager = HistoryManager(system_prompt)
+        ToolExecutor.history_manager = self.history_manager
         self.openai = OpenAIService()
         self.view = view if view else CLIView()
         self.base_tools = [
@@ -367,6 +368,14 @@ class AgentController:
                         "properties": {"query": {"type": "string"}},
                         "required": ["query"],
                     },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "generate_journal",
+                    "description": "Generate a markdown journal/summary of the current session.",
+                    "parameters": {"type": "object", "properties": {}, "required": []},
                 },
             },
         ]

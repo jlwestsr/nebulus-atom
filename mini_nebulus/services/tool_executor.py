@@ -10,6 +10,7 @@ from mini_nebulus.services.mcp_service import MCPService
 from mini_nebulus.services.preference_service import PreferenceServiceManager
 from mini_nebulus.services.doc_service import DocServiceManager
 from mini_nebulus.services.image_service import ImageServiceManager
+from mini_nebulus.services.journal_service import JournalServiceManager
 from mini_nebulus.services.docker_service import DockerServiceManager
 from mini_nebulus.models.task import TaskStatus
 from mini_nebulus.utils.logger import setup_logger
@@ -27,6 +28,8 @@ class ToolExecutor:
     preference_manager = PreferenceServiceManager()
     doc_manager = DocServiceManager()
     image_manager = ImageServiceManager()
+    journal_manager = JournalServiceManager()
+    history_manager = None  # Set by AgentController
     docker_manager = DockerServiceManager()
 
     @staticmethod
@@ -138,6 +141,17 @@ class ToolExecutor:
             elif tool_name == "scan_image":
                 image_service = ToolExecutor.image_manager.get_service(session_id)
                 return image_service.encode_image(args.get("path"))
+
+            # Journal Tools
+            elif tool_name == "generate_journal":
+                if not ToolExecutor.history_manager:
+                    return "Error: History manager not initialized."
+                journal_service = ToolExecutor.journal_manager.get_service(session_id)
+                task_service = ToolExecutor.task_manager.get_service(session_id)
+                history = ToolExecutor.history_manager.get_session(session_id)
+                return journal_service.generate_journal(
+                    session_id, task_service, history
+                )
 
             # Skill Tools
             elif tool_name == "create_skill":
