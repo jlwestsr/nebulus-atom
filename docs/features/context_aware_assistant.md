@@ -6,10 +6,10 @@
 This feature enhances the CLI with semantic search capabilities over the command history and potentially the codebase (via RAG). It allows the user or the agent to recall past commands, plans, or relevant code snippets using natural language queries.
 
 ## 2. Requirements
-- [ ] **History Indexing**: Automatically index user commands and agent responses into ChromaDB.
-- [ ] **Semantic Search**: Provide a tool `search_history` to query this index.
-- [ ] **Integration**: Hook into `AgentController` to index turns automatically.
-- [ ] **Command Suggestion**: (Optional) Provide suggestions based on current context.
+- [x] **History Indexing**: Automatically index user commands and agent responses into ChromaDB.
+- [x] **Semantic Search**: Provide a tool `search_history` to query this index.
+- [x] **Integration**: Hook into `AgentController` to index turns automatically.
+- [x] **Command Suggestion**: (Optional) Provide suggestions based on current context.
 
 ## 3. Technical Implementation
 - **Modules**:
@@ -21,20 +21,20 @@ This feature enhances the CLI with semantic search capabilities over the command
 
 ## 4. Verification Plan
 **Automated Tests**:
-- [ ] `tests/test_rag.py`:
+- [x] `tests/test_rag.py`:
     - Index a mock turn.
     - Search for a keyword.
     - Assert the turn is returned.
 
 **Manual Verification**:
-- [ ] Run `python -m mini_nebulus.main start`.
-- [ ] Execute: "Create a file named hello.txt".
-- [ ] Execute: "Search history for 'file creation'".
-- [ ] Verify the previous command is returned.
+- [x] Run `python -m mini_nebulus.main start`.
+- [x] Execute: "Create a file named hello.txt".
+- [x] Execute: "Search history for 'file creation'".
+- [x] Verify the previous command is returned.
 
 ## 5. Workflow Checklist
-- [ ] **Branch**: `feat/context-aware-commands`
-- [ ] **Work**: Implement RAG updates and Controller integration
-- [ ] **Test**: `pytest` passes
-- [ ] **Doc**: Updated docs
-- [ ] **Merge**: `develop`
+- [x] **Branch**: `feat/context-aware-commands`
+- [x] **Work**: Implement RAG updates and Controller integration
+- [x] **Test**: `pytest` passes
+- [x] **Doc**: Updated docs
+- [x] **Merge**: `develop`
