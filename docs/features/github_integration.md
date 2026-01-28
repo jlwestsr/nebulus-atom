@@ -6,10 +6,10 @@
 Leverage the **MCP Client** to connect to the official GitHub MCP server. This allows the agent to read Issues, check PRs, and map tasks directly to GitHub tickets, bridging the gap between "Local Lab" and "Real World Workflow".
 
 ## 2. Requirements
-- [ ] **MCP Connection**: Connect to the GitHub MCP server using `connect_mcp_server`.
-- [ ] **Auth Handling**: Handle GitHub Personal Access Token (PAT) via env vars or the MCP server's auth flow.
-- [ ] **Tool Exposure**: Expose GitHub tools (e.g., `github_create_issue`, `github_list_prs`) to the agent.
-- [ ] **Task Linking**: (Optional) Allow `Task` objects to link to GitHub Issue IDs.
+- [x] **MCP Connection**: Connect to the GitHub MCP server using `connect_mcp_server`.
+- [x] **Auth Handling**: Handle GitHub Personal Access Token (PAT) via env vars or the MCP server's auth flow.
+- [x] **Tool Exposure**: Expose GitHub tools (e.g., `github_create_issue`, `github_list_prs`) to the agent.
+- [x] **Task Linking**: (Optional) Allow `Task` objects to link to GitHub Issue IDs.
 
 ## 3. Technical Implementation
 - **Modules**:
@@ -20,20 +20,20 @@ Leverage the **MCP Client** to connect to the official GitHub MCP server. This a
 
 ## 4. Verification Plan
 **Automated Tests**:
-- [ ] `tests/test_github_mcp.py`:
+- [x] `tests/test_github_mcp.py`:
     - Mock the MCP server connection.
     - Verify tools are registered.
 
 **Manual Verification**:
-- [ ] Set `GITHUB_TOKEN`.
-- [ ] Run `mini-nebulus start`.
-- [ ] Command: "Connect to GitHub MCP".
-- [ ] Command: "List my open PRs".
-- [ ] Verify real data from GitHub is returned.
+- [x] Set `GITHUB_TOKEN`.
+- [x] Run `mini-nebulus start`.
+- [x] Command: "Connect to GitHub MCP".
+- [x] Command: "List my open PRs".
+- [x] Verify real data from GitHub is returned.
 
 ## 5. Workflow Checklist
-- [ ] **Branch**: Created `feat/github-mcp` branch?
-- [ ] **Work**: Implemented changes?
-- [ ] **Test**: All tests pass (`pytest`)?
-- [ ] **Doc**: Updated `README.md`?
-- [ ] **Data**: `git add .`, `git commit`?
+- [x] **Branch**: Created `feat/github-mcp` branch?
+- [x] **Work**: Implemented changes?
+- [x] **Test**: All tests pass (`pytest`)?
+- [x] **Doc**: Updated `README.md`?
+- [x] **Data**: `git add .`, `git commit`?
