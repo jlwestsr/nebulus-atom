@@ -10,6 +10,7 @@ class Config:
     NEBULUS_API_KEY = os.getenv("NEBULUS_API_KEY")
     NEBULUS_MODEL = os.getenv("NEBULUS_MODEL", "qwen3:30b-a3b")
     EXIT_COMMANDS = ["exit", "quit", "/exit", "/quit"]
+    SANDBOX_MODE = os.getenv("SANDBOX_MODE", "false").lower() == "true"
     GLOBAL_SKILLS_PATH = os.path.expanduser("~/.mini_nebulus/skills")
 
     # Logging Configuration

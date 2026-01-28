@@ -9,6 +9,7 @@ from mini_nebulus.services.rag_service import RagServiceManager
 from mini_nebulus.services.mcp_service import MCPService
 from mini_nebulus.services.preference_service import PreferenceServiceManager
 from mini_nebulus.services.doc_service import DocServiceManager
+from mini_nebulus.services.docker_service import DockerServiceManager
 from mini_nebulus.models.task import TaskStatus
 from mini_nebulus.utils.logger import setup_logger
 
@@ -24,6 +25,7 @@ class ToolExecutor:
     mcp_service = MCPService()
     preference_manager = PreferenceServiceManager()
     doc_manager = DocServiceManager()
+    docker_manager = DockerServiceManager()
 
     @staticmethod
     def initialize():
@@ -47,6 +49,9 @@ class ToolExecutor:
 
             # Shell Tools
             if tool_name == "run_shell_command":
+                docker_service = ToolExecutor.docker_manager.get_service(session_id)
+                if docker_service.enabled:
+                    return docker_service.execute_command(args.get("command"))
                 return await ToolExecutor.run_shell_command(args.get("command"))
 
             # File Tools
