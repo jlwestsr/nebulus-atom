@@ -12,6 +12,7 @@ from mini_nebulus.services.doc_service import DocServiceManager
 from mini_nebulus.services.image_service import ImageServiceManager
 from mini_nebulus.services.journal_service import JournalServiceManager
 from mini_nebulus.services.ast_service import ASTServiceManager
+from mini_nebulus.services.macro_service import MacroServiceManager
 from mini_nebulus.services.docker_service import DockerServiceManager
 from mini_nebulus.models.task import TaskStatus
 from mini_nebulus.utils.logger import setup_logger
@@ -31,6 +32,7 @@ class ToolExecutor:
     image_manager = ImageServiceManager()
     journal_manager = JournalServiceManager()
     ast_manager = ASTServiceManager()
+    macro_manager = MacroServiceManager()
     history_manager = None  # Set by AgentController
     docker_manager = DockerServiceManager()
 
@@ -162,6 +164,13 @@ class ToolExecutor:
             elif tool_name == "find_symbol":
                 ast_service = ToolExecutor.ast_manager.get_service(session_id)
                 return str(ast_service.find_symbol(args.get("symbol")))
+
+            # Macro Tools
+            elif tool_name == "create_macro":
+                macro_service = ToolExecutor.macro_manager.get_service(session_id)
+                return macro_service.create_macro(
+                    args.get("name"), args.get("commands"), args.get("description", "")
+                )
 
             # Skill Tools
             elif tool_name == "create_skill":

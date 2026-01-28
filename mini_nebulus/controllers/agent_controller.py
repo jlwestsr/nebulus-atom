@@ -412,6 +412,32 @@ class AgentController:
                     },
                 },
             },
+            {
+                "type": "function",
+                "function": {
+                    "name": "create_macro",
+                    "description": "Create a reusable shell script macro.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "description": "Name of the macro (e.g. clean_build)",
+                            },
+                            "commands": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "List of shell commands",
+                            },
+                            "description": {
+                                "type": "string",
+                                "description": "Optional description",
+                            },
+                        },
+                        "required": ["name", "commands"],
+                    },
+                },
+            },
         ]
 
     async def start(self, initial_prompt: Optional[str] = None):
