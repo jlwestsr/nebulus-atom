@@ -212,6 +212,26 @@ class AgentController:
             {
                 "type": "function",
                 "function": {
+                    "name": "list_docs",
+                    "description": "List available documentation files.",
+                    "parameters": {"type": "object", "properties": {}, "required": []},
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "read_doc",
+                    "description": "Read a documentation file.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {"path": {"type": "string"}},
+                        "required": ["path"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
                     "name": "create_skill",
                     "description": "Create a new skill.",
                     "parameters": {

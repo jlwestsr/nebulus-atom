@@ -2,6 +2,9 @@ import asyncio
 import typer
 from typing import List, Optional
 from mini_nebulus.controllers.agent_controller import AgentController
+from mini_nebulus.services.doc_service import DocService
+from rich.markdown import Markdown
+from rich.console import Console
 
 app = typer.Typer(invoke_without_command=True)
 
@@ -51,6 +54,46 @@ def start(
         view.set_controller(controller)
 
     asyncio.run(controller.start(initial_prompt))
+
+
+@app.command()
+def docs(
+    action: str = typer.Argument(..., help="Action: 'list' or 'read'"),
+    filename: Optional[str] = typer.Argument(None, help="Filename to read"),
+):
+    """
+    Access embedded documentation.
+    """
+    service = DocService()
+    console = Console()
+
+    if action.lower() == "list":
+        files = service.list_docs()
+        if not files:
+            console.print("No documentation files found.", style="yellow")
+            return
+
+        console.print("[bold cyan]Available Documentation:[/bold cyan]")
+        for f in files:
+            console.print(f" - {f}")
+
+    elif action.lower() == "read":
+        if not filename:
+            console.print(
+                "Error: Filename required for 'read' action.", style="bold red"
+            )
+            return
+
+        content = service.read_doc(filename)
+        if content:
+            md = Markdown(content)
+            console.print(md)
+        else:
+            console.print(f"Error: Could not read '{filename}'", style="bold red")
+    else:
+        console.print(
+            f"Unknown action: {action}. Use 'list' or 'read'.", style="bold red"
+        )
 
 
 if __name__ == "__main__":

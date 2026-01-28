@@ -8,6 +8,7 @@ from mini_nebulus.services.checkpoint_service import CheckpointServiceManager
 from mini_nebulus.services.rag_service import RagServiceManager
 from mini_nebulus.services.mcp_service import MCPService
 from mini_nebulus.services.preference_service import PreferenceServiceManager
+from mini_nebulus.services.doc_service import DocServiceManager
 from mini_nebulus.models.task import TaskStatus
 from mini_nebulus.utils.logger import setup_logger
 
@@ -22,6 +23,7 @@ class ToolExecutor:
     rag_manager = RagServiceManager()
     mcp_service = MCPService()
     preference_manager = PreferenceServiceManager()
+    doc_manager = DocServiceManager()
 
     @staticmethod
     def initialize():
@@ -101,6 +103,15 @@ class ToolExecutor:
                 return f"Task {args.get('task_id')} updated to {status.value}"
             elif tool_name == "get_plan":
                 return task_service.get_plan_data()
+
+            # Doc Tools
+            elif tool_name == "list_docs":
+                doc_service = ToolExecutor.doc_manager.get_service(session_id)
+                return str(doc_service.list_docs())
+            elif tool_name == "read_doc":
+                doc_service = ToolExecutor.doc_manager.get_service(session_id)
+                content = doc_service.read_doc(args.get("path"))
+                return content if content else "Error: Doc not found"
 
             # Preference Tools
             elif tool_name == "set_preference":
