@@ -2,12 +2,17 @@ import os
 import chromadb
 from sentence_transformers import SentenceTransformer
 from typing import List, Dict, Any
+import uuid
+import time
 
 
 class RagService:
     def __init__(self, db_path=".mini_nebulus/db", collection_name="codebase"):
         self.client = chromadb.PersistentClient(path=db_path)
         self.collection = self.client.get_or_create_collection(name=collection_name)
+        self.history_collection = self.client.get_or_create_collection(
+            name="command_history"
+        )
         self.model = SentenceTransformer("all-MiniLM-L6-v2")
 
     def index_codebase(self, root_dir: str = "."):
@@ -62,10 +67,50 @@ class RagService:
                     {
                         "id": results["ids"][0][i],
                         "score": results["distances"][0][i]
-                        if "distances" in results
+                        if "distances" in results and results["distances"] is not None
                         else 0,
                         "content": results["documents"][0][i][:200]
                         + "...",  # Truncate content
+                    }
+                )
+        return output
+
+    def index_history(self, role: str, content: str, session_id: str = "default"):
+        if not content or not content.strip():
+            return
+
+        doc_id = str(uuid.uuid4())
+        timestamp = time.time()
+
+        # Generate embedding
+        embedding = self.model.encode([content]).tolist()
+
+        self.history_collection.add(
+            documents=[content],
+            embeddings=embedding,
+            metadatas=[
+                {"role": role, "session_id": session_id, "timestamp": timestamp}
+            ],
+            ids=[doc_id],
+        )
+
+    def search_history(self, query: str, n_results: int = 5) -> List[Dict[str, Any]]:
+        query_embedding = self.model.encode([query]).tolist()
+        results = self.history_collection.query(
+            query_embeddings=query_embedding, n_results=n_results
+        )
+
+        output = []
+        if results["ids"]:
+            for i in range(len(results["ids"][0])):
+                output.append(
+                    {
+                        "id": results["ids"][0][i],
+                        "score": results["distances"][0][i]
+                        if "distances" in results and results["distances"] is not None
+                        else 0,
+                        "content": results["documents"][0][i],
+                        "metadata": results["metadatas"][0][i],
                     }
                 )
         return output

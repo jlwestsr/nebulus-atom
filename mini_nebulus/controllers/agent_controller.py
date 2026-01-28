@@ -300,6 +300,18 @@ class AgentController:
             {
                 "type": "function",
                 "function": {
+                    "name": "search_history",
+                    "description": "Search the command history using a natural language query.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {"query": {"type": "string"}},
+                        "required": ["query"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
                     "name": "search_code",
                     "description": "Search the codebase using a natural language query.",
                     "parameters": {
@@ -499,6 +511,7 @@ class AgentController:
 
         # Inject Pinned Context dynamically into each turn
         context_service = ToolExecutor.context_manager.get_service(session_id)
+        rag_service = ToolExecutor.rag_manager.get_service(session_id)
         pinned_content = context_service.get_context_string()
 
         # Update TUI Context View
@@ -509,6 +522,11 @@ class AgentController:
                 await self.view.print_context(context_list)
 
         messages = history.get()
+        # Index the last user message
+        last_msg = messages[-1] if messages else None
+        if last_msg and last_msg["role"] == "user":
+            rag_service.index_history("user", last_msg["content"], session_id)
+
         if pinned_content:
             messages = [m.copy() for m in messages]
             messages.append({"role": "system", "content": pinned_content})
@@ -641,6 +659,9 @@ class AgentController:
                                     getattr(self.openai, "last_telemetry", {})
                                 )
                                 history.add("assistant", full_response)
+                            rag_service.index_history(
+                                "assistant", full_response, session_id
+                            )
                         finished_turn = True
                 except Exception as e:
                     logger.error(f"Error in process_turn: {str(e)}", exc_info=True)

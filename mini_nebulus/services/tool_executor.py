@@ -74,6 +74,8 @@ class ToolExecutor:
                 return rag_service.index_codebase()
             elif tool_name == "search_code":
                 return str(rag_service.search_code(args.get("query")))
+            elif tool_name == "search_history":
+                return str(rag_service.search_history(args.get("query")))
 
             # Task Tools
             elif tool_name == "create_plan":
