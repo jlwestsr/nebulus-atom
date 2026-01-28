@@ -6,16 +6,16 @@
 Mini-Nebulus currently lacks a centralized logging system. Errors and execution details are printed to stdout/stderr or the TUI logs, but there is no persistent record for debugging or auditing. This feature implements a robust, rotating file-based logging system.
 
 ## 2. Requirements
-- [ ] Create a centralized logging configuration.
-- [ ] Logs should be saved to `logs/mini_nebulus.log`.
-- [ ] Implement log rotation (e.g., 5MB max size, keep 3 backups).
-- [ ] Ensure logs capture timestamp, level, logger name, and message.
-- [ ] Integrate logging into key components:
+- [x] Create a centralized logging configuration.
+- [x] Logs should be saved to `logs/mini_nebulus.log`.
+- [x] Implement log rotation (e.g., 5MB max size, keep 3 backups).
+- [x] Ensure logs capture timestamp, level, logger name, and message.
+- [x] Integrate logging into key components:
     - `AgentController` (Task lifecycle events)
     - `ToolExecutor` (Tool execution inputs/outputs/errors)
     - `OpenAIService` (LLM request/response stats - careful with PII/Tokens)
     - `Config` (Startup/Environment issues)
-- [ ] Ensure logging works seamlessly with TUI/CLI (i.e., doesn't pollute stdout in CLI mode unexpectedly).
+- [x] Ensure logging works seamlessly with TUI/CLI (i.e., doesn't pollute stdout in CLI mode unexpectedly).
 
 ## 3. Technical Implementation
 - **Modules**:
@@ -29,18 +29,18 @@ Mini-Nebulus currently lacks a centralized logging system. Errors and execution 
 
 ## 4. Verification Plan
 **Automated Tests**:
-- [ ] Script/Test: `pytest tests/test_logging.py`
-- [ ] Logic Verified: Check if log file is created, rotation works, and specific messages appear.
+- [x] Script/Test: `pytest tests/test_logging.py`
+- [x] Logic Verified: Check if log file is created, rotation works, and specific messages appear.
 
 **Manual Verification**:
-- [ ] Step 1: Run `python -m mini_nebulus.main start`
-- [ ] Step 2: Execute a command (e.g., "list files")
-- [ ] Step 3: Check `logs/mini_nebulus.log` for correct entries.
+- [x] Step 1: Run `python -m mini_nebulus.main start`
+- [x] Step 2: Execute a command (e.g., "list files")
+- [x] Step 3: Check `logs/mini_nebulus.log` for correct entries.
 
 ## 5. Workflow Checklist
 Follow the AI Behavior strict workflow:
-- [ ] **Branch**: Created `feat/logging` branch?
-- [ ] **Work**: Implemented changes?
-- [ ] **Test**: All tests pass (`pytest`)?
-- [ ] **Doc**: Updated `README.md` if necessary?
-- [ ] **Data**: `git add .`, `git commit`, `git push`?
+- [x] **Branch**: Created `feat/logging` branch?
+- [x] **Work**: Implemented changes?
+- [x] **Test**: All tests pass (`pytest`)?
+- [x] **Doc**: Updated `README.md` if necessary?
+- [x] **Data**: `git add .`, `git commit`, `git push`?
