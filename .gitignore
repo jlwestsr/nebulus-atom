@@ -27,3 +27,4 @@ __pycache__/
 # Project Specific
 logs/
 tmp/
+.mini_nebulus/
