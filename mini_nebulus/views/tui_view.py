@@ -1,5 +1,6 @@
 from typing import Dict, Any, ContextManager, List
 from contextlib import contextmanager
+import asyncio
 
 from textual.app import App, ComposeResult
 from textual.containers import Grid, Container, Vertical
@@ -83,6 +84,7 @@ class MiniNebulusApp(App):
     ]
 
     controller = None  # To be set via TUIView
+    pending_input: asyncio.Future = None
 
     def compose(self) -> ComposeResult:
         with Grid():
@@ -109,16 +111,15 @@ class MiniNebulusApp(App):
         log = self.query_one("#chat-log", Log)
         log.write(Text(f"User: {user_input}", style="bold cyan"))
 
+        # Check if we are waiting for specific input (ask_user)
+        if self.pending_input and not self.pending_input.done():
+            self.pending_input.set_result(user_input)
+            return
+
         if self.controller:
             await self.controller.handle_tui_input(user_input)
 
     async def on_key(self, event) -> None:
-        # Check specifically for "enter" without modifiers (modifiers would make it "shift+enter" etc)
-        # However, Textual TextArea handles Enter as newline by default.
-        # We want: Enter -> Submit, Shift+Enter -> Newline
-        # But overriding TextArea's default binding is tricky without a custom widget subclass.
-        # Simpler approach for now: Ctrl+S to submit (bound above), Enter is newline.
-        # Or we can try to intercept Enter.
         pass
 
 
@@ -135,18 +136,32 @@ class TUIView(BaseView):
         """Starts the Textual App."""
         await self.app.run_async()
 
-    def print_welcome(self):
+    async def print_welcome(self):
         # Can't print to log yet if app isn't running, but can queue or ignore
         pass
 
-    def prompt_user(self) -> str:
+    async def prompt_user(self) -> str:
         # Not used in TUI event-driven mode
         raise NotImplementedError("TUI uses event-driven input")
 
-    def ask_user_input(self, question: str) -> str:
-        # TODO: Implement a modal or input request in TUI
-        # For now, return a placeholder or implement blocking logic (hard in async)
-        return "User input via TUI (Not Implemented)"
+    async def ask_user_input(self, question: str) -> str:
+        if not self.app.is_running:
+            return "Error: TUI not running"
+
+        # Display question
+        log = self.app.query_one("#chat-log", Log)
+        log.write(Text(f"❓ {question}", style="bold magenta"))
+        log.write(Text("  (Please type your answer below)", style="dim magenta"))
+
+        # Create future
+        loop = asyncio.get_running_loop()
+        self.app.pending_input = loop.create_future()
+
+        # Wait for answer
+        answer = await self.app.pending_input
+        self.app.pending_input = None
+
+        return answer
 
     async def print_agent_response(self, text: str):
         if self.app.is_running:
@@ -155,7 +170,7 @@ class TUIView(BaseView):
             log.write(text)
             log.write("")  # Newline
 
-    def print_telemetry(self, metrics: Dict[str, Any]):
+    async def print_telemetry(self, metrics: Dict[str, Any]):
         pass
 
     async def print_tool_output(self, output: str, tool_name: str = ""):
@@ -169,7 +184,7 @@ class TUIView(BaseView):
         if self.app.is_running:
             tree = self.app.query_one("#plan-tree", Tree)
             tree.clear()
-            tree.root.label = f"Goal: {plan_data.get('goal', 'Unknown')}"
+            tree.root.label = f"Goal: {plan_data.get("goal", "Unknown")}"
             tree.root.expand()
 
             for task in plan_data.get("tasks", []):
@@ -181,7 +196,7 @@ class TUIView(BaseView):
                 elif task["status"] == "failed":
                     status_icon = "❌"
 
-                tree.root.add(f"{status_icon} {task['description']}", expand=True)
+                tree.root.add(f"{status_icon} {task["description"]}", expand=True)
 
     async def print_context(self, context_data: List[str]):
         if self.app.is_running:
@@ -195,7 +210,7 @@ class TUIView(BaseView):
             log = self.app.query_one("#chat-log", Log)
             log.write(Text(f"Error: {message}", style="bold red"))
 
-    def print_goodbye(self):
+    async def print_goodbye(self):
         if self.app.is_running:
             self.app.exit()
 

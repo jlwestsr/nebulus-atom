@@ -7,7 +7,7 @@ from mini_nebulus.views.cli_view import CLIView
 @pytest.mark.asyncio
 async def test_interactive_clarification():
     mock_view = MagicMock(spec=CLIView)
-    mock_view.ask_user_input.return_value = "My name is User"
+    mock_view.ask_user_input = AsyncMock(return_value="My name is User")
     mock_view.print_agent_response = AsyncMock()
     mock_view.print_tool_output = AsyncMock()
     mock_view.print_plan = AsyncMock()
@@ -45,7 +45,7 @@ async def test_interactive_clarification():
     mock_response_2.choices = [mock_choice_2]
 
     # Synchronous generator
-    def mock_stream_sequence(*args, **kwargs):
+    async def mock_stream_sequence(*args, **kwargs):
         if controller.openai.create_chat_completion.call_count == 1:
             yield mock_response
         else:

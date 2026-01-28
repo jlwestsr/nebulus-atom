@@ -4,17 +4,17 @@ from typing import Dict, Any, ContextManager
 
 class BaseView(ABC):
     @abstractmethod
-    def print_welcome(self):
-        """Displays the welcome message. Sync because run at startup."""
+    async def print_welcome(self):
+        """Displays the welcome message."""
         pass
 
     @abstractmethod
-    def prompt_user(self) -> str:
-        """Prompts the user for input. Sync for CLI loop."""
+    async def prompt_user(self) -> str:
+        """Prompts the user for input."""
         pass
 
     @abstractmethod
-    def ask_user_input(self, question: str) -> str:
+    async def ask_user_input(self, question: str) -> str:
         """Prompts the user for specific input requested by the agent."""
         pass
 
@@ -24,7 +24,7 @@ class BaseView(ABC):
         pass
 
     @abstractmethod
-    def print_telemetry(self, metrics: Dict[str, Any]):
+    async def print_telemetry(self, metrics: Dict[str, Any]):
         """Displays performance telemetry."""
         pass
 
@@ -44,11 +44,11 @@ class BaseView(ABC):
         pass
 
     @abstractmethod
-    def print_goodbye(self):
+    async def print_goodbye(self):
         """Displays a goodbye message."""
         pass
 
     @abstractmethod
     def create_spinner(self, text: str) -> ContextManager:
-        """Creates a context manager for a loading spinner. Can remain sync context manager for CLI, no-op for Discord."""
+        """Creates a context manager for a loading spinner."""
         pass

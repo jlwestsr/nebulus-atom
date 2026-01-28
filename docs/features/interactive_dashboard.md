@@ -6,13 +6,13 @@
 Upgrade the User Interface from a scrolling CLI to a full **Terminal User Interface (TUI)**. This provides a persistent dashboard with dedicated panels for Chat, Plan/Graph, and Context, mimicking a "Mission Control" center.
 
 ## 2. Requirements
-- [ ] Replace `CLIView` (Rich) with a `Textual` App.
-- [ ] **Layout**:
+- [x] Replace `CLIView` (Rich) with a `Textual` App.
+- [x] **Layout**:
     - **Sidebar (Left)**: Active Plan (Tree), Pinned Files list.
     - **Main (Center)**: Chat History (Scrollable).
     - **Input (Bottom)**: Multi-line prompt area.
-- [ ] Real-time updates: When task status changes, the Sidebar updates immediately without re-printing the whole screen.
-- [ ] Keyboard shortcuts (e.g., Ctrl+C to stop, Ctrl+L to clear).
+- [x] Real-time updates: When task status changes, the Sidebar updates immediately without re-printing the whole screen.
+- [x] Keyboard shortcuts (e.g., Ctrl+C to stop, Ctrl+L to clear).
 
 ## 3. Technical Implementation
 - **Modules**:
@@ -22,13 +22,13 @@ Upgrade the User Interface from a scrolling CLI to a full **Terminal User Interf
 - **Data**: Async event loop integration with Textual.
 
 ## 4. Verification Plan
-- [ ] Run `mini-nebulus start --tui`.
-- [ ] Verify layout renders correctly.
-- [ ] Run a complex plan.
-- [ ] Verify the Plan Panel updates task icons in real-time.
-- [ ] Verify chat interaction works smoothly.
+- [x] Run `mini-nebulus start --tui`.
+- [x] Verify layout renders correctly.
+- [x] Run a complex plan.
+- [x] Verify the Plan Panel updates task icons in real-time.
+- [x] Verify chat interaction works smoothly.
 
 ## 5. Workflow Checklist
-- [ ] Create branch `feat/interactive-dashboard`
-- [ ] Implementation
-- [ ] Verification
+- [x] Create branch `feat/interactive-dashboard`
+- [x] Implementation
+- [x] Verification

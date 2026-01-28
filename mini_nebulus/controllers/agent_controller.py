@@ -1,3 +1,4 @@
+import asyncio
 import json
 import re
 import time
@@ -371,7 +372,7 @@ class AgentController:
         ]
 
     async def start(self, initial_prompt: Optional[str] = None):
-        self.view.print_welcome()
+        await self.view.print_welcome()
         if isinstance(self.view, CLIView):
             if self.context_loaded:
                 self.view.console.print("✔ Loaded @CONTEXT.md", style="dim green")
@@ -382,7 +383,10 @@ class AgentController:
         session_id = "default"
         if initial_prompt:
             self.history_manager.get_session(session_id).add("user", initial_prompt)
-            await self.process_turn(session_id)
+            if hasattr(self.view, "start_app"):
+                asyncio.create_task(self.process_turn(session_id))
+            else:
+                await self.process_turn(session_id)
 
         # Check if we are using TUI
         if hasattr(self.view, "start_app"):
@@ -395,11 +399,11 @@ class AgentController:
     async def handle_tui_input(self, user_input: str, session_id: str = "default"):
         """Callback for TUI to push input to the controller."""
         if user_input.lower() in Config.EXIT_COMMANDS:
-            self.view.print_goodbye()
+            await self.view.print_goodbye()
             return
 
         self.history_manager.get_session(session_id).add("user", user_input)
-        await self.process_turn(session_id)
+        asyncio.create_task(self.process_turn(session_id))
 
     async def chat_loop(self, session_id: str = "default"):
         while True:
@@ -469,28 +473,28 @@ class AgentController:
                         continue
 
                 else:
-                    user_input = self.view.prompt_user()
+                    user_input = await self.view.prompt_user()
                     if not user_input.strip():
                         if isinstance(self.view, CLIView):
                             continue
                         else:
                             break
                     if user_input.lower() in Config.EXIT_COMMANDS:
-                        self.view.print_goodbye()
+                        await self.view.print_goodbye()
                         break
                     self.history_manager.get_session(session_id).add("user", user_input)
                     await self.process_turn(session_id)
 
             except (KeyboardInterrupt, EOFError):
-                self.view.print_goodbye()
+                await self.view.print_goodbye()
                 break
                 if user_input.lower() in Config.EXIT_COMMANDS:
-                    self.view.print_goodbye()
+                    await self.view.print_goodbye()
                     break
                 self.history_manager.get_session(session_id).add("user", user_input)
                 await self.process_turn(session_id)
             except (KeyboardInterrupt, EOFError):
-                self.view.print_goodbye()
+                await self.view.print_goodbye()
                 break
 
     def extract_json(self, text: str) -> List[dict]:
@@ -669,7 +673,7 @@ class AgentController:
                             if name == "ask_user":
                                 question = args.get("question", "")
                                 if question:
-                                    output = self.view.ask_user_input(question)
+                                    output = await self.view.ask_user_input(question)
                                 else:
                                     output = "Error: No question provided."
                             elif name == "execute_plan":
@@ -704,7 +708,7 @@ class AgentController:
                             ).strip()
                             if full_response:
                                 await self.view.print_agent_response(full_response)
-                                self.view.print_telemetry(
+                                await self.view.print_telemetry(
                                     getattr(self.openai, "last_telemetry", {})
                                 )
                                 history.add("assistant", full_response)

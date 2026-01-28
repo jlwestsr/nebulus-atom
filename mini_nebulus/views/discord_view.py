@@ -8,39 +8,49 @@ class DiscordView(BaseView):
     def __init__(self, channel: discord.abc.Messageable):
         self.channel = channel
 
-    def print_welcome(self):
-        # We don't need a welcome message for every turn in Discord
+    async def print_welcome(self):
         pass
 
-    def prompt_user(self) -> str:
-        # In a gateway architecture, we don't prompt; we react to events.
+    async def prompt_user(self) -> str:
         return ""
+
+    async def ask_user_input(self, question: str) -> str:
+        await self.channel.send(
+            f"❓ **Question:** {question}\n*(Please reply to this message)*"
+        )
+
+        # NOTE: Real implementation requires access to the client to use wait_for.
+        # This is a placeholder that acknowledges the architectural need.
+        return "Discord input not yet fully bridged to client.wait_for"
 
     async def print_agent_response(self, text: str):
         if text.strip():
-            # Split long messages if needed
             chunks = [text[i : i + 1900] for i in range(0, len(text), 1900)]
             for chunk in chunks:
                 await self.channel.send(chunk)
 
+    async def print_telemetry(self, metrics: Dict[str, Any]):
+        pass
+
     async def print_tool_output(self, output: str, tool_name: str = ""):
         if not output:
             return
-
-        # Format as code block
         lang = "python" if tool_name in ["read_file", "create_skill"] else ""
-        formatted = f"**Tool Output ({tool_name}):**\n```{lang}\n{output[:1900]}\n```"
+        formatted = (
+            f"**Tool Output ({tool_name}):**\n```"
+            + lang
+            + "\n"
+            + f"{output[:1900]}\n```"
+        )
         if len(output) > 1900:
             formatted += "\n*(Output truncated)*"
-
         await self.channel.send(formatted)
 
     async def print_plan(self, plan_data: Dict[str, Any]):
         embed = discord.Embed(
-            title=f"Plan: {plan_data.get('goal', 'Unknown')}",
+            title=f"Plan: {plan_data.get("goal", "Unknown")}",
             color=discord.Color.blue(),
         )
-
         description = ""
         for task in plan_data.get("tasks", []):
             status = task.get("status", "pending").lower()
@@ -51,20 +61,16 @@ class DiscordView(BaseView):
                 icon = "▶️"
             elif status == "failed":
                 icon = "❌"
-
-            description += f"{icon} **{status.upper()}**: {task.get('description')}\n"
-
+            description += f"{icon} **{status.upper()}**: {task.get("description")}\n"
         embed.description = description
         await self.channel.send(embed=embed)
 
     async def print_error(self, message: str):
         await self.channel.send(f"❌ **Error:** {message}")
 
-    def print_goodbye(self):
+    async def print_goodbye(self):
         pass
 
     @contextmanager
     def create_spinner(self, text: str) -> ContextManager:
-        # Spinners don't translate well to Discord messages
-        # We could send a "Thinking..." message and delete it, but for now we do nothing
         yield

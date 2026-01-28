@@ -31,16 +31,16 @@ class CLIView(BaseView):
     def __init__(self):
         self.console = console
 
-    def print_welcome(self):
+    async def print_welcome(self):
         self.console.print("[bold cyan]🦞 Mini-Nebulus Agent[/bold cyan]")
         self.console.print(
             f"[dim]Connected to {Config.NEBULUS_BASE_URL} using {Config.NEBULUS_MODEL}[/dim]\n"
         )
 
-    def prompt_user(self) -> str:
+    async def prompt_user(self) -> str:
         return Prompt.ask("[user]You[/user]")
 
-    def ask_user_input(self, question: str) -> str:
+    async def ask_user_input(self, question: str) -> str:
         self.console.print(f"[question]Agent asks:[/question] {question}")
         return Prompt.ask("[question]Answer[/question]")
 
@@ -53,7 +53,7 @@ class CLIView(BaseView):
             else:
                 self.console.print(f"[agent]Agent:[/agent] {text.strip()}")
 
-    def print_telemetry(self, metrics: Dict[str, Any]):
+    async def print_telemetry(self, metrics: Dict[str, Any]):
         """Displays performance telemetry in a footer."""
         if not metrics:
             return
@@ -135,7 +135,7 @@ class CLIView(BaseView):
     async def print_error(self, message: str):
         self.console.print(f"[error]\nError: {message}[/error]")
 
-    def print_goodbye(self):
+    async def print_goodbye(self):
         self.console.print("[warning]Goodbye![/warning]")
 
     def create_spinner(self, text: str) -> ContextManager:
