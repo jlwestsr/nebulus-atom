@@ -3,14 +3,14 @@
 ## 1. Overview
 **Branch**: `feat/embedded-docs`
 
-This feature provides in-terminal access to the project's documentation. Users can list, read, and search documentation files directly from the CLI or via the agent, reducing the need to switch context to a browser or file explorer.
+This feature provides in-terminal access to the project s documentation. Users can list, read, and search documentation files directly from the CLI or via the agent, reducing the need to switch context to a browser or file explorer.
 
 ## 2. Requirements
-- [ ] **Doc Listing**: List available documentation files in `docs/` and its subdirectories.
-- [ ] **Doc Viewing**: Render Markdown files in the terminal using `rich`.
-- [ ] **Doc Searching**: Simple keyword search or RAG-based search (reusing `RagService` if applicable) for documentation.
-- [ ] **CLI Command**: `mini-nebulus docs` subcommand.
-- [ ] **Agent Tool**: `read_doc` and `list_docs` tools for the agent.
+- [x] **Doc Listing**: List available documentation files in `docs/` and its subdirectories.
+- [x] **Doc Viewing**: Render Markdown files in the terminal using `rich`.
+- [x] **Doc Searching**: Simple keyword search or RAG-based search (reusing `RagService` if applicable) for documentation.
+- [x] **CLI Command**: `mini-nebulus docs` subcommand.
+- [x] **Agent Tool**: `read_doc` and `list_docs` tools for the agent.
 
 ## 3. Technical Implementation
 - **Modules**:
@@ -21,17 +21,17 @@ This feature provides in-terminal access to the project's documentation. Users c
 
 ## 4. Verification Plan
 **Automated Tests**:
-- [ ] `tests/test_doc_service.py`:
+- [x] `tests/test_doc_service.py`:
     - Verify file listing.
     - Verify file reading.
 
 **Manual Verification**:
-- [ ] Run `python -m mini_nebulus.main docs list`.
-- [ ] Run `python -m mini_nebulus.main docs read features/task_management.md`.
+- [x] Run `python -m mini_nebulus.main docs list`.
+- [x] Run `python -m mini_nebulus.main docs read features/task_management.md`.
 
 ## 5. Workflow Checklist
-- [ ] **Branch**: `feat/embedded-docs`
-- [ ] **Work**: Implement DocService and CLI commands
-- [ ] **Test**: `pytest` passes
-- [ ] **Doc**: Updated docs
-- [ ] **Merge**: `develop`
+- [x] **Branch**: `feat/embedded-docs`
+- [x] **Work**: Implement DocService and CLI commands
+- [x] **Test**: `pytest` passes
+- [x] **Doc**: Updated docs
+- [x] **Merge**: `develop`
