@@ -6,11 +6,11 @@
 Implement a client for the **Model Context Protocol (MCP)**. This allows Mini-Nebulus to dynamically discover and use tools provided by external MCP Servers (e.g., PostgreSQL, GitHub, Slack) without hardcoding integration logic.
 
 ## 2. Requirements
-- [ ] Implement `MCPClient` service to connect to stdio/SSE MCP servers.
-- [ ] Add `connect_mcp_server <command>` tool to launch and connect to an MCP server.
-- [ ] Dynamically register tools discovered from MCP servers into `ToolExecutor`.
-- [ ] Convert Mini-Nebulus internal tool calls to MCP JSON-RPC requests.
-- [ ] Handle MCP resources and prompts (optional, focus on tools first).
+- [x] Implement `MCPClient` service to connect to stdio/SSE MCP servers.
+- [x] Add `connect_mcp_server <command>` tool to launch and connect to an MCP server.
+- [x] Dynamically register tools discovered from MCP servers into `ToolExecutor`.
+- [x] Convert Mini-Nebulus internal tool calls to MCP JSON-RPC requests.
+- [x] Handle MCP resources and prompts (optional, focus on tools first).
 
 ## 3. Technical Implementation
 - **Modules**:
@@ -20,12 +20,12 @@ Implement a client for the **Model Context Protocol (MCP)**. This allows Mini-Ne
 - **Data**: Config to store persistent server connections.
 
 ## 4. Verification Plan
-- [ ] Start a simple "Echo" MCP server.
-- [ ] Connect Mini-Nebulus to it.
-- [ ] Ask agent to "Use the echo tool".
-- [ ] Verify agent calls the tool via MCP and receives response.
+- [x] Start a simple "Echo" MCP server.
+- [x] Connect Mini-Nebulus to it.
+- [x] Ask agent to "Use the echo tool".
+- [x] Verify agent calls the tool via MCP and receives response.
 
 ## 5. Workflow Checklist
-- [ ] Create branch `feat/mcp-client`
-- [ ] Implementation
-- [ ] Verification
+- [x] Create branch `feat/mcp-client`
+- [x] Implementation
+- [x] Verification
