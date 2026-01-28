@@ -6,6 +6,7 @@ from typing import Optional, List
 
 from mini_nebulus.config import Config
 from mini_nebulus.models.history import HistoryManager
+from mini_nebulus.models.task import TaskStatus
 from mini_nebulus.services.openai_service import OpenAIService
 from mini_nebulus.services.tool_executor import ToolExecutor
 from mini_nebulus.services.file_service import FileService
@@ -20,6 +21,8 @@ class AgentController:
     def __init__(self, view: Optional[BaseView] = None):
         logger.info("Initializing AgentController")
         ToolExecutor.initialize()
+
+        self.auto_mode = False
 
         self.context_loaded = False
         try:
@@ -169,6 +172,14 @@ class AgentController:
                         },
                         "required": ["task_id", "status"],
                     },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "execute_plan",
+                    "description": "Start autonomous execution of the current plan.",
+                    "parameters": {"type": "object", "properties": {}, "required": []},
                 },
             },
             {
@@ -334,12 +345,86 @@ class AgentController:
     async def chat_loop(self, session_id: str = "default"):
         while True:
             try:
-                user_input = self.view.prompt_user()
-                if not user_input.strip():
-                    if isinstance(self.view, CLIView):
+                if self.auto_mode:
+                    # Autonomous Logic
+                    task_service = ToolExecutor.task_manager.get_service(session_id)
+                    plan = task_service.current_plan
+
+                    if not plan:
+                        self.auto_mode = False
+                        if isinstance(self.view, CLIView):
+                            self.view.console.print(
+                                "No active plan. Stopping auto-execution.",
+                                style="bold red",
+                            )
                         continue
+
+                    # Find next PENDING task
+                    next_task = None
+                    for task in plan.tasks:
+                        if task.status == TaskStatus.PENDING:
+                            next_task = task
+                            break
+
+                    if next_task:
+                        if isinstance(self.view, CLIView):
+                            self.view.console.print(
+                                f"🤖 Auto-Executing Task: {next_task.description}",
+                                style="bold cyan",
+                            )
+
+                        # Update status to IN_PROGRESS
+                        task_service.update_task_status(
+                            next_task.id, TaskStatus.IN_PROGRESS
+                        )
+
+                        # Formulate prompt
+                        user_input = (
+                            f"Execute this task: {next_task.description}. "
+                            "Mark it as COMPLETED when done."
+                        )
+
+                        self.history_manager.get_session(session_id).add(
+                            "user", user_input
+                        )
+                        await self.process_turn(session_id)
+
+                        # Check if task was completed by the agent
+                        updated_task = task_service.get_task(next_task.id)
+                        if updated_task.status != TaskStatus.COMPLETED:
+                            # If task failed or wasn't completed, stop auto-execution for safety
+                            if updated_task.status == TaskStatus.FAILED:
+                                self.auto_mode = False
+                                if isinstance(self.view, CLIView):
+                                    self.view.console.print(
+                                        "Task failed. Stopping auto-execution.",
+                                        style="bold red",
+                                    )
                     else:
+                        self.auto_mode = False
+                        if isinstance(self.view, CLIView):
+                            self.view.console.print(
+                                "All tasks completed. Stopping auto-execution.",
+                                style="bold green",
+                            )
+                        continue
+
+                else:
+                    user_input = self.view.prompt_user()
+                    if not user_input.strip():
+                        if isinstance(self.view, CLIView):
+                            continue
+                        else:
+                            break
+                    if user_input.lower() in Config.EXIT_COMMANDS:
+                        self.view.print_goodbye()
                         break
+                    self.history_manager.get_session(session_id).add("user", user_input)
+                    await self.process_turn(session_id)
+
+            except (KeyboardInterrupt, EOFError):
+                self.view.print_goodbye()
+                break
                 if user_input.lower() in Config.EXIT_COMMANDS:
                     self.view.print_goodbye()
                     break
@@ -520,6 +605,10 @@ class AgentController:
                                     output = self.view.ask_user_input(question)
                                 else:
                                     output = "Error: No question provided."
+                            elif name == "execute_plan":
+                                self.auto_mode = True
+                                output = "Autonomous execution started. I will now proceed to execute tasks one by one."
+                                finished_turn = True
                             else:
                                 with self.view.create_spinner(f"Executing {name}"):
                                     output = await ToolExecutor.dispatch(
