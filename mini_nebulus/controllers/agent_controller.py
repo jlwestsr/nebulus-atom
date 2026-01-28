@@ -378,6 +378,40 @@ class AgentController:
                     "parameters": {"type": "object", "properties": {}, "required": []},
                 },
             },
+            {
+                "type": "function",
+                "function": {
+                    "name": "map_codebase",
+                    "description": "Generate a structural map (AST) of the codebase.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "target_dir": {
+                                "type": "string",
+                                "description": "Directory to scan (default: root)",
+                            }
+                        },
+                        "required": [],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "find_symbol",
+                    "description": "Find a class or function definition by name.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "symbol": {
+                                "type": "string",
+                                "description": "Name of the class or function",
+                            }
+                        },
+                        "required": ["symbol"],
+                    },
+                },
+            },
         ]
 
     async def start(self, initial_prompt: Optional[str] = None):

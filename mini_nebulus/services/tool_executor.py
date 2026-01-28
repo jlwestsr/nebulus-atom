@@ -11,6 +11,7 @@ from mini_nebulus.services.preference_service import PreferenceServiceManager
 from mini_nebulus.services.doc_service import DocServiceManager
 from mini_nebulus.services.image_service import ImageServiceManager
 from mini_nebulus.services.journal_service import JournalServiceManager
+from mini_nebulus.services.ast_service import ASTServiceManager
 from mini_nebulus.services.docker_service import DockerServiceManager
 from mini_nebulus.models.task import TaskStatus
 from mini_nebulus.utils.logger import setup_logger
@@ -29,6 +30,7 @@ class ToolExecutor:
     doc_manager = DocServiceManager()
     image_manager = ImageServiceManager()
     journal_manager = JournalServiceManager()
+    ast_manager = ASTServiceManager()
     history_manager = None  # Set by AgentController
     docker_manager = DockerServiceManager()
 
@@ -152,6 +154,14 @@ class ToolExecutor:
                 return journal_service.generate_journal(
                     session_id, task_service, history
                 )
+
+            # Codebase Tools
+            elif tool_name == "map_codebase":
+                ast_service = ToolExecutor.ast_manager.get_service(session_id)
+                return str(ast_service.generate_map(args.get("target_dir")))
+            elif tool_name == "find_symbol":
+                ast_service = ToolExecutor.ast_manager.get_service(session_id)
+                return str(ast_service.find_symbol(args.get("symbol")))
 
             # Skill Tools
             elif tool_name == "create_skill":
