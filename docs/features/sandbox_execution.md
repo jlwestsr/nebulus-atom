@@ -6,11 +6,11 @@
 Secure the agent s execution environment by running potentially dangerous operations (shell commands, python scripts) inside an ephemeral Docker container. This prevents accidental system damage (e.g., `rm -rf /`).
 
 ## 2. Requirements
-- [ ] Check if Docker is available on startup.
-- [ ] Create a persistent `mini-nebulus-sandbox` container mounting the project dir.
-- [ ] Intercept `run_shell_command` to execute via `docker exec`.
-- [ ] Intercept `write_file`? (Optional, if mounted volume is used, host write is fine, but shell is the danger).
-- [ ] Provide a configuration option `SANDBOX_MODE=true/false`.
+- [x] Check if Docker is available on startup.
+- [x] Create a persistent `mini-nebulus-sandbox` container mounting the project dir.
+- [x] Intercept `run_shell_command` to execute via `docker exec`.
+- [x] Intercept `write_file`? (Optional, if mounted volume is used, host write is fine, but shell is the danger).
+- [x] Provide a configuration option `SANDBOX_MODE=true/false`.
 
 ## 3. Technical Implementation
 - **Modules**:
@@ -20,12 +20,12 @@ Secure the agent s execution environment by running potentially dangerous operat
 - **Data**: Dockerfile for the sandbox environment.
 
 ## 4. Verification Plan
-- [ ] Enable Sandbox Mode.
+- [x] Enable Sandbox Mode.
 - [ ] Run `run_shell_command "whoami"`.
 - [ ] Output should be `root` (inside docker) or `sandbox_user`, different from host user.
 - [ ] Verify file changes inside docker reflect on host (volume mount).
 
 ## 5. Workflow Checklist
-- [ ] Create branch `feat/sandbox-execution`
-- [ ] Implementation
-- [ ] Verification
+- [x] Create branch `feat/sandbox-execution`
+- [x] Implementation
+- [x] Verification (Partially complete - Tests pass, runtime requires Docker)
