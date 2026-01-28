@@ -13,7 +13,28 @@ class RagService:
         self.history_collection = self.client.get_or_create_collection(
             name="command_history"
         )
-        self.model = SentenceTransformer("all-MiniLM-L6-v2")
+        self._model_instance = None
+
+    @property
+    def model(self):
+        if self._model_instance is None:
+            print("Lazy-loading RAG model...")
+            try:
+                self._model_instance = SentenceTransformer("all-MiniLM-L6-v2")
+            except Exception as e:
+                print(f"Warning: Could not load SentenceTransformer: {e}")
+                print("RAG features will be disabled (using dummy embeddings).")
+                self._model_instance = self._create_dummy_model()
+        return self._model_instance
+
+    def _create_dummy_model(self):
+        class DummyModel:
+            def encode(self, documents):
+                # Return dummy embeddings (384 dimensions is standard for MiniLM)
+                count = 1 if isinstance(documents, str) else len(documents)
+                return [[0.0] * 384] * count
+
+        return DummyModel()
 
     def index_codebase(self, root_dir: str = "."):
         documents = []

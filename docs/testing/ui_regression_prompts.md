@@ -3,7 +3,7 @@
 This document contains a standardized set of prompts for manually verifying the **Mini-Nebulus** CLI agent's capabilities.
 
 ## Usage
-Run these prompts interactively (e.g., `python -m mini_nebulus.main start --tui`) to ensure the agent correctly identifies and executes the appropriate tools.
+Run these prompts interactively (e.g., `mn`) to ensure the agent correctly identifies and executes the appropriate tools.
 
 ## Core Features (Legacy)
 
@@ -18,12 +18,14 @@ Run these prompts interactively (e.g., `python -m mini_nebulus.main start --tui`
 
 ## New Features (v2.0)
 
-### 1. Interactive Dashboard (TUI)
-**Prompt:** (Run with `--tui`)
+### 1. Rich REPL Interface
+**Prompt:**
 > "What is your current plan?"
 **Verification:**
-- Check if the chat history scrolls correctly.
-- Check if the Sidebar (Plan/Context) updates if you add a task (e.g. "Add a task to check the time").
+- **Prompt Box**: Ensure the `Mini-Nebulus ➤` prompt remains at the bottom of the screen.
+- **Streaming**: Verify the agent's response streams *above* the input box.
+- **Status Bar**: Check the bottom toolbar for `CWD | (Branch) | Model`.
+- **History**: Press `Up Arrow` to verify you can see the command you just typed.
 
 ### 2. Session Journal (Daily Standup)
 **Prompt:**
@@ -83,7 +85,8 @@ Run these prompts interactively (e.g., `python -m mini_nebulus.main start --tui`
 **Prompt:**
 > "Create a plan to 'Test Persistence'." -> Exit -> Restart.
 **Verification:**
-- Upon restart, the Plan sidebar should automatically populate with "Test Persistence".
+- Upon restart, run `get_plan` (or "Show plan").
+- The output should contain "Test Persistence".
 
 ## Integrated Workflow: "The Architect"
 

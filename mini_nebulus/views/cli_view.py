@@ -1,142 +1,232 @@
-from typing import Dict, Any, ContextManager
+from typing import Dict, Any, ContextManager, List
+from contextlib import contextmanager
+
 from rich.console import Console
-from rich.prompt import Prompt
-from rich.theme import Theme
-from rich.panel import Panel
 from rich.tree import Tree
-from rich.syntax import Syntax
+
+# Prompt Toolkit Imports
+from prompt_toolkit import PromptSession
+from prompt_toolkit.history import FileHistory
+from prompt_toolkit.styles import Style as PromptStyle
+from prompt_toolkit.formatted_text import HTML
+from prompt_toolkit.key_binding import KeyBindings
+from prompt_toolkit.keys import Keys
+
+import os
+import subprocess
+import asyncio
+
 from mini_nebulus.config import Config
 from mini_nebulus.views.base_view import BaseView
-
-custom_theme = Theme(
-    {
-        "info": "dim cyan",
-        "warning": "yellow",
-        "error": "bold red",
-        "user": "bold green",
-        "agent": "bold blue",
-        "tool": "dim white",
-        "task.pending": "dim white",
-        "task.in_progress": "yellow",
-        "task.completed": "green",
-        "task.failed": "red",
-        "question": "bold magenta",
-    }
-)
-
-console = Console(theme=custom_theme)
 
 
 class CLIView(BaseView):
     def __init__(self):
-        self.console = console
+        self.console = Console()
+        # Initialize PromptSession with persistent history
+        self.session = PromptSession(history=FileHistory(".mini_nebulus_history"))
+        self.controller = None
+        self.status_message = ""
+        self.is_thinking = False
 
-    async def print_welcome(self):
-        self.console.print("[bold cyan]🦞 Mini-Nebulus Agent[/bold cyan]")
+        # input_future is used to pause the main loop and return value to ask_user_input
+        self.input_future = None
+        self.input_prompt = ""
+
+    def set_controller(self, controller):
+        self.controller = controller
+
+    def get_prompt_message(self):
+        # Determine prompt style and label based on state
+        # Priority: Agent Asking Input > Agent Thinking > Standard User Input
+        if self.input_future and not self.input_future.done():
+            # Agent needs input
+            return HTML(
+                "<b><style bg='ansimagenta' color='white'> Input </style> ➤ </b>"
+            )
+        elif self.is_thinking:
+            # Agent is busy
+            return HTML("<b><style bg='ansigray' color='white'> Busy </style> ➤ </b>")
+        else:
+            # Standard
+            return HTML(
+                "<b><style bg='ansiblue' color='white'> Type your message </style> ➤ </b>"
+            )
+
+    def create_key_bindings(self):
+        kb = KeyBindings()
+
+        @kb.add(Keys.Up)
+        def _(event):
+            event.current_buffer.auto_up(
+                count=1, go_to_start_of_line_if_history_changes=True
+            )
+
+        @kb.add(Keys.Down)
+        def _(event):
+            event.current_buffer.auto_down(
+                count=1, go_to_start_of_line_if_history_changes=True
+            )
+
+        return kb
+
+    async def start_app(self):
+        """Starts the persistent REPL loop with streaming output."""
+        from prompt_toolkit.patch_stdout import patch_stdout
+
         self.console.print(
-            f"[dim]Connected to {Config.NEBULUS_BASE_URL} using {Config.NEBULUS_MODEL}[/dim]\n"
+            "[dim]Type 'exit' to quit. Use Up/Down arrows for history.[/dim]\n"
         )
 
+        kb = self.create_key_bindings()
+
+        with patch_stdout():
+            while True:
+                try:
+                    # Wait for input using dynamic prompt message
+                    user_input = await self.session.prompt_async(
+                        self.get_prompt_message,
+                        bottom_toolbar=self.get_bottom_toolbar,
+                        style=PromptStyle.from_dict(
+                            {
+                                "bottom-toolbar": "#444444 bg:#222222",
+                            }
+                        ),
+                        refresh_interval=0.5,
+                        key_bindings=kb,
+                    )
+
+                    if not user_input.strip():
+                        continue
+
+                    # Handle Input Routing
+                    if self.input_future and not self.input_future.done():
+                        # Route to waiting agent
+                        self.input_future.set_result(user_input.strip())
+                        # Clear future so loop resets
+                        self.input_future = None
+                    else:
+                        # Route to controller (New Command)
+                        if self.is_thinking:
+                            self.console.print(
+                                "[dim]Agent is busy. Processing command in background...[/dim]"
+                            )
+
+                        if self.controller:
+                            # Run in background to keep prompt loop alive
+                            asyncio.create_task(
+                                self.controller.handle_tui_input(user_input)
+                            )
+
+                except (EOFError, KeyboardInterrupt):
+                    self.console.print("[bold cyan]👋 Goodbye![/bold cyan]")
+                    break
+                except Exception as e:
+                    self.console.print(f"[bold red]Error in REPL loop: {e}[/bold red]")
+
+    def _get_git_branch(self):
+        try:
+            return (
+                subprocess.check_output(
+                    ["git", "branch", "--show-current"], stderr=subprocess.DEVNULL
+                )
+                .decode()
+                .strip()
+            )
+        except Exception:
+            return ""
+
+    def get_bottom_toolbar(self):
+        cwd = os.getcwd().replace(os.path.expanduser("~"), "~")
+        branch = self._get_git_branch()
+        branch_str = f"({branch})" if branch else ""
+        model = Config.NEBULUS_MODEL
+
+        status_part = ""
+        if self.status_message:
+            status_part = (
+                f" <style bg='ansiyellow' color='black'> {self.status_message} </style>"
+            )
+
+        # Simple status bar: Path (Branch) ... Model ... Status
+        return HTML(
+            f"<b>{cwd}</b> <style color='ansicyan'>{branch_str}</style> "
+            f"<style color='ansigray'>│</style> Model: <b>{model}</b> "
+            f"<style color='ansigray'>│</style> <b>Mini-Nebulus</b>"
+            f"{status_part}"
+        )
+
+    # Legacy method shim for Controller compatibility if it calls prompt_user directly
+    # But in start_app mode, controller shouldn't call this.
     async def prompt_user(self) -> str:
-        return Prompt.ask("[user]You[/user]")
+        return await self.session.prompt_async("> ")
 
     async def ask_user_input(self, question: str) -> str:
-        self.console.print(f"[question]Agent asks:[/question] {question}")
-        return Prompt.ask("[question]Answer[/question]")
+        # Event-driven: Print question, set state, wait for Future
+        self.console.print(f"[bold magenta]❓ {question}[/bold magenta]")
+
+        loop = asyncio.get_running_loop()
+        self.input_future = loop.create_future()
+        self.input_prompt = "Answer"
+
+        # Force refresh of prompt app to pick up state change immediately
+        if hasattr(self.session, "app"):
+            self.session.app.invalidate()
+
+        # Wait for the main loop to fulfill the future
+        return await self.input_future
 
     async def print_agent_response(self, text: str):
-        if text.strip():
-            if len(text) > 200:
-                self.console.print(
-                    Panel(text.strip(), title="Mini-Nebulus", border_style="blue")
-                )
-            else:
-                self.console.print(f"[agent]Agent:[/agent] {text.strip()}")
+        self.console.print(f"[bold green]Agent:[/bold green] {text}")
 
     async def print_telemetry(self, metrics: Dict[str, Any]):
-        """Displays performance telemetry in a footer."""
-        if not metrics:
-            return
-
-        ttft = f"{metrics.get('ttft', 0):.2f}s" if metrics.get("ttft") else "N/A"
-        total = (
-            f"{metrics.get('total_time', 0):.2f}s"
-            if metrics.get("total_time")
-            else "N/A"
-        )
-        usage = metrics.get("usage", {})
-
-        # Format: Latency: 0.12s / 2.3s | Tokens: 50 / 120 (170) | Model: qwen3...
-        status = (
-            f"[dim]"
-            f"⏱️  {ttft} / {total}  |  "
-            f"🪙  {usage.get('prompt_tokens', '?')} + {usage.get('completion_tokens', '?')} = {usage.get('total_tokens', '?')}  |  "
-            f"🤖 {metrics.get('model', 'Unknown')}"
-            f"[/dim]"
-        )
-        self.console.print(Panel(status, style="dim white", border_style="dim"))
+        pass
 
     async def print_tool_output(self, output: str, tool_name: str = ""):
-        if not output:
-            return
-
-        if tool_name == "read_file":
-            syntax = Syntax(output, "python", theme="monokai", line_numbers=True)
-            self.console.print(Panel(syntax, title="File Content", border_style="dim"))
+        self.console.print(f"[dim blue]✔ Executed: {tool_name}[/dim blue]")
+        if len(output) > 500:
+            self.console.print(f"  [dim]{output[:500]}... (truncated)[/dim]")
         else:
-            formatted = "\n".join([f"  {line}" for line in output.strip().split("\n")])
-            self.console.print(f"[tool]{formatted}[/tool]")
+            self.console.print(f"  [dim]{output}[/dim]")
 
     async def print_plan(self, plan_data: Dict[str, Any]):
-        """Displays the current plan as a dependency tree."""
         goal = plan_data.get("goal", "Unknown Goal")
-        tree = Tree(f"[bold cyan]Plan: {goal}[/bold cyan]")
-
         tasks = plan_data.get("tasks", [])
-        if not tasks:
-            self.console.print(tree)
-            return
 
-        # Map tasks by ID for easy lookup
+        tree = Tree(f"[bold]{goal}[/bold]")
+        for task in tasks:
+            icon = "⏳"
+            if task["status"] == "completed":
+                icon = "✅"
+            elif task["status"] == "in_progress":
+                icon = "🔄"
+            elif task["status"] == "failed":
+                icon = "❌"
+            tree.add(f"{icon} {task['description']}")
 
-        # Identify "roots" of the dependency graph (tasks with no dependencies)
-        # Note: If A depends on B, B comes first.
-        # But for visualizing "Execution Flow", we might want to show B -> A
-        # Roots = Tasks that depend on NOTHING (start here)
-
-        roots = [t for t in tasks if not t.get("dependencies")]
-
-        # Helper to recursively add nodes
-        # This handles a Tree structure. If it is a DAG (A->C, B->C), C appears twice.
-        def add_nodes(parent_node, current_tasks):
-            for task in current_tasks:
-                status = task.get("status", "pending").lower()
-                status_style = f"task.{status}"
-                icon = "○"
-                if status == "completed":
-                    icon = "✔"
-                elif status == "in_progress":
-                    icon = "▶"
-                elif status == "failed":
-                    icon = "✖"
-
-                label = f"[{status_style}]{icon} {task['description']} ({task['id'][:8]})[/{status_style}]"
-                node = parent_node.add(label)
-
-                # Find tasks that depend on THIS task
-                dependents = [
-                    t for t in tasks if task["id"] in t.get("dependencies", [])
-                ]
-                add_nodes(node, dependents)
-
-        add_nodes(tree, roots)
         self.console.print(tree)
 
+    async def print_context(self, context_data: List[str]):
+        # Optional: Print context if needed by CLI
+        pass
+
     async def print_error(self, message: str):
-        self.console.print(f"[error]\nError: {message}[/error]")
+        self.console.print(f"[bold red]❌ {message}[/bold red]")
 
     async def print_goodbye(self):
-        self.console.print("[warning]Goodbye![/warning]")
+        self.console.print("[bold cyan]👋 Goodbye![/bold cyan]")
 
+    @contextmanager
     def create_spinner(self, text: str) -> ContextManager:
-        return self.console.status(f"[blue]{text}[/blue]", spinner="dots")
+        # Update status bar instead of blocking console
+        self.status_message = f"⠙ {text}"
+        self.is_thinking = True
+        if hasattr(self.session, "app"):
+            self.session.app.invalidate()
+        try:
+            yield
+        finally:
+            self.status_message = ""
+            self.is_thinking = False
+            if hasattr(self.session, "app"):
+                self.session.app.invalidate()

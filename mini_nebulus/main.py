@@ -15,6 +15,7 @@ def main(
     prompt: Optional[List[str]] = typer.Argument(
         None, help="Initial prompt to execute immediately"
     ),
+    tui: bool = typer.Option(False, help="Enable Interactive Dashboard (TUI)"),
 ):
     """
     Mini-Nebulus: A professional, autonomous AI engineer CLI.
@@ -24,9 +25,7 @@ def main(
         return
 
     # If no subcommand, we run the default behavior (interactive mode)
-    initial_prompt = " ".join(prompt) if prompt else None
-    controller = AgentController()
-    asyncio.run(controller.start(initial_prompt))
+    _start_agent(prompt, tui)
 
 
 @app.command()
@@ -34,11 +33,15 @@ def start(
     prompt: Optional[List[str]] = typer.Argument(
         None, help="Initial prompt to execute immediately"
     ),
-    tui: bool = typer.Option(False, help="Enable Interactive Dashboard (TUI)"),
+    tui: bool = typer.Option(False, help="Enable Interactive Dashboard (Deprecated)"),
 ):
     """
     Start the Mini-Nebulus AI Agent.
     """
+    _start_agent(prompt, tui)
+
+
+def _start_agent(prompt: Optional[List[str]], tui: bool):
     initial_prompt = " ".join(prompt) if prompt else None
 
     view = None

@@ -4,7 +4,7 @@ import asyncio
 
 from textual.app import App, ComposeResult
 from textual.containers import Grid, Container, Vertical
-from textual.widgets import Footer, Log, Tree, Label, TextArea
+from textual.widgets import Footer, RichLog, Tree, Label, TextArea
 from textual.binding import Binding
 from rich.text import Text
 
@@ -16,12 +16,12 @@ class Sidebar(Container):
         yield Label("[bold]Plan[/bold]", classes="section-title")
         yield Tree("Tasks", id="plan-tree")
         yield Label("[bold]Context[/bold]", classes="section-title")
-        yield Log(id="context-log")
+        yield RichLog(id="context-log")
 
 
 class ChatPanel(Container):
     def compose(self) -> ComposeResult:
-        yield Log(id="chat-log", markup=True)
+        yield RichLog(id="chat-log", markup=True)
 
 
 class MiniNebulusApp(App):
@@ -91,11 +91,14 @@ class MiniNebulusApp(App):
             yield Sidebar()
             with Vertical(id="main-area"):
                 yield ChatPanel()
-                yield TextArea(id="input-area", show_line_numbers=False)
+                # Prevent Enter from creating newlines by dedenting/handling in key handler
+                area = TextArea(id="input-area", show_line_numbers=False)
+                area.show_line_numbers = False
+                yield area
         yield Footer()
 
     def action_clear_log(self):
-        log = self.query_one("#chat-log", Log)
+        log = self.query_one("#chat-log", RichLog)
         log.clear()
 
     async def action_submit_message(self):
@@ -108,7 +111,7 @@ class MiniNebulusApp(App):
         input_area.text = ""  # Clear input
 
         # Display user message immediately
-        log = self.query_one("#chat-log", Log)
+        log = self.query_one("#chat-log", RichLog)
         log.write(Text(f"User: {user_input}", style="bold cyan"))
 
         # Check if we are waiting for specific input (ask_user)
@@ -120,7 +123,12 @@ class MiniNebulusApp(App):
             await self.controller.handle_tui_input(user_input)
 
     async def on_key(self, event) -> None:
-        pass
+        # Bind Enter to submit if input area has focus
+        if event.key == "enter":
+            input_area = self.query_one("#input-area", TextArea)
+            if input_area.has_focus:
+                event.stop()  # Prevent newline
+                await self.action_submit_message()
 
 
 class TUIView(BaseView):
@@ -149,7 +157,7 @@ class TUIView(BaseView):
             return "Error: TUI not running"
 
         # Display question
-        log = self.app.query_one("#chat-log", Log)
+        log = self.app.query_one("#chat-log", RichLog)
         log.write(Text(f"❓ {question}", style="bold magenta"))
         log.write(Text("  (Please type your answer below)", style="dim magenta"))
 
@@ -165,7 +173,7 @@ class TUIView(BaseView):
 
     async def print_agent_response(self, text: str):
         if self.app.is_running:
-            log = self.app.query_one("#chat-log", Log)
+            log = self.app.query_one("#chat-log", RichLog)
             log.write(Text("Agent:", style="bold green"))
             log.write(text)
             log.write("")  # Newline
@@ -175,7 +183,7 @@ class TUIView(BaseView):
 
     async def print_tool_output(self, output: str, tool_name: str = ""):
         if self.app.is_running:
-            log = self.app.query_one("#chat-log", Log)
+            log = self.app.query_one("#chat-log", RichLog)
             log.write(Text(f"Tool ({tool_name}):", style="bold blue"))
             log.write(output)
             log.write("")
@@ -200,14 +208,14 @@ class TUIView(BaseView):
 
     async def print_context(self, context_data: List[str]):
         if self.app.is_running:
-            log = self.app.query_one("#context-log", Log)
+            log = self.app.query_one("#context-log", RichLog)
             log.clear()
             for item in context_data:
                 log.write(Text(f"• {item}", style="dim cyan"))
 
     async def print_error(self, message: str):
         if self.app.is_running:
-            log = self.app.query_one("#chat-log", Log)
+            log = self.app.query_one("#chat-log", RichLog)
             log.write(Text(f"Error: {message}", style="bold red"))
 
     async def print_goodbye(self):

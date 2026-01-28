@@ -181,6 +181,14 @@ class AgentController:
             {
                 "type": "function",
                 "function": {
+                    "name": "get_plan",
+                    "description": "Retrieve the current plan and task status.",
+                    "parameters": {"type": "object", "properties": {}, "required": []},
+                },
+            },
+            {
+                "type": "function",
+                "function": {
                     "name": "set_preference",
                     "description": "Set a user preference.",
                     "parameters": {
@@ -480,10 +488,28 @@ class AgentController:
         """Callback for TUI to push input to the controller."""
         if user_input.lower() in Config.EXIT_COMMANDS:
             await self.view.print_goodbye()
-            return
+            import sys
+
+            sys.exit(0)
 
         self.history_manager.get_session(session_id).add("user", user_input)
-        asyncio.create_task(self.process_turn(session_id))
+
+        # Process the initial user input
+        await self.process_turn(session_id)
+
+        # Check for autonomous continuation (TDD or Auto Mode)
+        # We loop here to handle the entire chain of autonomous actions
+        while self.pending_tdd_goal or self.auto_mode:
+            if self.pending_tdd_goal:
+                await self.run_tdd_cycle(self.pending_tdd_goal, session_id)
+                # run_tdd_cycle clears pending_tdd_goal when done
+            elif self.auto_mode:
+                # Re-run process_turn to pick up next task
+                await self.process_turn(session_id)
+
+                # Breaker: If plan is empty/done, auto_mode is set to False in process_turn
+                # But we need to ensure we don't infinite loop if it fails to clear
+                # process_turn logic handles auto_mode clearing.
 
     async def chat_loop(self, session_id: str = "default"):
         while True:
