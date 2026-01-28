@@ -6,10 +6,10 @@
 Allow the agent to take a successful tool execution or plan and "compile" it into a standard Bash script or shell alias for the user to use *without* the agent next time. This reduces latency for repetitive tasks.
 
 ## 2. Requirements
-- [ ] **Macro Creation**: Agent can generate a shell script from a sequence of `run_shell_command` calls.
-- [ ] **Alias Suggestion**: Agent can suggest an alias (e.g., `alias clean-docker="..."`).
-- [ ] **Persistence**: Save macros to `~/.mini_nebulus/macros/` or append to `.bashrc` (with user permission).
-- [ ] **Tool Integration**: Add `create_macro` tool.
+- [x] **Macro Creation**: Agent can generate a shell script from a sequence of `run_shell_command` calls.
+- [x] **Alias Suggestion**: Agent can suggest an alias (e.g., `alias clean-docker="..."`).
+- [x] **Persistence**: Save macros to `~/.mini_nebulus/macros/` or append to `.bashrc` (with user permission).
+- [x] **Tool Integration**: Add `create_macro` tool.
 
 ## 3. Technical Implementation
 - **Modules**:
@@ -20,18 +20,18 @@ Allow the agent to take a successful tool execution or plan and "compile" it int
 
 ## 4. Verification Plan
 **Automated Tests**:
-- [ ] `tests/test_macro_service.py`:
+- [x] `tests/test_macro_service.py`:
     - Pass a history of commands.
     - Verify generated script content.
 
 **Manual Verification**:
-- [ ] Run `mini-nebulus start`.
-- [ ] Ask: "Create a macro to clean all docker containers".
-- [ ] Verify `clean_docker.sh` is created and executable.
+- [x] Run `mini-nebulus start`.
+- [x] Ask: "Create a macro to clean all docker containers".
+- [x] Verify `clean_docker.sh` is created and executable.
 
 ## 5. Workflow Checklist
-- [ ] **Branch**: Created `feat/shell-macro` branch?
-- [ ] **Work**: Implemented changes?
-- [ ] **Test**: All tests pass (`pytest`)?
-- [ ] **Doc**: Updated `README.md`?
-- [ ] **Data**: `git add .`, `git commit`?
+- [x] **Branch**: Created `feat/shell-macro` branch?
+- [x] **Work**: Implemented changes?
+- [x] **Test**: All tests pass (`pytest`)?
+- [x] **Doc**: Updated `README.md`?
+- [x] **Data**: `git add .`, `git commit`?
