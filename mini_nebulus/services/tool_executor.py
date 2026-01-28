@@ -9,6 +9,7 @@ from mini_nebulus.services.rag_service import RagServiceManager
 from mini_nebulus.services.mcp_service import MCPService
 from mini_nebulus.services.preference_service import PreferenceServiceManager
 from mini_nebulus.services.doc_service import DocServiceManager
+from mini_nebulus.services.image_service import ImageServiceManager
 from mini_nebulus.services.docker_service import DockerServiceManager
 from mini_nebulus.models.task import TaskStatus
 from mini_nebulus.utils.logger import setup_logger
@@ -25,6 +26,7 @@ class ToolExecutor:
     mcp_service = MCPService()
     preference_manager = PreferenceServiceManager()
     doc_manager = DocServiceManager()
+    image_manager = ImageServiceManager()
     docker_manager = DockerServiceManager()
 
     @staticmethod
@@ -131,6 +133,11 @@ class ToolExecutor:
                     session_id
                 )
                 return str(preference_service.get_preference(args.get("key")))
+
+            # Image Tools
+            elif tool_name == "scan_image":
+                image_service = ToolExecutor.image_manager.get_service(session_id)
+                return image_service.encode_image(args.get("path"))
 
             # Skill Tools
             elif tool_name == "create_skill":
