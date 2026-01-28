@@ -26,8 +26,12 @@ class MCPService:
         """
         logger.info(f"Connecting to MCP server '{name}' with command: {command} {args}")
 
+        merged_env = os.environ.copy()
+        if env:
+            merged_env.update(env)
+
         server_params = StdioServerParameters(
-            command=command, args=args, env=env or os.environ.copy()
+            command=command, args=args, env=merged_env
         )
 
         try:
@@ -81,14 +85,6 @@ class MCPService:
 
         server_name = parts[1]
         tool_name = "__".join(parts[2:])  # In case tool name has underscores
-
-        # Actually, the real tool name on the server is just the suffix.
-        # But we need to handle if the server tool name had underscores.
-        # Re-joining parts[2:] is correct if we split by exactly "__".
-
-        # Wait, the tool name on the server is just "tool.name".
-        # If tool.name was "get_weather", our internal name is "mcp__weather_server__get_weather".
-        # Splitting by "__" gives ["mcp", "weather_server", "get_weather"].
 
         if server_name not in self.sessions:
             raise ValueError(f"MCP server '{server_name}' not connected.")

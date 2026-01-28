@@ -12,6 +12,7 @@ class Config:
     EXIT_COMMANDS = ["exit", "quit", "/exit", "/quit"]
     SANDBOX_MODE = os.getenv("SANDBOX_MODE", "false").lower() == "true"
     GLOBAL_SKILLS_PATH = os.path.expanduser("~/.mini_nebulus/skills")
+    GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 
     # Logging Configuration
     LOG_DIR = os.path.join(os.getcwd(), "logs")
