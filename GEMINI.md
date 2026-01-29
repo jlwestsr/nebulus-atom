@@ -9,8 +9,8 @@ This is a custom, lightweight CLI agent built to interact directly with a local 
 - **UI**: Rich
 - **LLM Client**: OpenAI Python Library
 - **Architecture**: Strict MVC (Model-View-Controller) with OOP best practices.
-- **Target Server**: http://nebulus:11434/v1
-- **Model**: qwen2.5-coder:latest
+- **Target Server**: http://localhost:5000/v1
+- **Model**: Meta-Llama-3.1-8B-Instruct-exl2-8_0
 
 ## Agent Instructions
 - Always work on the `develop` branch.

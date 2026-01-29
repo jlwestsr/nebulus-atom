@@ -25,9 +25,9 @@ class OpenAIService:
     async def create_chat_completion(self, messages, tools=None):
         import time
 
-        logger.debug(
-            f"Creating chat completion with {len(messages)} messages and {len(tools) if tools else 0} tools"
-        )
+        # logger.debug(
+        #     f"Creating chat completion with {len(messages)} messages and {len(tools) if tools else 0} tools"
+        # )
         start_time = time.time()
         self.last_telemetry = {
             "model": self.model,
@@ -44,9 +44,10 @@ class OpenAIService:
             model=self.model,
             messages=messages,
             stream=True,
-            tools=tools,
-            tool_choice="auto" if tools else None,
-            stream_options={"include_usage": True},  # Request usage stats
+            # Force native tools off for Prompt-Based Tool Calling
+            tools=None,
+            tool_choice=None,
+            # stream_options={"include_usage": True},  # Request usage stats -- REMOVED for stability
         )
 
         first_token = True

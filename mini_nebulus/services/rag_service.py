@@ -19,9 +19,27 @@ class RagService:
     @property
     def model(self):
         if self._model_instance is None:
-            print("Lazy-loading RAG model (bert-base-uncased)...")
-            # Use a lighter model for speed or the configured one
-            self._model_instance = SentenceTransformer("all-MiniLM-L6-v2")
+            # print("Lazy-loading RAG model (bert-base-uncased)...")  # Removed to prevent TUI corruption
+            # Suppress logs during heavy model loading
+            import contextlib
+            import sys
+
+            @contextlib.contextmanager
+            def suppress_output():
+                with open(os.devnull, "w") as devnull:
+                    old_stdout = sys.stdout
+                    old_stderr = sys.stderr
+                    sys.stdout = devnull
+                    sys.stderr = devnull
+                    try:
+                        yield
+                    finally:
+                        sys.stdout = old_stdout
+                        sys.stderr = old_stderr
+
+            with suppress_output():
+                # Use a lighter model for speed or the configured one
+                self._model_instance = SentenceTransformer("all-MiniLM-L6-v2")
         return self._model_instance
 
     async def index_codebase(self, root_dir: str = "."):

@@ -10,7 +10,6 @@ from mini_nebulus.models.history import HistoryManager
 from mini_nebulus.models.task import TaskStatus
 from mini_nebulus.services.openai_service import OpenAIService
 from mini_nebulus.services.tool_executor import ToolExecutor
-from mini_nebulus.services.file_service import FileService
 from mini_nebulus.views.base_view import BaseView
 from mini_nebulus.views.cli_view import CLIView
 from mini_nebulus.utils.logger import setup_logger
@@ -27,75 +26,18 @@ class AgentController:
 
         self.context_loaded = False
         try:
-            context_content = FileService.read_file("CONTEXT.md")
+            # Context disabled to prevent overflow on local backends
+            context_content = ""
             self.context_loaded = True
         except Exception:
             context_content = "Context file not found."
 
-        self.pending_tdd_goal = None
-        system_prompt = (
-            "You are Mini-Nebulus, an autonomous AI engineer. You have full system access.\n"
-            "Your ONLY goal is to execute tasks. NEVER explain what you are going to do.\n"
-            "NEVER use markdown code blocks like ```python unless you are calling a tool.\n"
-            "ALWAYS use tools to perform actions.\n\n"
-            "### AUTONOMY RULES ###\n"
-            "1. You are AUTONOMOUS. Do NOT ask the user for input (e.g., via ask_user) to define tasks or plans.\n"
-            "2. Infer the goal and task description yourself based on the user's initial prompt and the current context.\n"
-            "3. Only use ask_user if there is a critical ambiguity that completely stops you from proceeding.\n"
-            "4. If you have executed the user's request, STOP immediately. Do NOT create plans, add tasks, write files, or pin files.\n"
-            "5. Do NOT hallucinate that you need to implement features just because you see them in the context files.\n"
-            "6. Simple requests (like 'list files', 'read file', 'check size') do NOT require `create_plan` or `add_task`. Just run the command and stop.\n"
-            "7. Do NOT try to `update_task` if you haven't created a plan first. If there is no plan, there are no tasks to update.\n"
-            "8. Do NOT create a plan AFTER doing the work just to mark it as done. If the work is done, you are done.\n"
-            "9. Do NOT pin files or read files 'just to check' or 'get context' unless the user asked you to analyze those specific files.\n"
-            "10. If the request is 'search for X', run `search_code` and then report the results based on the tool output. Do NOT read the source files to 'verify' unless explicitly asked.\n\n"
-            "### TOOL USAGE RULES ###\n"
-            "1. You MUST ONLY use the tools provided in the `tools` list. Do NOT invent new tools (e.g., 'find_file' does NOT exist).\n"
-            "2. To list files, use `run_shell_command` with `ls` or `FileService.list_dir` if available.\n\n"
-            "### HOW TO CALL TOOLS ###\n"
-            "To perform an action, output ONLY a JSON tool call using DOUBLE QUOTES.\n"
-            'Example: {"name": "write_file", "arguments": {"path": "test.py", "content": "print(\'hi\')"}}\n\n'
-            "To call multiple tools, use a list:\n"
-            '[{"name": "tool1", ...}, {"name": "tool2", ...}]\n\n'
-            "### PROJECT CONTEXT ###\n"
-            f"{context_content}\n\n"
-            "### FILE SYSTEM RULES ###\n"
-            "1. You have access to a `.scratchpad/` directory for temporary files, tests, and experiments.\n"
-            "2. ALWAYS use `.scratchpad/` for TDD cycles, regression tests, or any file that is not part of the core codebase.\n"
-            "3. Only write to `mini_nebulus/` or `tests/` if you are implementing a requested feature or fixing a bug in the core."
-        )
-        self.history_manager = HistoryManager(system_prompt)
-        ToolExecutor.history_manager = self.history_manager
-        self.openai = OpenAIService()
-        self.view = view if view else CLIView()
-        if hasattr(self.view, "set_controller"):
-            self.view.set_controller(self)
         self.base_tools = [
             {
                 "type": "function",
                 "function": {
-                    "name": "connect_mcp_server",
-                    "description": "Connects to an MCP server via stdio.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "name": {"type": "string"},
-                            "command": {"type": "string"},
-                            "args": {"type": "array", "items": {"type": "string"}},
-                            "env": {
-                                "type": "object",
-                                "additionalProperties": {"type": "string"},
-                            },
-                        },
-                        "required": ["name", "command"],
-                    },
-                },
-            },
-            {
-                "type": "function",
-                "function": {
                     "name": "run_shell_command",
-                    "description": "Executes a shell command.",
+                    "description": "Run shell cmd.",
                     "parameters": {
                         "type": "object",
                         "properties": {"command": {"type": "string"}},
@@ -107,7 +49,7 @@ class AgentController:
                 "type": "function",
                 "function": {
                     "name": "read_file",
-                    "description": "Reads a file.",
+                    "description": "Read file.",
                     "parameters": {
                         "type": "object",
                         "properties": {"path": {"type": "string"}},
@@ -118,8 +60,8 @@ class AgentController:
             {
                 "type": "function",
                 "function": {
-                    "name": "{write_file}",
-                    "description": "Writes content to a file.",
+                    "name": "write_file",
+                    "description": "Write file.",
                     "parameters": {
                         "type": "object",
                         "properties": {
@@ -134,7 +76,7 @@ class AgentController:
                 "type": "function",
                 "function": {
                     "name": "create_plan",
-                    "description": "Initialize a plan.",
+                    "description": "Init plan.",
                     "parameters": {
                         "type": "object",
                         "properties": {"goal": {"type": "string"}},
@@ -145,144 +87,16 @@ class AgentController:
             {
                 "type": "function",
                 "function": {
-                    "name": "add_task",
-                    "description": "Add a task.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "description": {"type": "string"},
-                            "dependencies": {
-                                "type": "array",
-                                "items": {"type": "string"},
-                            },
-                        },
-                        "required": ["description"],
-                    },
-                },
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "update_task",
-                    "description": "Update task status.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "task_id": {"type": "string"},
-                            "status": {"type": "string"},
-                            "result": {"type": "string"},
-                        },
-                        "required": ["task_id", "status"],
-                    },
-                },
-            },
-            {
-                "type": "function",
-                "function": {
                     "name": "execute_plan",
-                    "description": "Start autonomous execution of the current plan.",
+                    "description": "Auto-execute plan.",
                     "parameters": {"type": "object", "properties": {}, "required": []},
-                },
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "get_plan",
-                    "description": "Retrieve the current plan and task status.",
-                    "parameters": {"type": "object", "properties": {}, "required": []},
-                },
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "set_preference",
-                    "description": "Set a user preference.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "key": {"type": "string"},
-                            "value": {"type": "string"},
-                        },
-                        "required": ["key", "value"],
-                    },
-                },
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "get_preference",
-                    "description": "Get a user preference.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {"key": {"type": "string"}},
-                        "required": ["key"],
-                    },
-                },
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "list_docs",
-                    "description": "List available documentation files.",
-                    "parameters": {"type": "object", "properties": {}, "required": []},
-                },
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "read_doc",
-                    "description": "Read a documentation file.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {"path": {"type": "string"}},
-                        "required": ["path"],
-                    },
-                },
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "create_skill",
-                    "description": "Create a new skill.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "name": {"type": "string"},
-                            "code": {"type": "string"},
-                        },
-                        "required": ["name", "code"],
-                    },
-                },
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "pin_file",
-                    "description": "Pin a file to the active context.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {"path": {"type": "string"}},
-                        "required": ["path"],
-                    },
-                },
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "unpin_file",
-                    "description": "Unpin a file from the active context.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {"path": {"type": "string"}},
-                        "required": ["path"],
-                    },
                 },
             },
             {
                 "type": "function",
                 "function": {
                     "name": "list_context",
-                    "description": "List currently pinned files.",
+                    "description": "List pinned files.",
                     "parameters": {
                         "type": "object",
                         "properties": {},
@@ -293,177 +107,60 @@ class AgentController:
             {
                 "type": "function",
                 "function": {
-                    "name": "ask_user",
-                    "description": "Ask the user for clarification or input.",
+                    "name": "pin_file",
+                    "description": "Pin file.",
                     "parameters": {
                         "type": "object",
-                        "properties": {"question": {"type": "string"}},
-                        "required": ["question"],
-                    },
-                },
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "create_checkpoint",
-                    "description": "Create a file system checkpoint (backup).",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {"label": {"type": "string"}},
-                        "required": ["label"],
-                    },
-                },
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "rollback_checkpoint",
-                    "description": "Restore files from a checkpoint.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {"id": {"type": "string"}},
-                        "required": ["id"],
-                    },
-                },
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "list_checkpoints",
-                    "description": "List available checkpoints.",
-                    "parameters": {"type": "object", "properties": {}, "required": []},
-                },
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "publish_skill",
-                    "description": "Publish a local skill to the global library.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {"name": {"type": "string"}},
-                        "required": ["name"],
-                    },
-                },
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "index_codebase",
-                    "description": "Index the codebase for semantic search.",
-                    "parameters": {"type": "object", "properties": {}, "required": []},
-                },
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "search_history",
-                    "description": "Search the command history using a natural language query.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {"query": {"type": "string"}},
-                        "required": ["query"],
-                    },
-                },
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "search_code",
-                    "description": "Search the codebase using a natural language query.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {"query": {"type": "string"}},
-                        "required": ["query"],
-                    },
-                },
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "save_session_log",
-                    "description": "Save the current session logs to a permanent file. ONLY use this if the user explicitly asks to 'save logs' or 'export session'.",
-                    "parameters": {"type": "object", "properties": {}, "required": []},
-                },
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "map_codebase",
-                    "description": "Generate a structural map (AST) of the codebase.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "target_dir": {
-                                "type": "string",
-                                "description": "Directory to scan (default: root)",
-                            }
-                        },
-                        "required": [],
-                    },
-                },
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "find_symbol",
-                    "description": "Find a class or function definition by name.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "symbol": {
-                                "type": "string",
-                                "description": "Name of the class or function",
-                            }
-                        },
-                        "required": ["symbol"],
-                    },
-                },
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "create_macro",
-                    "description": "Create a reusable shell script macro.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "name": {
-                                "type": "string",
-                                "description": "Name of the macro (e.g. clean_build)",
-                            },
-                            "commands": {
-                                "type": "array",
-                                "items": {"type": "string"},
-                                "description": "List of shell commands",
-                            },
-                            "description": {
-                                "type": "string",
-                                "description": "Optional description",
-                            },
-                        },
-                        "required": ["name", "commands"],
-                    },
-                },
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "start_tdd",
-                    "description": "Start an autonomous TDD loop for a given goal.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "goal": {
-                                "type": "string",
-                                "description": "The coding goal (e.g. Implement add function)",
-                            }
-                        },
-                        "required": ["goal"],
+                        "properties": {"path": {"type": "string"}},
+                        "required": ["path"],
                     },
                 },
             },
         ]
+
+        self.pending_tdd_goal = None
+        system_prompt = (
+            "Your ONLY goal is to execute tasks. NEVER explain what you are going to do.\n"
+            "NEVER use markdown code blocks like ```python unless you are calling a tool.\n"
+            "ALWAYS use tools to perform actions.\n\n"
+            "### PROJECT PROTOCOL (STRICT COMPLIANCE) ###\n"
+            "1. **Architecture**: Python MVC. Models=DataClasses/Pydantic. Config=`config.py`. Services=Integrations.\n"
+            "2. **Workflow**: Gitflow-lite. Work on `feat/<name>` or `develop`. `main` is production.\n"
+            "3. **Coding**: Python 3.12+, Type Hints, AsyncIO, SOLID Principles.\n"
+            "4. **Autonomy**: Execute tasks immediately. Use JSON tools. No `ask_user` unless blocked.\n"
+            "5. **Context Strategy**: These rules are PRE-LOADED. Do NOT read `AI_DIRECTIVES.md`, `WORKFLOW.md`, `CONTEXT.md` unless verifying a specific line.\n\n"
+            "### AUTONOMY RULES ###\n"
+            "1. **INITIAL STATE**: You are IDLE. Wait for the user to provide a specific goal. Do NOT auto-start tasks.\n"
+            "2. Infer goals ONLY from the user's prompt (e.g., 'Do X'). If prompt is empty/greeting, just list context or wait.\n"
+            "3. Use tools to perform actions. Output ONLY valid JSON.\n"
+            "4. Do NOT hallucinate features. Stick to the request.\n"
+            "5. **CRITICAL**: Do NOT read general documentation files. Trust the 'PROJECT PROTOCOL' above.\n\n"
+            "### TOOL USAGE RULES ###\n"
+            "1. You MUST ONLY use the provided tools. Do NOT invent new tools.\n"
+            "2. To list files, use `run_shell_command` with `ls`.\n\n"
+            "### HOW TO CALL TOOLS ###\n"
+            "Output ONLY a raw JSON object (no markdown, no code blocks).\n"
+            "Format: {\"name\": \"<tool_name>\", \"arguments\": {<args>}}\n\n"
+            "Example:\n"
+            "{\"name\": \"write_file\", \"arguments\": {\"path\": \"test.py\", \"content\": \"print('hello')\"}}\n\n"
+            "CRITICAL:\n"
+            "- Do NOT nest JSON inside JSON strings.\n"
+            "- Do NOT use 'parameters' field, use 'arguments'.\n"
+            "- Output valid JSON only.\n\n"
+            "### PROJECT CONTEXT ###\n"
+            f"{context_content}\n\n"
+            "### FILE SYSTEM RULES ###\n"
+            "1. You have access to a `.scratchpad/` directory for temporary files.\n"
+            "2. ALWAYS use `.scratchpad/` for experiments.\n\n"
+            "### AVAILABLE TOOLS ###\n"
+            f"{json.dumps([t['function'] for t in self.get_current_tools()], indent=2)}"
+        )
+        self.history_manager = HistoryManager(system_prompt)
+        ToolExecutor.history_manager = self.history_manager
+        self.openai = OpenAIService()
+        self.view = view if view else CLIView()
+        if hasattr(self.view, "set_controller"):
+            self.view.set_controller(self)
 
     async def start(self, initial_prompt: Optional[str] = None):
         await self.view.print_welcome()
@@ -477,7 +174,9 @@ class AgentController:
         session_id = "default"
         if initial_prompt:
             self.history_manager.get_session(session_id).add("user", initial_prompt)
-            if hasattr(self.view, "start_app"):
+            # CLIView handles spinners synchronously, so we must AWAIT the turn.
+            # Only Textual TUI needs create_task to unblock the rendering loop.
+            if hasattr(self.view, "start_app") and not isinstance(self.view, CLIView):
                 asyncio.create_task(self.process_turn(session_id))
             else:
                 await self.process_turn(session_id)
@@ -702,9 +401,13 @@ class AgentController:
 
     def get_current_tools(self):
         """Merges base tools, dynamic skills, and MCP tools."""
-        skill_defs = ToolExecutor.skill_service.get_tool_definitions()
-        mcp_defs = ToolExecutor.mcp_service.get_tools()
-        return self.base_tools + skill_defs + mcp_defs
+        # Check if services are initialized (ToolExecutor might not be fully ready during init)
+        try:
+            skill_defs = ToolExecutor.skill_service.get_tool_definitions()
+            mcp_defs = ToolExecutor.mcp_service.get_tools()
+            return self.base_tools + skill_defs + mcp_defs
+        except Exception:
+            return self.base_tools
 
     async def process_turn(self, session_id: str = "default"):
         finished_turn = False
@@ -714,9 +417,8 @@ class AgentController:
         # Inject Pinned Context dynamically into each turn
         context_service = ToolExecutor.context_manager.get_service(session_id)
         rag_service = ToolExecutor.rag_manager.get_service(session_id)
-        preference_service = ToolExecutor.preference_manager.get_service(session_id)
+        # preference_service removed as unused
         pinned_content = context_service.get_context_string()
-        pinned_content += preference_service.get_context_string()
 
         # Update TUI Context View
         if hasattr(self.view, "print_context"):
@@ -737,8 +439,6 @@ class AgentController:
             messages.append({"role": "system", "content": pinned_content})
 
         while not finished_turn:
-            current_tools = self.get_current_tools()
-
             # Determine spinner text based on context
             current_messages = history.get()
             last_role = current_messages[-1]["role"] if current_messages else "user"
@@ -751,7 +451,8 @@ class AgentController:
             with self.view.create_spinner(spinner_text):
                 try:
                     response_stream = self.openai.create_chat_completion(
-                        messages, current_tools
+                        messages,
+                        tools=None,  # FORCE PROMPT ONLY to bypass TabbyAPI 400
                     )
                     full_response = ""
                     tool_calls = []
@@ -785,10 +486,24 @@ class AgentController:
                         extracted_list = self.extract_json(full_response)
                         if extracted_list:
                             for i, extracted in enumerate(extracted_list):
-                                args = extracted.get("arguments", extracted)
+                                args = (
+                                    extracted.get("arguments")
+                                    or extracted.get("parameters")
+                                    or extracted
+                                )
+
+                                # Handle stringified JSON (common local model hallucination)
+                                if isinstance(args, str):
+                                    try:
+                                        args = json.loads(args)
+                                    except Exception:
+                                        pass  # Keep as string if parsing fails, might be intended
+
+                                # Fallback: if 'command' is at root, treat root as args
                                 if (
-                                    extracted.get("command")
-                                    and "arguments" not in extracted
+                                    isinstance(args, dict)
+                                    and "command" not in args
+                                    and "command" in extracted
                                 ):
                                     args = extracted
 
@@ -828,7 +543,9 @@ class AgentController:
                             except Exception as e:
                                 output_str = f"Error parsing JSON arguments: {str(e)}"
                                 history.add(
-                                    "tool", content=output_str, tool_call_id=tc["id"]
+                                    "user",
+                                    content=f"System Error: {output_str}",
+                                    tool_call_id=None,
                                 )
                                 continue
 
@@ -866,9 +583,12 @@ class AgentController:
                                     output_str, tool_name=name
                                 )
 
-                            history.add(
-                                "tool", content=output_str, tool_call_id=tc["id"]
-                            )
+                                # Convert tool output to user message for Prompt-Based Tool Calling compliance check
+                                history.add(
+                                    "user",
+                                    content=f"Tool '{name}' output:\n{output_str}",
+                                    tool_call_id=None,  # No tool_call_id needed for user messages
+                                )
                     else:
                         if full_response.strip():
                             full_response = re.sub(

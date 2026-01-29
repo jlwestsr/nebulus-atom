@@ -48,3 +48,6 @@ We adhere to the **MVC (Model-View-Controller)** pattern for this Python CLI app
 # Strict Execution Protocol
 1. **Stop Talking, Start Coding**: If you describe a technical step, you MUST execute it in the same turn using a tool.
 2. **Assume Approval**: Once a plan is confirmed, you have full approval to implement all tasks. Do not ask "Should I proceed?" or "Is this okay?". Just do it.
+
+## Communication Standards
+- **Prompt Delivery**: When suggesting a prompt for the user to run, ALWAYS wrap it in a code block under a "Proposed Prompt" header. This facilitates easy copy/pasting.

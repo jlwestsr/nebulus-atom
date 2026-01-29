@@ -193,50 +193,19 @@ class CLIView(BaseView):
 
         return Panel(grid, style="white on #222222", box=box.SIMPLE, padding=(0, 1))
 
-    @contextmanager
     def create_spinner(self, text: str) -> ContextManager:
-        from rich.live import Live
-        from rich.spinner import Spinner
-        from rich.console import Group
-        from rich.align import Align
+        if os.environ.get("MINI_NEBULUS_HEADLESS") == "1":
+            # Headless mode: Simple log, no Rich Live
+            self.console.print(f"[dim]Thinking: {text}[/dim]")
 
-        # Update status bar AND show a real spinner
-        self.status_message = f"⠙ {text}"
-        self.is_thinking = True
+            @contextmanager
+            def dummy():
+                yield
 
-        # Invalidate prompt app to update toolbar (if it were visible, which it isn't)
-        if hasattr(self.session, "app"):
-            self.session.app.invalidate()
+            return dummy()
 
-        # Create a Layout Group: Spinner + Spacer + Toolbar
-        # This keeps the toolbar "pinned" to the bottom while thinking
-        spinner = Spinner(
-            "dots", text=f"[bold cyan]{text}[/bold cyan]", style="bold cyan"
-        )
-        toolbar = self._get_rich_toolbar()
-
-        # We use a group to render the spinner, then the toolbar at the bottom
-        # Note: In a real TUI this would be absolute positioning, but in a stream
-        # we can just render the toolbar below the spinner.
-        # However, to be "just above", we might want the spinner separate.
-        # Let's try to just render the Toolbar as part of the Live display.
-
-        render_group = Group(
-            Align.left(spinner),
-            # Add some newlines to push toolbar down if needed, but here we just stack them
-            # Actually, standard REPL just appends.
-            # To make it look "Fixed", we want the toolbar to act as the footer.
-            toolbar,
-        )
-
-        with Live(render_group, console=self.console, refresh_per_second=10):
-            yield
-
-        # Cleanup
-        self.status_message = ""
-        self.is_thinking = False
-        if hasattr(self.session, "app"):
-            self.session.app.invalidate()
+        # Simplified to use standard Rich Status for maximum reliability
+        return self.console.status(f"[bold cyan]{text}[/bold cyan]", spinner="dots")
 
     def _get_git_branch(self):
         try:

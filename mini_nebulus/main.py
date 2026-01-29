@@ -44,17 +44,19 @@ def start(
 def _start_agent(prompt: Optional[List[str]], tui: bool):
     initial_prompt = " ".join(prompt) if prompt else None
 
-    # Pivot: We now use TextualView as the default "Premium" interface.
-    # The 'tui' flag is effectively ignored/deprecated as this IS the TUI.
-    from mini_nebulus.views.tui_view import TextualView
+    if tui:
+        from mini_nebulus.views.tui_view import TextualView
 
-    view = TextualView()
+        view = TextualView()
+    else:
+        from mini_nebulus.views.cli_view import CLIView
+
+        view = CLIView()
+
     controller = AgentController(view=view)
     view.set_controller(controller)
 
     # Start the controller loop
-    # Note: TextualView.start_app calls the Textual event loop.
-    # AgentController.start will configure the controller and then call view.start_app.
     try:
         asyncio.run(controller.start(initial_prompt))
     except (KeyboardInterrupt, SystemExit):

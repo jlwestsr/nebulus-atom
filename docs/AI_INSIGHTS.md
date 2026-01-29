@@ -39,3 +39,26 @@ This allows us to correlate "feeling slow" with actual data (Time-to-First-Token
 ## Future Recommendations
 - **Search Efficiency**: Continue to monitor if the agent "reads" files after searching. If it starts doing so again, we may need to introduce a dedicated `search_and_read` tool to atomicize the operation.
 - **Context Pinning**: The agent should be conservative with pinning. If context grows too large (>8k tokens), performance on local models degrades noticeably.
+
+---
+
+## 2026-01-29: The "Integration Tax" of High-Performance Local Backends (Ollama vs. TabbyAPI)
+
+### Insight
+Moving from an "All-in-One" backend (Ollama) to a "Raw Inference" backend (TabbyAPI/ExLlamaV2) significantly improves token generation speed and memory efficiency but imposes a steep "Integration Tax" on the application layer.
+
+### The Problem
+- **API Strictness**: Ollama acts as a middleware that silently handles "messy" inputs, parallel tool calls, and fuzzy schema matching. TabbyAPI (closer to the metal) rejects non-compliant requests with `400 Bad Request` or `TemplateError`.
+- **Tooling Support**: Native OpenAI `tools` API support in raw local backends is often incomplete or buggy compared to Ollama's managed router.
+- **Context Bloat**: Bypassing API limitations requires injecting tool schemas directly into the System Prompt, consuming significant context window space (~10-15k characters).
+
+### The Solution: "Prompt-Based Tool Calling"
+To achieve stability with TabbyAPI, we fundamentally refactored the agent's architecture:
+1.  **Disable Native Tools**: We explicitly set `tools=None` in the API call to bypass backend validation.
+2.  **Prompt Injection**: Tool schemas are injected as text into the System Prompt.
+3.  **Role Mimicry**: Tool outputs are stored as `User` messages (not `Tool` messages) to trick the backend into treating the interaction as standard chat.
+
+### Assessment
+**Verdict**: The move was **Strategic Win, Tactical Pain**.
+- **Pros**: Access to ExLlamaV2 (highest possible TPS on consumer hardware), 100% control over the "Thought Process" (no black-box routing), and backend agnosticism.
+- **Cons**: Requires stricter context management (frequent restarts) and more complex client-side logic.
