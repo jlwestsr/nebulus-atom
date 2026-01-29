@@ -14,6 +14,7 @@ from mini_nebulus.services.journal_service import JournalServiceManager
 from mini_nebulus.services.ast_service import ASTServiceManager
 from mini_nebulus.services.macro_service import MacroServiceManager
 from mini_nebulus.services.docker_service import DockerServiceManager
+from mini_nebulus.services.error_recovery_service import ErrorRecoveryServiceManager
 from mini_nebulus.models.task import TaskStatus
 from mini_nebulus.utils.logger import setup_logger
 
@@ -35,6 +36,7 @@ class ToolExecutor:
     macro_manager = MacroServiceManager()
     history_manager = None  # Set by AgentController
     docker_manager = DockerServiceManager()
+    recovery_manager = ErrorRecoveryServiceManager()
 
     @staticmethod
     def initialize():
@@ -206,7 +208,13 @@ class ToolExecutor:
                 return f"Unknown tool: {tool_name}"
         except Exception as e:
             logger.error(f"Error executing {tool_name}: {str(e)}", exc_info=True)
-            return f"Error executing {tool_name}: {str(e)}"
+            try:
+                recovery_service = ToolExecutor.recovery_manager.get_service(session_id)
+                return recovery_service.analyze_error(tool_name, str(e), args)
+            except Exception as e2:
+                logger.error(f"CRITICAL: Recovery Service Failed: {e2}", exc_info=True)
+                # Fallback to standard error message
+                return f"Error executing {tool_name}: {str(e)}"
 
     @staticmethod
     async def run_shell_command(command: str) -> str:

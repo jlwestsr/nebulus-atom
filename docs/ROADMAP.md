@@ -30,7 +30,17 @@ Mini-Nebulus has achieved **Stability** (it runs without crashing) and **Basic A
 - [ ] **Vector Memory**: Properly Index `AI_DIRECTIVES` and codebases so the agent can query them without loading the full file.
 - [ ] **User Profile**: Remember user preferences ("Always use snake_case") across sessions.
 
-### Phase 4: Control Plane (UI)
-**Objective**: Better User Experience.
-- [ ] **Interactive TUI**: Upgrade `Textual` view to allow real-time intervention.
-- [ ] **Web Dashboard**: Visualizing the Plan Graph and Token usage.
+### Phase 4: The "Self-Healing" Loop (Resilience)
+**Objective**: Turn "Runtime Errors" into "Learning Opportunities".
+- [ ] **ErrorRecoveryAgent**: Structured loop to analyze stderr, patch code, and retry.
+- [ ] **Debugger Prompt**: Specialized prompt for fixing syntax/logic errors autonomously.
+
+### Phase 5: Dynamic Skill Acquisition (Evolution)
+**Objective**: Stop solving the same problems twice.
+- [ ] **SkillService**: Abstract successful workflows into Python tools.
+- [ ] **Hot-Loading**: Auto-load new skills properly to `AgentController`.
+
+### Phase 6: Observability "Flight Recorder" (Telemetry)
+**Objective**: Structured visibility into agent reasoning.
+- [ ] **TelemetryService**: Log thought/tool/result to SQLite.
+- [ ] **Dashboard**: Visual trace of thinking process.
