@@ -58,12 +58,18 @@ class AgentController:
             "To call multiple tools, use a list:\n"
             '[{"name": "tool1", ...}, {"name": "tool2", ...}]\n\n'
             "### PROJECT CONTEXT ###\n"
-            f"{context_content}"
+            f"{context_content}\n\n"
+            "### FILE SYSTEM RULES ###\n"
+            "1. You have access to a `.scratchpad/` directory for temporary files, tests, and experiments.\n"
+            "2. ALWAYS use `.scratchpad/` for TDD cycles, regression tests, or any file that is not part of the core codebase.\n"
+            "3. Only write to `mini_nebulus/` or `tests/` if you are implementing a requested feature or fixing a bug in the core."
         )
         self.history_manager = HistoryManager(system_prompt)
         ToolExecutor.history_manager = self.history_manager
         self.openai = OpenAIService()
         self.view = view if view else CLIView()
+        if hasattr(self.view, "set_controller"):
+            self.view.set_controller(self)
         self.base_tools = [
             {
                 "type": "function",
@@ -375,8 +381,8 @@ class AgentController:
             {
                 "type": "function",
                 "function": {
-                    "name": "generate_journal",
-                    "description": "Generate a markdown journal/summary of the current session.",
+                    "name": "save_session_log",
+                    "description": "Save the current session logs to a permanent file. ONLY use this if the user explicitly asks to 'save logs' or 'export session'.",
                     "parameters": {"type": "object", "properties": {}, "required": []},
                 },
             },
@@ -486,30 +492,36 @@ class AgentController:
 
     async def handle_tui_input(self, user_input: str, session_id: str = "default"):
         """Callback for TUI to push input to the controller."""
-        if user_input.lower() in Config.EXIT_COMMANDS:
-            await self.view.print_goodbye()
-            import sys
+        try:
+            if user_input.lower() in Config.EXIT_COMMANDS:
+                await self.view.print_goodbye()
+                import sys
 
-            sys.exit(0)
+                sys.exit(0)
 
-        self.history_manager.get_session(session_id).add("user", user_input)
+            self.history_manager.get_session(session_id).add("user", user_input)
 
-        # Process the initial user input
-        await self.process_turn(session_id)
+            # Process the initial user input
+            await self.process_turn(session_id)
 
-        # Check for autonomous continuation (TDD or Auto Mode)
-        # We loop here to handle the entire chain of autonomous actions
-        while self.pending_tdd_goal or self.auto_mode:
-            if self.pending_tdd_goal:
-                await self.run_tdd_cycle(self.pending_tdd_goal, session_id)
-                # run_tdd_cycle clears pending_tdd_goal when done
-            elif self.auto_mode:
-                # Re-run process_turn to pick up next task
-                await self.process_turn(session_id)
+            # Check for autonomous continuation (TDD or Auto Mode)
+            # We loop here to handle the entire chain of autonomous actions
+            while self.pending_tdd_goal or self.auto_mode:
+                if self.pending_tdd_goal:
+                    await self.run_tdd_cycle(self.pending_tdd_goal, session_id)
+                    # run_tdd_cycle clears pending_tdd_goal when done
+                elif self.auto_mode:
+                    # Re-run process_turn to pick up next task
+                    await self.process_turn(session_id)
+        except Exception as e:
+            await self.view.print_error(f"Error in handle_tui_input: {e}")
+            import traceback
 
-                # Breaker: If plan is empty/done, auto_mode is set to False in process_turn
-                # But we need to ensure we don't infinite loop if it fails to clear
-                # process_turn logic handles auto_mode clearing.
+            traceback.print_exc()
+
+            # Breaker: If plan is empty/done, auto_mode is set to False in process_turn
+            # But we need to ensure we don't infinite loop if it fails to clear
+            # process_turn logic handles auto_mode clearing.
 
     async def chat_loop(self, session_id: str = "default"):
         while True:
@@ -717,7 +729,8 @@ class AgentController:
         # Index the last user message
         last_msg = messages[-1] if messages else None
         if last_msg and last_msg["role"] == "user":
-            rag_service.index_history("user", last_msg["content"], session_id)
+            with self.view.create_spinner("Updating Context..."):
+                await rag_service.index_history("user", last_msg["content"], session_id)
 
         if pinned_content:
             messages = [m.copy() for m in messages]
@@ -725,7 +738,17 @@ class AgentController:
 
         while not finished_turn:
             current_tools = self.get_current_tools()
-            with self.view.create_spinner("Thinking..."):
+
+            # Determine spinner text based on context
+            current_messages = history.get()
+            last_role = current_messages[-1]["role"] if current_messages else "user"
+            spinner_text = "Thinking..."
+            if last_role == "tool":
+                spinner_text = "Analyzing Tool Output..."
+            elif last_role == "user":
+                spinner_text = "Processing Request..."
+
+            with self.view.create_spinner(spinner_text):
                 try:
                     response_stream = self.openai.create_chat_completion(
                         messages, current_tools
@@ -857,9 +880,10 @@ class AgentController:
                                     getattr(self.openai, "last_telemetry", {})
                                 )
                                 history.add("assistant", full_response)
-                            rag_service.index_history(
-                                "assistant", full_response, session_id
-                            )
+                            with self.view.create_spinner("Updating Context..."):
+                                await rag_service.index_history(
+                                    "assistant", full_response, session_id
+                                )
                         finished_turn = True
                 except Exception as e:
                     logger.error(f"Error in process_turn: {str(e)}", exc_info=True)

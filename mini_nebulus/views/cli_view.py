@@ -12,6 +12,7 @@ from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.keys import Keys
 
+import sys
 import os
 import subprocess
 import asyncio
@@ -21,8 +22,32 @@ from mini_nebulus.views.base_view import BaseView
 
 
 class CLIView(BaseView):
+    async def print_welcome(self):
+        """Displays the welcome message in a panel."""
+        from rich.panel import Panel
+        from rich.table import Table
+        from rich import box
+
+        grid = Table.grid(expand=True)
+        grid.add_column(justify="center", ratio=1)
+        grid.add_column(justify="right")
+        grid.add_row(
+            "[bold cyan]Mini-Nebulus Agent[/bold cyan]",
+            f"[dim]Model: {os.environ.get('NEBULUS_MODEL', 'qwen2.5-coder')}[/dim]",
+        )
+
+        self.console.print(
+            Panel(
+                grid,
+                style="cyan",
+                box=box.ROUNDED,
+                width=60,
+            )
+        )
+
     def __init__(self):
-        self.console = Console()
+        # Force writing to the real stdout to avoid patch_stdout/Typer encoding issues
+        self.console = Console(file=sys.__stdout__, force_terminal=True)
         # Initialize PromptSession with persistent history
         self.session = PromptSession(history=FileHistory(".mini_nebulus_history"))
         self.controller = None
@@ -39,18 +64,25 @@ class CLIView(BaseView):
     def get_prompt_message(self):
         # Determine prompt style and label based on state
         # Priority: Agent Asking Input > Agent Thinking > Standard User Input
+        # Use simple standard XML tags for colors which are more robust
+
         if self.input_future and not self.input_future.done():
-            # Agent needs input
+            # Agent needs input - Magenta Box
             return HTML(
-                "<b><style bg='ansimagenta' color='white'> Input </style> ➤ </b>"
+                "<ansimagenta>╭─ Answer ──────────────╮</ansimagenta>\n"
+                "<ansimagenta>│</ansimagenta> ➤ "
             )
         elif self.is_thinking:
-            # Agent is busy
-            return HTML("<b><style bg='ansigray' color='white'> Busy </style> ➤ </b>")
-        else:
-            # Standard
+            # Agent is busy - Grey Box
             return HTML(
-                "<b><style bg='ansiblue' color='white'> Type your message </style> ➤ </b>"
+                "<ansigray>╭─ Processing... ───────╮</ansigray>\n"
+                "<ansigray>│</ansigray> ➤ "
+            )
+        else:
+            # Standard - Blue Box
+            return HTML(
+                "<ansiblue>╭─ Input ───────────────╮</ansiblue>\n"
+                "<ansiblue>│</ansiblue> ➤ "
             )
 
     def create_key_bindings(self):
@@ -80,9 +112,12 @@ class CLIView(BaseView):
 
         kb = self.create_key_bindings()
 
-        with patch_stdout():
-            while True:
-                try:
+        # We apply patch_stdout ONLY during the prompt phase to catch background logs.
+        # We release it during execution so Rich can render the spinner correctly without interference.
+        while True:
+            try:
+                # 1. Prompt Phase (Logs patched)
+                with patch_stdout():
                     # Wait for input using dynamic prompt message
                     user_input = await self.session.prompt_async(
                         self.get_prompt_message,
@@ -96,33 +131,112 @@ class CLIView(BaseView):
                         key_bindings=kb,
                     )
 
-                    if not user_input.strip():
-                        continue
+                if not user_input.strip():
+                    continue
 
-                    # Handle Input Routing
-                    if self.input_future and not self.input_future.done():
-                        # Route to waiting agent
-                        self.input_future.set_result(user_input.strip())
-                        # Clear future so loop resets
-                        self.input_future = None
-                    else:
-                        # Route to controller (New Command)
-                        if self.is_thinking:
-                            self.console.print(
-                                "[dim]Agent is busy. Processing command in background...[/dim]"
-                            )
+                # 2. Execution Phase (No patch, direct stdout)
+                # Handle Input Routing
+                if self.input_future and not self.input_future.done():
+                    # Route to waiting agent
+                    self.input_future.set_result(user_input.strip())
+                    self.input_future = None
+                else:
+                    # Route to controller (New Command)
+                    if self.controller:
+                        # Await the controller. Rich spinner will run cleanly here.
+                        await self.controller.handle_tui_input(user_input)
 
-                        if self.controller:
-                            # Run in background to keep prompt loop alive
-                            asyncio.create_task(
-                                self.controller.handle_tui_input(user_input)
-                            )
+            except (EOFError, KeyboardInterrupt):
+                self.console.print("[bold cyan]👋 Goodbye![/bold cyan]")
+                break
+            except Exception as e:
+                self.console.print(f"[bold red]Error in REPL loop: {e}[/bold red]")
+                import traceback
 
-                except (EOFError, KeyboardInterrupt):
-                    self.console.print("[bold cyan]👋 Goodbye![/bold cyan]")
-                    break
-                except Exception as e:
-                    self.console.print(f"[bold red]Error in REPL loop: {e}[/bold red]")
+                traceback.print_exc()
+
+    def _get_rich_toolbar(self):
+        """Generates a Rich renderable for the bottom toolbar."""
+        from rich.table import Table
+        from rich.text import Text
+
+        cwd = os.getcwd().replace(os.path.expanduser("~"), "~")
+        branch = self._get_git_branch()
+        branch_str = f"({branch})" if branch else ""
+        model = Config.NEBULUS_MODEL
+
+        # Create a table to mimic the PTK toolbar layout
+        grid = Table.grid(expand=True)
+        grid.add_column()
+        grid.add_column(justify="right")
+
+        # Left side: CWD + Branch
+        left_text = Text()
+        left_text.append(f"{cwd} ", style="bold default")
+        left_text.append(f"{branch_str}", style="cyan")
+
+        # Right side: Model + App Name + Status
+        right_text = Text()
+        right_text.append("Model: ", style="dim")
+        right_text.append(f"{model} ", style="bold default")
+        right_text.append("│ ", style="dim")
+        right_text.append("Mini-Nebulus", style="bold default")
+
+        if self.status_message:
+            right_text.append(f" {self.status_message} ", style="black on yellow")
+
+        grid.add_row(left_text, right_text)
+
+        # Wrap in a style to match the PTK toolbar background
+        from rich.panel import Panel
+        from rich import box
+
+        return Panel(grid, style="white on #222222", box=box.SIMPLE, padding=(0, 1))
+
+    @contextmanager
+    def create_spinner(self, text: str) -> ContextManager:
+        from rich.live import Live
+        from rich.spinner import Spinner
+        from rich.console import Group
+        from rich.align import Align
+
+        # Update status bar AND show a real spinner
+        self.status_message = f"⠙ {text}"
+        self.is_thinking = True
+
+        # Invalidate prompt app to update toolbar (if it were visible, which it isn't)
+        if hasattr(self.session, "app"):
+            self.session.app.invalidate()
+
+        # Create a Layout Group: Spinner + Spacer + Toolbar
+        # This keeps the toolbar "pinned" to the bottom while thinking
+        spinner = Spinner(
+            "dots", text=f"[bold cyan]{text}[/bold cyan]", style="bold cyan"
+        )
+        toolbar = self._get_rich_toolbar()
+
+        # We use a group to render the spinner, then the toolbar at the bottom
+        # Note: In a real TUI this would be absolute positioning, but in a stream
+        # we can just render the toolbar below the spinner.
+        # However, to be "just above", we might want the spinner separate.
+        # Let's try to just render the Toolbar as part of the Live display.
+
+        render_group = Group(
+            Align.left(spinner),
+            # Add some newlines to push toolbar down if needed, but here we just stack them
+            # Actually, standard REPL just appends.
+            # To make it look "Fixed", we want the toolbar to act as the footer.
+            toolbar,
+        )
+
+        with Live(render_group, console=self.console, refresh_per_second=10):
+            yield
+
+        # Cleanup
+        self.status_message = ""
+        self.is_thinking = False
+        if hasattr(self.session, "app"):
+            self.session.app.invalidate()
 
     def _get_git_branch(self):
         try:
@@ -215,18 +329,3 @@ class CLIView(BaseView):
 
     async def print_goodbye(self):
         self.console.print("[bold cyan]👋 Goodbye![/bold cyan]")
-
-    @contextmanager
-    def create_spinner(self, text: str) -> ContextManager:
-        # Update status bar instead of blocking console
-        self.status_message = f"⠙ {text}"
-        self.is_thinking = True
-        if hasattr(self.session, "app"):
-            self.session.app.invalidate()
-        try:
-            yield
-        finally:
-            self.status_message = ""
-            self.is_thinking = False
-            if hasattr(self.session, "app"):
-                self.session.app.invalidate()

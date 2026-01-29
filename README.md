@@ -1,4 +1,13 @@
-# Mini-Nebulus
+# Nebulus Atom (formerly Mini-Nebulus)
+
+> **The Fundamental Unit of Autonomy ⚛️**
+
+**Nebulus Atom** is a lightweight, containerized autonomous agent designed to be portably deployed into any environment. It serves as the "Autonomy" tier in the greater Nebulus ecosystem:
+*   **Nebulus Prime**: Heavy Compute / Training.
+*   **Nebulus Edge**: High-speed Inference.
+*   **Nebulus Atom**: Autonomous Execution & Utility.
+
+## Features
 
 ## Context Manager Feature
 The Context Manager allows users to "pin" files to the agent s active context. This ensures the agent is always aware of the content of these files without needing to read them repeatedly.

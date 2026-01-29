@@ -89,11 +89,11 @@ class ToolExecutor:
 
             # RAG Tools
             elif tool_name == "index_codebase":
-                return rag_service.index_codebase()
+                return await rag_service.index_codebase()
             elif tool_name == "search_code":
-                return str(rag_service.search_code(args.get("query")))
+                return str(await rag_service.search_code(args.get("query")))
             elif tool_name == "search_history":
-                return str(rag_service.search_history(args.get("query")))
+                return str(await rag_service.search_history(args.get("query")))
 
             # Task Tools
             elif tool_name == "create_plan":
@@ -147,7 +147,7 @@ class ToolExecutor:
                 return image_service.encode_image(args.get("path"))
 
             # Journal Tools
-            elif tool_name == "generate_journal":
+            elif tool_name == "save_session_log":
                 if not ToolExecutor.history_manager:
                     return "Error: History manager not initialized."
                 journal_service = ToolExecutor.journal_manager.get_service(session_id)

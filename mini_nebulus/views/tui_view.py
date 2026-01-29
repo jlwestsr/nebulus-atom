@@ -1,228 +1,210 @@
-from typing import Dict, Any, ContextManager, List
+from typing import Dict, Any, ContextManager
 from contextlib import contextmanager
 import asyncio
+import os
 
 from textual.app import App, ComposeResult
-from textual.containers import Grid, Container, Vertical
-from textual.widgets import Footer, RichLog, Tree, Label, TextArea
-from textual.binding import Binding
-from rich.text import Text
-
-from mini_nebulus.views.base_view import BaseView
+from textual.widgets import Header, Footer, Input, RichLog
+from rich.panel import Panel
+from rich.table import Table
+from rich import box
 
 
-class Sidebar(Container):
-    def compose(self) -> ComposeResult:
-        yield Label("[bold]Plan[/bold]", classes="section-title")
-        yield Tree("Tasks", id="plan-tree")
-        yield Label("[bold]Context[/bold]", classes="section-title")
-        yield RichLog(id="context-log")
+class TextualView(App):
+    """
+    Main TUI View using Textual.
+    Implements the BaseView interface (implicitly) to work with AgentController.
+    """
 
-
-class ChatPanel(Container):
-    def compose(self) -> ComposeResult:
-        yield RichLog(id="chat-log", markup=True)
-
-
-class MiniNebulusApp(App):
     CSS = """
-    Grid {
-        grid-size: 2 2;
-        grid-columns: 1fr 3fr;
-        grid-rows: 1fr auto;
+    Screen {
+        layout: grid;
+        grid-size: 1 3;
+        grid-rows: 1 1fr 3;
     }
 
-    Sidebar {
-        row-span: 2;
-        background: $panel;
-        border-right: vkey $accent;
+    RichLog {
         width: 100%;
         height: 100%;
-    }
-
-    .section-title {
-        background: $accent;
-        color: $text;
-        padding: 0 1;
-        width: 100%;
-    }
-
-    #plan-tree {
-        height: 1fr;
-        border-bottom: solid $accent;
-    }
-
-    #context-log {
-        height: 1fr;
-    }
-
-    #main-area {
-        height: 100%;
+        border: solid cyan;
         background: $surface;
     }
 
-    ChatPanel {
-        height: 100%;
-    }
-
-    #chat-log {
-        height: 100%;
-        padding: 1;
-    }
-
-    TextArea {
+    Input {
         dock: bottom;
-        height: 5;
-        border-top: solid $accent;
+        width: 100%;
+        margin: 0 0;
+        border: heavy magenta;
+    }
+
+    .hidden {
+        display: none;
     }
     """
 
     BINDINGS = [
-        Binding("ctrl+c", "quit", "Quit", show=True),
-        Binding("ctrl+l", "clear_log", "Clear Log", show=True),
-        Binding("ctrl+s", "submit_message", "Submit", show=True),
+        ("ctrl+c", "quit", "Quit"),
+        ("ctrl+l", "clear_log", "Clear Log"),
     ]
 
-    controller = None  # To be set via TUIView
-    pending_input: asyncio.Future = None
+    def __init__(self):
+        super().__init__()
+        self.controller = None
+        self.input_future = None
+        self.logger = None
+        self.user_input_widget = None
+        self.queued_messages = []
 
     def compose(self) -> ComposeResult:
-        with Grid():
-            yield Sidebar()
-            with Vertical(id="main-area"):
-                yield ChatPanel()
-                # Prevent Enter from creating newlines by dedenting/handling in key handler
-                area = TextArea(id="input-area", show_line_numbers=False)
-                area.show_line_numbers = False
-                yield area
+        yield Header(show_clock=True)
+        yield RichLog(id="chat_log", highlight=True, markup=True)
+        yield Input(placeholder="Type your command...", id="user_input")
         yield Footer()
 
-    def action_clear_log(self):
-        log = self.query_one("#chat-log", RichLog)
-        log.clear()
+    def on_mount(self) -> None:
+        self.logger = self.query_one("#chat_log", RichLog)
+        self.user_input_widget = self.query_one("#user_input", Input)
+        self.user_input_widget.focus()
 
-    async def action_submit_message(self):
-        input_area = self.query_one("#input-area", TextArea)
-        user_input = input_area.text
-
-        if not user_input.strip():
-            return
-
-        input_area.text = ""  # Clear input
-
-        # Display user message immediately
-        log = self.query_one("#chat-log", RichLog)
-        log.write(Text(f"User: {user_input}", style="bold cyan"))
-
-        # Check if we are waiting for specific input (ask_user)
-        if self.pending_input and not self.pending_input.done():
-            self.pending_input.set_result(user_input)
-            return
-
-        if self.controller:
-            await self.controller.handle_tui_input(user_input)
-
-    async def on_key(self, event) -> None:
-        # Bind Enter to submit if input area has focus
-        if event.key == "enter":
-            input_area = self.query_one("#input-area", TextArea)
-            if input_area.has_focus:
-                event.stop()  # Prevent newline
-                await self.action_submit_message()
-
-
-class TUIView(BaseView):
-    def __init__(self):
-        self.app = MiniNebulusApp()
-        self.controller = None
+        # Flush queued messages
+        for msg in self.queued_messages:
+            self.logger.write(msg)
+        self.queued_messages.clear()
 
     def set_controller(self, controller):
         self.controller = controller
-        self.app.controller = controller
+
+    async def on_input_submitted(self, message: Input.Submitted) -> None:
+        """Handle input submission from the Textual widget."""
+        value = message.value.strip()
+        if not value:
+            return
+
+        self.user_input_widget.value = ""
+
+        # Log the user's input as a "chat bubble"
+        self.logger.write(f"\n[bold magenta]➤ User:[/bold magenta] {value}\n")
+
+        # Logic to route input
+        # Logic to route input
+        if self.input_future and not self.input_future.done():
+            # If the agent is waiting for input (via prompt_user), resolve the future
+            self.input_future.set_result(value)
+            self.input_future = None
+        elif self.controller:
+            # Initiate a new turn if we aren't waiting for specific input
+            self.run_worker(self._handle_controller_input(value))
+
+    async def _handle_controller_input(self, value: str):
+        """Helper to await controller input handling safely."""
+        try:
+            await self.controller.handle_tui_input(value)
+        except Exception as e:
+            if self.logger:
+                self.logger.write(f"[bold red]Error handling input: {e}[/bold red]")
+
+    # --- BaseView Implementation ---
 
     async def start_app(self):
         """Starts the Textual App."""
-        await self.app.run_async()
+        # This blocks until the app exits
+        await self.run_async()
+
+    def action_quit(self):
+        self.exit()
+
+    def action_clear_log(self):
+        if self.logger:
+            self.logger.clear()
 
     async def print_welcome(self):
-        # Can't print to log yet if app isn't running, but can queue or ignore
-        pass
+        grid = Table.grid(expand=True)
+        grid.add_column(justify="center", ratio=1)
+        grid.add_column(justify="right")
+        grid.add_row(
+            "[bold cyan]Mini-Nebulus Agent[/bold cyan]",
+            f"[dim]Model: {os.environ.get('NEBULUS_MODEL', 'qwen2.5-coder')}[/dim]",
+        )
+        panel = Panel(grid, style="cyan", box=box.ROUNDED)
 
+        if self.logger:
+            self.logger.write(panel)
+        else:
+            self.queued_messages.append(panel)
+
+    # The Logic Bridge: prompt_user waits for the UI event
     async def prompt_user(self) -> str:
-        # Not used in TUI event-driven mode
-        raise NotImplementedError("TUI uses event-driven input")
+        # Create a future that on_input_submitted will resolve
+        loop = asyncio.get_running_loop()
+        self.input_future = loop.create_future()
+
+        # Ensure input is focused
+        if self.user_input_widget:
+            self.user_input_widget.focus()
+
+        # Wait for user to type something
+        return await self.input_future
 
     async def ask_user_input(self, question: str) -> str:
-        if not self.app.is_running:
-            return "Error: TUI not running"
-
-        # Display question
-        log = self.app.query_one("#chat-log", RichLog)
-        log.write(Text(f"❓ {question}", style="bold magenta"))
-        log.write(Text("  (Please type your answer below)", style="dim magenta"))
-
-        # Create future
-        loop = asyncio.get_running_loop()
-        self.app.pending_input = loop.create_future()
-
-        # Wait for answer
-        answer = await self.app.pending_input
-        self.app.pending_input = None
-
-        return answer
+        self.logger.write(f"[bold magenta]❓ {question}[/bold magenta]")
+        return await self.prompt_user()
 
     async def print_agent_response(self, text: str):
-        if self.app.is_running:
-            log = self.app.query_one("#chat-log", RichLog)
-            log.write(Text("Agent:", style="bold green"))
-            log.write(text)
-            log.write("")  # Newline
+        self.logger.write(f"[bold green]Agent:[/bold green] {text}")
 
     async def print_telemetry(self, metrics: Dict[str, Any]):
+        # Optional: could output to a separate tab or log
         pass
 
     async def print_tool_output(self, output: str, tool_name: str = ""):
-        if self.app.is_running:
-            log = self.app.query_one("#chat-log", RichLog)
-            log.write(Text(f"Tool ({tool_name}):", style="bold blue"))
-            log.write(output)
-            log.write("")
+        self.logger.write(f"[dim blue]✔ Executed: {tool_name}[/dim blue]")
+        if len(output) > 500:
+            self.logger.write(f"  [dim]{output[:500]}... (truncated)[/dim]")
+        else:
+            self.logger.write(f"  [dim]{output}[/dim]")
 
     async def print_plan(self, plan_data: Dict[str, Any]):
-        if self.app.is_running:
-            tree = self.app.query_one("#plan-tree", Tree)
-            tree.clear()
-            tree.root.label = f"Goal: {plan_data.get("goal", "Unknown")}"
-            tree.root.expand()
+        # Reuse existing tree logic, print to log
+        from rich.tree import Tree
 
-            for task in plan_data.get("tasks", []):
-                status_icon = "⏳"
-                if task["status"] == "completed":
-                    status_icon = "✅"
-                elif task["status"] == "in_progress":
-                    status_icon = "🔄"
-                elif task["status"] == "failed":
-                    status_icon = "❌"
+        goal = plan_data.get("goal", "Unknown Goal")
+        tasks = plan_data.get("tasks", [])
 
-                tree.root.add(f"{status_icon} {task["description"]}", expand=True)
+        tree = Tree(f"[bold]{goal}[/bold]")
+        for task in tasks:
+            icon = "⏳"
+            if task["status"] == "completed":
+                icon = "✅"
+            elif task["status"] == "in_progress":
+                icon = "🔄"
+            elif task["status"] == "failed":
+                icon = "❌"
+            tree.add(f"{icon} {task['description']}")
 
-    async def print_context(self, context_data: List[str]):
-        if self.app.is_running:
-            log = self.app.query_one("#context-log", RichLog)
-            log.clear()
-            for item in context_data:
-                log.write(Text(f"• {item}", style="dim cyan"))
+        self.logger.write(tree)
 
     async def print_error(self, message: str):
-        if self.app.is_running:
-            log = self.app.query_one("#chat-log", RichLog)
-            log.write(Text(f"Error: {message}", style="bold red"))
+        self.logger.write(f"[bold red]❌ {message}[/bold red]")
 
     async def print_goodbye(self):
-        if self.app.is_running:
-            self.app.exit()
+        self.logger.write("[bold cyan]👋 Goodbye![/bold cyan]")
+        # Give user a moment to see it, or delay exit
+        await asyncio.sleep(1)
+        self.exit()
 
     @contextmanager
     def create_spinner(self, text: str) -> ContextManager:
-        # TUI spinner could be a loading indicator widget
-        yield
+        # Textual has a 'loading' attribute on widgets, or we can use the footer/status
+        # For now, let's write a status message to the log or footer
+
+        # Alternative: Use a LoadingIndicator widget overlay
+        # But simpler: Update footer
+        # self.status_message = text
+
+        # Logic: changing self.sub_title update header
+        original_sub = self.sub_title
+        self.sub_title = f"⠙ {text}"
+        try:
+            yield
+        finally:
+            self.sub_title = original_sub

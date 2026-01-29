@@ -1,4 +1,4 @@
-from openai import OpenAI
+from openai import AsyncOpenAI
 from mini_nebulus.config import Config
 from mini_nebulus.utils.logger import setup_logger
 
@@ -11,7 +11,7 @@ class OpenAIService:
             f"Connecting to Nebulus at {Config.NEBULUS_BASE_URL} with model {Config.NEBULUS_MODEL}"
         )
         try:
-            self.client = OpenAI(
+            self.client = AsyncOpenAI(
                 base_url=Config.NEBULUS_BASE_URL,
                 api_key=Config.NEBULUS_API_KEY,
             )
@@ -40,7 +40,7 @@ class OpenAIService:
             },
         }
 
-        stream = self.client.chat.completions.create(
+        stream = await self.client.chat.completions.create(
             model=self.model,
             messages=messages,
             stream=True,
@@ -50,7 +50,7 @@ class OpenAIService:
         )
 
         first_token = True
-        for chunk in stream:
+        async for chunk in stream:
             if first_token:
                 self.last_telemetry["ttft"] = time.time() - start_time
                 first_token = False

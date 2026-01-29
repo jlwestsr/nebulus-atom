@@ -1,4 +1,5 @@
 import os
+import asyncio
 import chromadb
 from sentence_transformers import SentenceTransformer
 from typing import List, Dict, Any
@@ -18,25 +19,16 @@ class RagService:
     @property
     def model(self):
         if self._model_instance is None:
-            print("Lazy-loading RAG model...")
-            try:
-                self._model_instance = SentenceTransformer("all-MiniLM-L6-v2")
-            except Exception as e:
-                print(f"Warning: Could not load SentenceTransformer: {e}")
-                print("RAG features will be disabled (using dummy embeddings).")
-                self._model_instance = self._create_dummy_model()
+            print("Lazy-loading RAG model (bert-base-uncased)...")
+            # Use a lighter model for speed or the configured one
+            self._model_instance = SentenceTransformer("all-MiniLM-L6-v2")
         return self._model_instance
 
-    def _create_dummy_model(self):
-        class DummyModel:
-            def encode(self, documents):
-                # Return dummy embeddings (384 dimensions is standard for MiniLM)
-                count = 1 if isinstance(documents, str) else len(documents)
-                return [[0.0] * 384] * count
+    async def index_codebase(self, root_dir: str = "."):
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, self._index_codebase_sync, root_dir)
 
-        return DummyModel()
-
-    def index_codebase(self, root_dir: str = "."):
+    def _index_codebase_sync(self, root_dir: str):
         documents = []
         ids = []
         metadatas = []
@@ -48,6 +40,7 @@ class RagService:
                 or ".git" in dirpath
                 or "__pycache__" in dirpath
                 or ".mini_nebulus" in dirpath
+                or "egg-info" in dirpath
             ):
                 continue
 
@@ -55,27 +48,33 @@ class RagService:
                 if filename.endswith(".py") or filename.endswith(".md"):
                     filepath = os.path.join(dirpath, filename)
                     try:
-                        with open(filepath, "r", encoding="utf-8") as f:
+                        with open(
+                            filepath, "r", encoding="utf-8", errors="ignore"
+                        ) as f:
                             content = f.read()
                             if content.strip():
-                                documents.append(content)
+                                documents.append(content[:2000])  # Chunk limit
                                 ids.append(filepath)
                                 metadatas.append({"path": filepath})
-                    except Exception as e:
-                        print(f"Skipping {filepath}: {e}")
+                    except Exception:
+                        continue
 
         if documents:
-            # Generate embeddings
+            # Accessing self.model here triggers the lazy load in the thread
             embeddings = self.model.encode(documents).tolist()
-
-            # Add to ChromaDB
             self.collection.upsert(
                 documents=documents, embeddings=embeddings, metadatas=metadatas, ids=ids
             )
             return f"Indexed {len(documents)} files."
         return "No files found to index."
 
-    def search_code(self, query: str, n_results: int = 5) -> List[Dict[str, Any]]:
+    async def search_code(self, query: str, n_results: int = 5) -> List[Dict[str, Any]]:
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            None, self._search_code_sync, query, n_results
+        )
+
+    def _search_code_sync(self, query: str, n_results: int) -> List[Dict[str, Any]]:
         query_embedding = self.model.encode([query]).tolist()
         results = self.collection.query(
             query_embeddings=query_embedding, n_results=n_results
@@ -90,20 +89,23 @@ class RagService:
                         "score": results["distances"][0][i]
                         if "distances" in results and results["distances"] is not None
                         else 0,
-                        "content": results["documents"][0][i][:200]
-                        + "...",  # Truncate content
+                        "content": results["documents"][0][i][:200] + "...",
+                        "metadata": results["metadatas"][0][i],
                     }
                 )
         return output
 
-    def index_history(self, role: str, content: str, session_id: str = "default"):
+    async def index_history(self, role: str, content: str, session_id: str = "default"):
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(
+            None, self._index_history_sync, role, content, session_id
+        )
+
+    def _index_history_sync(self, role: str, content: str, session_id: str):
         if not content or not content.strip():
             return
-
         doc_id = str(uuid.uuid4())
         timestamp = time.time()
-
-        # Generate embedding
         embedding = self.model.encode([content]).tolist()
 
         self.history_collection.add(
@@ -115,7 +117,15 @@ class RagService:
             ids=[doc_id],
         )
 
-    def search_history(self, query: str, n_results: int = 5) -> List[Dict[str, Any]]:
+    async def search_history(
+        self, query: str, n_results: int = 5
+    ) -> List[Dict[str, Any]]:
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            None, self._search_history_sync, query, n_results
+        )
+
+    def _search_history_sync(self, query: str, n_results: int) -> List[Dict[str, Any]]:
         query_embedding = self.model.encode([query]).tolist()
         results = self.history_collection.query(
             query_embeddings=query_embedding, n_results=n_results
