@@ -116,6 +116,30 @@ class AgentController:
                     },
                 },
             },
+            {
+                "type": "function",
+                "function": {
+                    "name": "search_memory",
+                    "description": "Search past conversation history.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {"query": {"type": "string"}},
+                        "required": ["query"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "search_knowledge",
+                    "description": "Search indexed codebase.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {"query": {"type": "string"}},
+                        "required": ["query"],
+                    },
+                },
+            },
         ]
 
         self.pending_tdd_goal = None
@@ -153,6 +177,10 @@ class AgentController:
             "### FILE SYSTEM RULES ###\n"
             "1. You have access to a `.scratchpad/` directory for temporary files.\n"
             "2. ALWAYS use `.scratchpad/` for experiments.\n\n"
+            "### MEMORY CAPABILITIES ###\n"
+            "1. **Recall**: You have long-term memory. Use `search_memory` to recall past conversations.\n"
+            "2. **Knowledge**: Use `search_knowledge` to find code snippets or documentation in the repo.\n"
+            "3. **Proactive Retrieval**: If you lack context, SEARCH first before asking the user.\n\n"
             "### AVAILABLE TOOLS ###\n"
             f"{json.dumps([t['function'] for t in self.get_current_tools()], indent=2)}"
         )

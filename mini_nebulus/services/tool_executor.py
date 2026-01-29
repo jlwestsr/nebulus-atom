@@ -90,9 +90,9 @@ class ToolExecutor:
             # RAG Tools
             elif tool_name == "index_codebase":
                 return await rag_service.index_codebase()
-            elif tool_name == "search_code":
+            elif tool_name == "search_code" or tool_name == "search_knowledge":
                 return str(await rag_service.search_code(args.get("query")))
-            elif tool_name == "search_history":
+            elif tool_name == "search_history" or tool_name == "search_memory":
                 return str(await rag_service.search_history(args.get("query")))
 
             # Task Tools
