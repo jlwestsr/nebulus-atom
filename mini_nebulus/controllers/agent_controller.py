@@ -140,10 +140,11 @@ class AgentController:
             "2. To list files, use `run_shell_command` with `ls`.\n\n"
             "### HOW TO CALL TOOLS ###\n"
             "Output ONLY a raw JSON object (no markdown, no code blocks).\n"
-            "Format: {\"name\": \"<tool_name>\", \"arguments\": {<args>}}\n\n"
+            "Format: {\"thought\": \"<reasoning>\", \"name\": \"<tool_name>\", \"arguments\": {<args>}}\n\n"
             "Example:\n"
-            "{\"name\": \"write_file\", \"arguments\": {\"path\": \"test.py\", \"content\": \"print('hello')\"}}\n\n"
+            "{\"thought\": \"I need to create a test file.\", \"name\": \"write_file\", \"arguments\": {\"path\": \"test.py\", \"content\": \"print('hello')\"}}\n\n"
             "CRITICAL:\n"
+            "- You MUST include a \"thought\" field explaining WHY you are taking this action.\n"
             "- Do NOT nest JSON inside JSON strings.\n"
             "- Do NOT use 'parameters' field, use 'arguments'.\n"
             "- Output valid JSON only.\n\n"
@@ -386,6 +387,7 @@ class AgentController:
                     continue
 
             if isinstance(obj, list):
+                # Handle list of tool calls (legacy/fallback support)
                 results.extend(
                     [
                         o
@@ -394,6 +396,7 @@ class AgentController:
                     ]
                 )
             elif isinstance(obj, dict):
+                # Handle single tool call with optional Thought
                 if "name" in obj or "command" in obj:
                     results.append(obj)
 
@@ -508,6 +511,14 @@ class AgentController:
                                     args = extracted
 
                                 tool_name = extracted.get("name", "run_shell_command")
+                                thought = extracted.get("thought")
+
+                                # Print thought if present
+                                if thought and isinstance(self.view, CLIView):
+                                    self.view.console.print(
+                                        f"💭 {thought}", style="dim cyan"
+                                    )
+
                                 tool_calls.append(
                                     {
                                         "id": f"manual_{int(time.time())}_{i}",
