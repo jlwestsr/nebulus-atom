@@ -51,3 +51,4 @@ logs/
 tmp/
 .gemini/
 .scratchpad/
+.mini_nebulus_history

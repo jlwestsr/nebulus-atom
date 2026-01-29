@@ -8,6 +8,7 @@ services:
       - "8000:8000"
     environment:
       - NEBULUS_MODEL=${NEBULUS_MODEL:-qwen2.5-coder}
+      - NEBULUS_BASE_URL=http://host.docker.internal:5000/v1
     volumes:
       # Mount the project root so the agent can edit files (optional, for safety)
       # In a real secure sandbox, we might NOT mount this, or mount a subfolder.

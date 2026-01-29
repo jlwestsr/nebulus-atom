@@ -3,6 +3,7 @@ pyproject.toml
 mini_nebulus/__init__.py
 mini_nebulus/config.py
 mini_nebulus/main.py
+mini_nebulus/server.py
 mini_nebulus.egg-info/PKG-INFO
 mini_nebulus.egg-info/SOURCES.txt
 mini_nebulus.egg-info/dependency_links.txt
@@ -46,10 +47,13 @@ mini_nebulus/views/__init__.py
 mini_nebulus/views/base_view.py
 mini_nebulus/views/cli_view.py
 mini_nebulus/views/discord_view.py
+mini_nebulus/views/headless_view.py
 mini_nebulus/views/tui_view.py
 mini_nebulus/views/web_view.py
+mini_nebulus/web/app.py
 tests/test_ast_service.py
 tests/test_autonomous_execution.py
+tests/test_calculator.py
 tests/test_context_manager.py
 tests/test_doc_service.py
 tests/test_github_mcp.py
