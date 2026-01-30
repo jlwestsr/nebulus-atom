@@ -14,23 +14,11 @@ app = typer.Typer(invoke_without_command=True)
 
 
 @app.callback()
-def main(
-    ctx: typer.Context,
-    prompt: Optional[List[str]] = typer.Argument(
-        None, help="Initial prompt to execute immediately"
-    ),
-    tui: bool = typer.Option(False, help="Enable Interactive Dashboard (TUI)"),
-    session_id: str = typer.Option("default", help="Session ID"),
-):
+def main(ctx: typer.Context):
     """
     Nebulus Atom: A professional, autonomous AI engineer CLI.
     """
-    # If a subcommand (like "start") is invoked, we do nothing here.
-    if ctx.invoked_subcommand is not None:
-        return
-
-    # If no subcommand, we run the default behavior (interactive mode)
-    _start_agent(prompt, tui, session_id)
+    pass
 
 
 @app.command()

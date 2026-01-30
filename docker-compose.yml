@@ -24,6 +24,8 @@ services:
     container_name: nebulus-atom-dashboard
     volumes:
       - ./nebulus_atom/data:/app/nebulus_atom/data
+    env_file:
+      - .env
     environment:
       - STREAMLIT_SERVER_PORT=8501
       - STREAMLIT_SERVER_ADDRESS=0.0.0.0
