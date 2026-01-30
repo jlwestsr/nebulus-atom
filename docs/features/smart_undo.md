@@ -11,14 +11,14 @@ List specific, testable requirements:
 - [x] Agent automatically creates a checkpoint before running shell commands that modify the filesystem. (Decided to restrict auto-checkpoint to `write_file` for performance/precision, manual available for shell).
 - [x] User can manually trigger `create_checkpoint`.
 - [x] User can trigger `rollback_checkpoint` to restore the state to the last safe point.
-- [x] The system uses Git stash or a hidden backup directory without interfering with user s manual Git workflow. (Implemented using `.mini_nebulus/checkpoints` directory).
+- [x] The system uses Git stash or a hidden backup directory without interfering with user s manual Git workflow. (Implemented using `.nebulus_atom/checkpoints` directory).
 
 ## 3. Technical Implementation
 - **Modules**:
-    - `mini_nebulus/services/checkpoint_service.py` (New service).
-    - `mini_nebulus/services/tool_executor.py` (Integrate checkpoint hook before execution).
+    - `nebulus_atom/services/checkpoint_service.py` (New service).
+    - `nebulus_atom/services/tool_executor.py` (Integrate checkpoint hook before execution).
 - **Dependencies**: Git (system requirement).
-- **Data**: `.git/` operations or `.mini_nebulus/backups/`.
+- **Data**: `.git/` operations or `.nebulus_atom/backups/`.
 
 ## 4. Verification Plan
 **Automated Tests**:
@@ -28,7 +28,7 @@ List specific, testable requirements:
     - Verify multiple checkpoints work (stack).
 
 **Manual Verification**:
-- [x] Step 1: Run `mini-nebulus start`
+- [x] Step 1: Run `nebulus-atom start`
 - [x] Step 2: Ask agent to "Overwrite README.md with broken content"
 - [x] Step 3: Verify it did so.
 - [x] Step 4: Run `rollback_checkpoint`.

@@ -17,8 +17,8 @@ This feature enables the agent to autonomously execute tasks from the plan witho
 
 ## 3. Technical Implementation
 - **Modules**:
-    - `mini_nebulus/controllers/agent_controller.py`: Implement the `execute_plan()` method to loop through tasks.
-    - `mini_nebulus/services/tool_executor.py`: Ensure tools return structured output usable by subsequent tasks.
+    - `nebulus_atom/controllers/agent_controller.py`: Implement the `execute_plan()` method to loop through tasks.
+    - `nebulus_atom/services/tool_executor.py`: Ensure tools return structured output usable by subsequent tasks.
 - **Logic**:
     - Add a `auto_mode` flag to the controller.
     - In `run_loop`, if `auto_mode` is active, skip `get_user_input` and instead generate the prompt from the current task description.
@@ -31,7 +31,7 @@ This feature enables the agent to autonomously execute tasks from the plan witho
     - Verify both tasks transition to `COMPLETED` without mock user input.
 
 **Manual Verification**:
-- [x] Run `python -m mini_nebulus.main start --tui`.
+- [x] Run `python -m nebulus_atom.main start --tui`.
 - [x] Command: "Create a plan to (1) echo 'hello' and (2) echo 'world'. Then execute it."
 - [x] Verify the agent runs both steps automatically.
 

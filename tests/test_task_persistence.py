@@ -1,14 +1,14 @@
 import os
 import shutil
 import pytest
-from mini_nebulus.services.task_service import TaskService, TaskServiceManager
-from mini_nebulus.models.task import TaskStatus
+from nebulus_atom.services.task_service import TaskService, TaskServiceManager
+from nebulus_atom.models.task import TaskStatus
 
 
 @pytest.fixture
 def clean_storage():
-    """Ensures a clean .mini_nebulus directory for tests."""
-    path = os.path.join(os.getcwd(), ".mini_nebulus", "sessions", "test_session")
+    """Ensures a clean .nebulus_atom directory for tests."""
+    path = os.path.join(os.getcwd(), ".nebulus_atom", "sessions", "test_session")
     if os.path.exists(path):
         shutil.rmtree(path)
     yield

@@ -16,8 +16,8 @@ This is a custom, lightweight CLI agent built to interact directly with a local 
 - Always work on the `develop` branch.
 - Follow the directives in `AI_DIRECTIVES.md` (includes strict OOP/SOLID mandates).
 - Follow the workflow in `WORKFLOW.md`.
-- The main entry point is `mini_nebulus/main.py`.
-- Run via: `python3 -m mini_nebulus.main start`.
+- The main entry point is `nebulus_atom/main.py`.
+- Run via: `python3 -m nebulus_atom.main start`.
 
 ## Project Influences
 - **Gemini CLI**: https://github.com/google-gemini/gemini-cli

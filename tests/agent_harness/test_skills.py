@@ -1,12 +1,12 @@
 import pytest
 import os
-from mini_nebulus.services.tool_executor import ToolExecutor
+from nebulus_atom.services.tool_executor import ToolExecutor
 
 
 @pytest.fixture
 def clean_skills():
     """Ensure we don't leave garbage skills."""
-    skills_dir = "mini_nebulus/skills"
+    skills_dir = "nebulus_atom/skills"
     test_skill_path = os.path.join(skills_dir, "test_math_skill.py")
     if os.path.exists(test_skill_path):
         os.remove(test_skill_path)
@@ -36,7 +36,7 @@ def execute(a: int, b: int) -> int:
     assert "created and loaded" in result
 
     # 3. Verify file exists
-    assert os.path.exists("mini_nebulus/skills/test_math_skill.py")
+    assert os.path.exists("nebulus_atom/skills/test_math_skill.py")
 
     # 4. Execute the new skill directly via dispatch
     # Note: SkillService registers it as "test_math_skill.execute" usually,

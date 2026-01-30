@@ -1,12 +1,12 @@
 import pytest
 from unittest.mock import MagicMock, patch
 import os
-from mini_nebulus.services.docker_service import DockerService
+from nebulus_atom.services.docker_service import DockerService
 
 
 @pytest.fixture
 def mock_docker():
-    with patch("mini_nebulus.services.docker_service.docker") as mock:
+    with patch("nebulus_atom.services.docker_service.docker") as mock:
         mock_client = MagicMock()
         mock.from_env.return_value = mock_client
         yield mock

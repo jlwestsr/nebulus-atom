@@ -1,17 +1,17 @@
 import pytest
 from unittest.mock import MagicMock, patch
-from mini_nebulus.services.rag_service import RagService
+from nebulus_atom.services.rag_service import RagService
 
 
 @pytest.fixture
 def mock_chroma():
-    with patch("mini_nebulus.services.rag_service.chromadb") as mock:
+    with patch("nebulus_atom.services.rag_service.chromadb") as mock:
         yield mock
 
 
 @pytest.fixture
 def mock_sentence_transformer():
-    with patch("mini_nebulus.services.rag_service.SentenceTransformer") as mock:
+    with patch("nebulus_atom.services.rag_service.SentenceTransformer") as mock:
         mock_instance = mock.return_value
         # Mock encode to return an object with tolist()
         mock_embeddings = MagicMock()

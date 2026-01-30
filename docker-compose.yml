@@ -1,40 +1,32 @@
 services:
-  mini-nebulus-core:
-    build:
-      context: .
-      dockerfile: Dockerfile.core
-    container_name: mini-nebulus-core
-    ports:
-      - "8000:8000"
-    environment:
-      - NEBULUS_MODEL=${NEBULUS_MODEL:-qwen2.5-coder}
-      - NEBULUS_BASE_URL=http://host.docker.internal:5000/v1
+  agent:
+    build: .
+    image: nebulus-atom:latest
+    container_name: nebulus-atom-agent
     volumes:
-      # Mount the project root so the agent can edit files (optional, for safety)
-      # In a real secure sandbox, we might NOT mount this, or mount a subfolder.
-      # For now, we mount it to allow the agent to work on the codebase.
-      - .:/app
+      - ./nebulus_atom/data:/app/nebulus_atom/data
+      - ./nebulus_atom/skills:/app/nebulus_atom/skills
+      - ./.scratchpad:/app/.scratchpad
+    env_file:
+      - .env
+    environment:
+      - NEBULUS_BASE_URL=http://host.docker.internal:5000/v1
+      - NEBULUS_MODEL=Meta-Llama-3.1-8B-Instruct-exl2-8_0
+    stdin_open: true # docker run -i
+    tty: true # docker run -t
+    command: python -m nebulus_atom.main start --tui
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    restart: unless-stopped
 
-  mini-nebulus-web:
-    build:
-      context: .
-      dockerfile: Dockerfile.web
-    container_name: mini-nebulus-web
+  dashboard:
+    build: .
+    image: nebulus-atom:latest
+    container_name: nebulus-atom-dashboard
+    volumes:
+      - ./nebulus_atom/data:/app/nebulus_atom/data
+    environment:
+      - STREAMLIT_SERVER_PORT=8501
+      - STREAMLIT_SERVER_ADDRESS=0.0.0.0
     ports:
       - "8501:8501"
-    environment:
-      - API_URL=http://mini-nebulus-core:8000
-      - WEB_UI_USERNAME=${WEB_UI_USERNAME:-admin}
-      - WEB_UI_PASSWORD=${WEB_UI_PASSWORD:-nebulus}
-    volumes:
-      - .:/app
-    depends_on:
-      - mini-nebulus-core
-    restart: unless-stopped
-
-networks:
-  default:
-    driver: bridge
+    command: python -m nebulus_atom.main dashboard

@@ -1,5 +1,5 @@
 import pytest
-from mini_nebulus.controllers.agent_controller import AgentController
+from nebulus_atom.controllers.agent_controller import AgentController
 
 
 @pytest.mark.asyncio

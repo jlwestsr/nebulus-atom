@@ -13,10 +13,10 @@ Implement **Retrieval-Augmented Generation (RAG)** for the codebase. Instead of 
 
 ## 3. Technical Implementation
 - **Modules**:
-    - `mini_nebulus/services/rag_service.py` (Indexing and retrieval logic).
-    - `mini_nebulus/services/tool_executor.py` (Add search tools).
+    - `nebulus_atom/services/rag_service.py` (Indexing and retrieval logic).
+    - `nebulus_atom/services/tool_executor.py` (Add search tools).
 - **Dependencies**: `sentence-transformers`, `chromadb`.
-- **Data**: `.mini_nebulus/db/` for vector storage.
+- **Data**: `.nebulus_atom/db/` for vector storage.
 
 ## 4. Verification Plan
 - [x] Run `index_codebase`.

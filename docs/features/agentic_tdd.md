@@ -14,8 +14,8 @@ A specialized autonomous mode that strictly follows Test-Driven Development (TDD
 
 ## 3. Technical Implementation
 - **Modules**:
-    - `mini_nebulus/controllers/agent_controller.py`: Add `run_tdd_loop` method or new `TDDController`.
-    - `mini_nebulus/services/tool_executor.py`: Ensure test runner output is clean for the LLM.
+    - `nebulus_atom/controllers/agent_controller.py`: Add `run_tdd_loop` method or new `TDDController`.
+    - `nebulus_atom/services/tool_executor.py`: Ensure test runner output is clean for the LLM.
 - **Dependencies**: None (`pytest` is standard).
 - **Data**: None.
 
@@ -26,7 +26,7 @@ A specialized autonomous mode that strictly follows Test-Driven Development (TDD
     - Verify the loop iterates 2 times and exits on success.
 
 **Manual Verification**:
-- [x] Run `mini-nebulus start`.
+- [x] Run `nebulus-atom start`.
 - [x] Command: "Implement a function `add(a, b)` using TDD".
 - [x] Verify agent creates `tests/test_add.py`, runs it (fails), creates `add.py`, runs test (passes).
 

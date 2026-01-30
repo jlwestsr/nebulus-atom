@@ -1,4 +1,4 @@
-# Nebulus Atom (formerly Mini-Nebulus)
+# Nebulus Atom (formerly Nebulus Atom)
 
 > **The Fundamental Unit of Autonomy ⚛️**
 
@@ -33,7 +33,7 @@ The agent protects your files by automatically creating checkpoints before risky
 
 ## Persistent Skill Library
 Skills created via `create_skill` can be shared across projects.
-- **Publishing**: Use \`publish_skill(name)\` to move a local skill to your global library (`~/.mini_nebulus/skills`).
+- **Publishing**: Use \`publish_skill(name)\` to move a local skill to your global library (`~/.nebulus_atom/skills`).
 - **Global Skills**: Global skills are automatically loaded in every project and prefixed with `global.` (e.g., \`global.my_function\`).
 
 ## Visual Task Graph

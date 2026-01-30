@@ -14,8 +14,8 @@ Uses Python's `ast` module to generate a structural map of classes, functions, a
 
 ## 3. Technical Implementation
 - **Modules**:
-    - `mini_nebulus/services/ast_service.py`: New service for parsing.
-    - `mini_nebulus/services/tool_executor.py`: Add `map_codebase` and `find_symbol` tools.
+    - `nebulus_atom/services/ast_service.py`: New service for parsing.
+    - `nebulus_atom/services/tool_executor.py`: Add `map_codebase` and `find_symbol` tools.
 - **Dependencies**: None (Standard `ast` library).
 - **Data**: In-memory cache of the AST map.
 
@@ -26,9 +26,9 @@ Uses Python's `ast` module to generate a structural map of classes, functions, a
     - Verify it extracts class and function names correctly.
 
 **Manual Verification**:
-- [x] Run `mini-nebulus start`.
+- [x] Run `nebulus-atom start`.
 - [x] Command: "Map the codebase".
-- [x] Verify the agent sees the structure of `mini_nebulus/`.
+- [x] Verify the agent sees the structure of `nebulus_atom/`.
 
 ## 5. Workflow Checklist
 - [x] **Branch**: Created `feat/codebase-cartographer` branch?

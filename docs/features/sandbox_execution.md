@@ -7,15 +7,15 @@ Secure the agent s execution environment by running potentially dangerous operat
 
 ## 2. Requirements
 - [x] Check if Docker is available on startup.
-- [x] Create a persistent `mini-nebulus-sandbox` container mounting the project dir.
+- [x] Create a persistent `nebulus-atom-sandbox` container mounting the project dir.
 - [x] Intercept `run_shell_command` to execute via `docker exec`.
 - [x] Intercept `write_file`? (Optional, if mounted volume is used, host write is fine, but shell is the danger).
 - [x] Provide a configuration option `SANDBOX_MODE=true/false`.
 
 ## 3. Technical Implementation
 - **Modules**:
-    - `mini_nebulus/services/docker_service.py` (Manage container lifecycle).
-    - `mini_nebulus/services/tool_executor.py` (Route shell commands to DockerService).
+    - `nebulus_atom/services/docker_service.py` (Manage container lifecycle).
+    - `nebulus_atom/services/tool_executor.py` (Route shell commands to DockerService).
 - **Dependencies**: `docker` (python sdk).
 - **Data**: Dockerfile for the sandbox environment.
 

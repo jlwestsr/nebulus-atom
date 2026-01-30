@@ -1,46 +1,29 @@
-# Mini-Nebulus: Production Readiness Roadmap
+# Nebulus Atom: Strategic Roadmap (Architect's View)
 
-## Executive Summary
-Mini-Nebulus has achieved **Stability** (it runs without crashing) and **Basic Autonomy** (it can write code). To reach **Production Quality**, we must shift focus from "making it run" to "making it smart, safe, and scalable."
+## Current State (The "Autonomous Core")
+We have successfully built the "Autonomous Core", enabling resilience and evolution:
+*   ✅ **Phase 1 (Maturity)**: Test Harness & Headless Execution.
+*   ✅ **Phase 2 (Cognition)**: Reflection Loop ("Think before Act").
+*   ✅ **Phase 3 (Memory)**: RAG (Context Recall).
+*   ✅ **Phase 4 (Resilience)**: Self-Healing Loop (Error Recovery).
+*   ✅ **Phase 5 (Evolution)**: Dynamic Skills (Tool Creation).
+*   ✅ **Phase 6 (Observability)**: Telemetry "Flight Recorder".
 
-## Gap Analysis
+The agent is now self-healing, capable of learning, and fully observable. It is no longer a simple script but a robust autonomous entity.
 
-| Dimension | Current State | Production Goal | Gap |
-| :--- | :--- | :--- | :--- |
-| **Cognition** | Linear Execution (Plan $\to$ Act). Prone to "tunnel vision". | **Iterative Reasoning** (Think $\to$ Act $\to$ Observe $\to$ Correct). | Lack of self-correction loops. |
-| **Memory** | Ephemeral (Context Window only). | **Persistent Knowledge Graph** (RAG + Learned Preferences). | Agent forgets everything on restart. |
-| **Safety** | Heuristics (Regex fixes). `.scratchpad` convention. | **Formal Sandboxing** & Deterministic Guards. | Reliance on "hope" that model outputs valid JSON. |
-| **I/O** | Raw CLI / Logs. | **Structured Observability** (Traces, Metrics, UI). | Blind execution; debugging relies on tailing logs. |
-| **QA** | Manual "eyeball" testing. | **Agent Evaluation Harness** (Automated benchmarks). | High risk of regression. |
+## Completed Milestones (V1 Release)
+We have successfully built and deployed **Nebulus Atom V1**:
+*   ✅ **Phase 1-6 (Core)**: Autonomy, Memory, Resilience, Skills, Telemetry.
+*   ✅ **Phase 7 (Control Plane)**: TUI & Dashboard.
+*   ✅ **Phase 8 (Swarm)**: Multi-Agent Orchestration.
+*   ✅ **Phase 9 (Deployment)**: Secure Docker Containerization.
+*   ✅ **Phase 10 (Identity)**: Rebranding to "Nebulus Atom".
+*   ✅ **Phase 11 (Refactor)**: Codebase migration to `nebulus_atom` package.
 
-## Proposed Roadmap
+## Future Horizons (V2)
+The foundation is complete. Future work will focus on:
+1.  **Cloud Integration**: Connecting Atom to Nebulus Cloud.
+2.  **Advanced Cognition**: Implementing "System 2" thinking loops.
+3.  **Marketplace**: Sharing skills via community registry.
 
-### Phase 1: The "Ironclad" Foundation (Quality Assurance)
-**Objective**: Guarantee the agent never regresses on basic capabilities.
-- [ ] **Agent Test Harness**: A suite of scenarios (e.g., "Create a file", "Refactor Code", "Handle Error") that runs automatically.
-- [ ] **Regression Suite**: Add the "JSON Hallucination" and "Context Overflow" cases as permanent regression tests.
-
-### Phase 2: Enhanced Cognition (The "Brain" Upgrade)
-**Objective**: Enable the agent to solve complex problems, not just one-shot tasks.
-- [ ] **Thinking Loop**: Implement a `Reflect` step where the agent critiques its own code before saving.
-- [ ] **Tool Expansion**: Add `LSP` (Language Server Protocol) support so the agent can "see" syntax errors before running code.
-
-### Phase 3: Persistent Memory (RAG)
-**Objective**: Stop the "Context Amnesia".
-- [ ] **Vector Memory**: Properly Index `AI_DIRECTIVES` and codebases so the agent can query them without loading the full file.
-- [ ] **User Profile**: Remember user preferences ("Always use snake_case") across sessions.
-
-### Phase 4: The "Self-Healing" Loop (Resilience)
-**Objective**: Turn "Runtime Errors" into "Learning Opportunities".
-- [ ] **ErrorRecoveryAgent**: Structured loop to analyze stderr, patch code, and retry.
-- [ ] **Debugger Prompt**: Specialized prompt for fixing syntax/logic errors autonomously.
-
-### Phase 5: Dynamic Skill Acquisition (Evolution)
-**Objective**: Stop solving the same problems twice.
-- [ ] **SkillService**: Abstract successful workflows into Python tools.
-- [ ] **Hot-Loading**: Auto-load new skills properly to `AgentController`.
-
-### Phase 6: Observability "Flight Recorder" (Telemetry)
-**Objective**: Structured visibility into agent reasoning.
-- [ ] **TelemetryService**: Log thought/tool/result to SQLite.
-- [ ] **Dashboard**: Visual trace of thinking process.
+**Status**: V1 STABLE / PRODUCTION READY

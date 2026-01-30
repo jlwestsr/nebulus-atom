@@ -1,7 +1,7 @@
 import os
 import time
-from mini_nebulus.config import Config
-from mini_nebulus.utils.logger import setup_logger
+from nebulus_atom.config import Config
+from nebulus_atom.utils.logger import setup_logger
 
 
 def test_logger_file_creation():

@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import MagicMock, AsyncMock
-from mini_nebulus.controllers.agent_controller import AgentController
-from mini_nebulus.views.cli_view import CLIView
+from nebulus_atom.controllers.agent_controller import AgentController
+from nebulus_atom.views.cli_view import CLIView
 
 
 @pytest.mark.asyncio

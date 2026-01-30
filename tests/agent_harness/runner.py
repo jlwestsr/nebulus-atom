@@ -26,8 +26,18 @@ class AgentRunner:
         """
         start_time = time.time()
 
-        # Command to run: python3 -m mini_nebulus.main start "<prompt>"
-        cmd = [self.python_executable, "-m", "mini_nebulus.main", prompt]
+        session_id = f"test_{int(time.time())}_{os.urandom(2).hex()}"
+
+        # Command to run: python3 -m nebulus_atom.main start "<prompt>" --session-id <id>
+        cmd = [
+            self.python_executable,
+            "-m",
+            "nebulus_atom.main",
+            "start",
+            prompt,
+            "--session-id",
+            session_id,
+        ]
 
         print(f"DEBUG: Harness running command: {' '.join(cmd)}")
 

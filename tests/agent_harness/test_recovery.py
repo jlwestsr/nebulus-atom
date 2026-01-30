@@ -1,5 +1,5 @@
 import pytest
-from mini_nebulus.services.tool_executor import ToolExecutor
+from nebulus_atom.services.tool_executor import ToolExecutor
 
 
 @pytest.mark.asyncio

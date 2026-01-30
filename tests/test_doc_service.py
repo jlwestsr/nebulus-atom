@@ -1,7 +1,7 @@
 import pytest
 import os
 import shutil
-from mini_nebulus.services.doc_service import DocService
+from nebulus_atom.services.doc_service import DocService
 
 
 @pytest.fixture

@@ -1,0 +1,37 @@
+# Version Control
+.git/
+.gitignore
+
+# Python / Environment
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.pytest_cache/
+.mypy_cache/
+
+# Local Config & Secrets
+.env
+.env.local
+config/local_*.py
+
+# Project Specific
+scratchpad/
+logs/
+nebulus_atom.egg-info/
+build/
+dist/
+wheels/

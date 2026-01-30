@@ -13,12 +13,12 @@ This feature enables the agent to learn from user interactions and feedback to a
 
 ## 3. Technical Implementation
 - **Modules**:
-    - `mini_nebulus/services/preference_service.py`: New service to manage preferences.
-    - `mini_nebulus/models/preference.py`: Data model for preferences.
-    - `mini_nebulus/controllers/agent_controller.py`: Inject preferences into system prompt.
-    - `mini_nebulus/services/tool_executor.py`: Add tools `set_preference`, `get_preference`.
+    - `nebulus_atom/services/preference_service.py`: New service to manage preferences.
+    - `nebulus_atom/models/preference.py`: Data model for preferences.
+    - `nebulus_atom/controllers/agent_controller.py`: Inject preferences into system prompt.
+    - `nebulus_atom/services/tool_executor.py`: Add tools `set_preference`, `get_preference`.
 - **Data**:
-    - Storage: `.mini_nebulus/preferences.json`
+    - Storage: `.nebulus_atom/preferences.json`
 
 ## 4. Verification Plan
 **Automated Tests**:
@@ -28,7 +28,7 @@ This feature enables the agent to learn from user interactions and feedback to a
     - Verify injection string generation.
 
 **Manual Verification**:
-- [x] Run `python -m mini_nebulus.main start`.
+- [x] Run `python -m nebulus_atom.main start`.
 - [x] Command: "Set preference coding_style to 'verbose'".
 - [x] Verify subsequent prompts include this preference.
 

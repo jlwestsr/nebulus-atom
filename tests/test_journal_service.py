@@ -1,9 +1,9 @@
 import pytest
 from unittest.mock import MagicMock
 import datetime
-from mini_nebulus.services.journal_service import JournalService
-from mini_nebulus.services.task_service import TaskService
-from mini_nebulus.models.history import History
+from nebulus_atom.services.journal_service import JournalService
+from nebulus_atom.services.task_service import TaskService
+from nebulus_atom.models.history import History
 
 
 @pytest.fixture

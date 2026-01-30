@@ -15,9 +15,9 @@ List specific, testable requirements:
 
 ## 3. Technical Implementation
 - **Modules**:
-    - `mini_nebulus/models/history.py` (Update to store pinned paths).
-    - `mini_nebulus/controllers/agent_controller.py` (Update context injection logic).
-    - `mini_nebulus/services/context_service.py` (New service for managing pins).
+    - `nebulus_atom/models/history.py` (Update to store pinned paths).
+    - `nebulus_atom/controllers/agent_controller.py` (Update context injection logic).
+    - `nebulus_atom/services/context_service.py` (New service for managing pins).
 - **Dependencies**: None.
 - **Data**: In-memory state within `History` or `ContextService`.
 
@@ -27,7 +27,7 @@ List specific, testable requirements:
 - [x] Logic Verified: Verify that `pin_file` adds to state and `unpin_file` removes it. Verify context injection string construction.
 
 **Manual Verification**:
-- [x] Step 1: Run `mini-nebulus start`
+- [x] Step 1: Run `nebulus-atom start`
 - [x] Step 2: Execute `pin_file README.md`
 - [x] Step 3: Ask "What is in the pinned file?" without using `read_file` tool.
 - [x] Step 4: Verify the agent answers correctly based on context.

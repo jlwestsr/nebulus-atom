@@ -8,13 +8,13 @@ Allow the agent to take a successful tool execution or plan and "compile" it int
 ## 2. Requirements
 - [x] **Macro Creation**: Agent can generate a shell script from a sequence of `run_shell_command` calls.
 - [x] **Alias Suggestion**: Agent can suggest an alias (e.g., `alias clean-docker="..."`).
-- [x] **Persistence**: Save macros to `~/.mini_nebulus/macros/` or append to `.bashrc` (with user permission).
+- [x] **Persistence**: Save macros to `~/.nebulus_atom/macros/` or append to `.bashrc` (with user permission).
 - [x] **Tool Integration**: Add `create_macro` tool.
 
 ## 3. Technical Implementation
 - **Modules**:
-    - `mini_nebulus/services/macro_service.py`: Logic to extract shell commands from history and format them.
-    - `mini_nebulus/services/tool_executor.py`: Add `create_macro`.
+    - `nebulus_atom/services/macro_service.py`: Logic to extract shell commands from history and format them.
+    - `nebulus_atom/services/tool_executor.py`: Add `create_macro`.
 - **Dependencies**: None.
 - **Data**: Macro files.
 
@@ -25,7 +25,7 @@ Allow the agent to take a successful tool execution or plan and "compile" it int
     - Verify generated script content.
 
 **Manual Verification**:
-- [x] Run `mini-nebulus start`.
+- [x] Run `nebulus-atom start`.
 - [x] Ask: "Create a macro to clean all docker containers".
 - [x] Verify `clean_docker.sh` is created and executable.
 

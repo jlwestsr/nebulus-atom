@@ -16,13 +16,13 @@ Upgrade the User Interface from a scrolling CLI to a full **Terminal User Interf
 
 ## 3. Technical Implementation
 - **Modules**:
-    - `mini_nebulus/views/tui_view.py` (New view implementation using Textual).
-    - `mini_nebulus/main.py` (Switch to TUI mode).
+    - `nebulus_atom/views/tui_view.py` (New view implementation using Textual).
+    - `nebulus_atom/main.py` (Switch to TUI mode).
 - **Dependencies**: `textual`.
 - **Data**: Async event loop integration with Textual.
 
 ## 4. Verification Plan
-- [x] Run `mini-nebulus start --tui`.
+- [x] Run `nebulus-atom start --tui`.
 - [x] Verify layout renders correctly.
 - [x] Run a complex plan.
 - [x] Verify the Plan Panel updates task icons in real-time.

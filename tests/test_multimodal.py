@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import MagicMock
-from mini_nebulus.services.image_service import ImageService
-from mini_nebulus.services.tool_executor import ToolExecutor
+from nebulus_atom.services.image_service import ImageService
+from nebulus_atom.services.tool_executor import ToolExecutor
 
 
 def test_encode_image_file_not_found():

@@ -1,5 +1,5 @@
 import pytest
-from mini_nebulus.services.ast_service import ASTService
+from nebulus_atom.services.ast_service import ASTService
 
 
 @pytest.fixture

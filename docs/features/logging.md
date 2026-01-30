@@ -3,11 +3,11 @@
 ## 1. Overview
 **Branch**: `feat/logging`
 
-Mini-Nebulus currently lacks a centralized logging system. Errors and execution details are printed to stdout/stderr or the TUI logs, but there is no persistent record for debugging or auditing. This feature implements a robust, rotating file-based logging system.
+Nebulus Atom currently lacks a centralized logging system. Errors and execution details are printed to stdout/stderr or the TUI logs, but there is no persistent record for debugging or auditing. This feature implements a robust, rotating file-based logging system.
 
 ## 2. Requirements
 - [x] Create a centralized logging configuration.
-- [x] Logs should be saved to `logs/mini_nebulus.log`.
+- [x] Logs should be saved to `logs/nebulus_atom.log`.
 - [x] Implement log rotation (e.g., 5MB max size, keep 3 backups).
 - [x] Ensure logs capture timestamp, level, logger name, and message.
 - [x] Integrate logging into key components:
@@ -19,11 +19,11 @@ Mini-Nebulus currently lacks a centralized logging system. Errors and execution 
 
 ## 3. Technical Implementation
 - **Modules**:
-    - `mini_nebulus/utils/logger.py`: New module for logging setup.
-    - `mini_nebulus/config.py`: Add logging constants (path, level).
-    - `mini_nebulus/controllers/agent_controller.py`: Add log calls.
-    - `mini_nebulus/services/tool_executor.py`: Add log calls.
-    - `mini_nebulus/services/openai_service.py`: Add log calls.
+    - `nebulus_atom/utils/logger.py`: New module for logging setup.
+    - `nebulus_atom/config.py`: Add logging constants (path, level).
+    - `nebulus_atom/controllers/agent_controller.py`: Add log calls.
+    - `nebulus_atom/services/tool_executor.py`: Add log calls.
+    - `nebulus_atom/services/openai_service.py`: Add log calls.
 - **Dependencies**: Standard library `logging` and `logging.handlers`. No new external deps.
 - **Data**: `logs/` directory creation.
 
@@ -33,9 +33,9 @@ Mini-Nebulus currently lacks a centralized logging system. Errors and execution 
 - [x] Logic Verified: Check if log file is created, rotation works, and specific messages appear.
 
 **Manual Verification**:
-- [x] Step 1: Run `python -m mini_nebulus.main start`
+- [x] Step 1: Run `python -m nebulus_atom.main start`
 - [x] Step 2: Execute a command (e.g., "list files")
-- [x] Step 3: Check `logs/mini_nebulus.log` for correct entries.
+- [x] Step 3: Check `logs/nebulus_atom.log` for correct entries.
 
 ## 5. Workflow Checklist
 Follow the AI Behavior strict workflow:

@@ -15,10 +15,10 @@ List specific, testable requirements:
 
 ## 3. Technical Implementation
 - **Modules**:
-    - `mini_nebulus/services/tool_executor.py` (Add `ask_user` tool definition).
-    - `mini_nebulus/controllers/agent_controller.py` (Handle the pause/resume logic).
-    - `mini_nebulus/views/base_view.py` (Add `ask_user_input` method).
-    - `mini_nebulus/gateways/discord_gateway.py` (Implement wait_for logic).
+    - `nebulus_atom/services/tool_executor.py` (Add `ask_user` tool definition).
+    - `nebulus_atom/controllers/agent_controller.py` (Handle the pause/resume logic).
+    - `nebulus_atom/views/base_view.py` (Add `ask_user_input` method).
+    - `nebulus_atom/gateways/discord_gateway.py` (Implement wait_for logic).
 - **Dependencies**: None.
 - **Data**: Temporary state for the pending question.
 
@@ -28,7 +28,7 @@ List specific, testable requirements:
 - [x] Logic Verified: Mock the view input and verify the agent receives it correctly.
 
 **Manual Verification**:
-- [x] Step 1: Run `mini-nebulus start`
+- [x] Step 1: Run `nebulus-atom start`
 - [x] Step 2: Instruct agent: "If you don t know my name, ask me."
 - [x] Step 3: Agent calls `ask_user("What is your name?")`.
 - [x] Step 4: User types name.

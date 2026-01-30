@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import patch
-from mini_nebulus.services.skill_service import SkillService
+from nebulus_atom.services.skill_service import SkillService
 
 
 @pytest.fixture
@@ -19,7 +19,7 @@ def test_publish_skill(temp_dirs):
     skill_file = local_dir / "my_skill.py"
     skill_file.write_text("def my_func():\n    return 'hello'")
 
-    with patch("mini_nebulus.config.Config.GLOBAL_SKILLS_PATH", str(global_dir)):
+    with patch("nebulus_atom.config.Config.GLOBAL_SKILLS_PATH", str(global_dir)):
         service = SkillService(skills_dir=str(local_dir))
         # Ensure correct path is used
         service.global_skills_dir = str(global_dir)
@@ -42,7 +42,7 @@ def test_load_global_skill(temp_dirs):
         "def global_func():\n    return 'world'"
     )
 
-    with patch("mini_nebulus.config.Config.GLOBAL_SKILLS_PATH", str(global_dir)):
+    with patch("nebulus_atom.config.Config.GLOBAL_SKILLS_PATH", str(global_dir)):
         service = SkillService(skills_dir=str(local_dir))
         service.global_skills_dir = str(global_dir)
 

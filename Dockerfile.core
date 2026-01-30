@@ -26,7 +26,7 @@ RUN pip install --no-cache-dir \
     docker
 
 # Copy source code
-COPY mini_nebulus ./mini_nebulus
+COPY nebulus_atom ./nebulus_atom
 COPY CONTEXT.md .
 
 # Set PYTHONPATH
@@ -36,4 +36,4 @@ ENV PYTHONPATH=/app
 EXPOSE 8000
 
 # Run the server
-CMD ["uvicorn", "mini_nebulus.server:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "nebulus_atom.server:app", "--host", "0.0.0.0", "--port", "8000"]

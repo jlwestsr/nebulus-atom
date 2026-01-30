@@ -1,4 +1,4 @@
-# AI Directives for Mini-Nebulus
+# AI Directives for Nebulus Atom
 
 # Autonomy Mandates
 1. **Autonomous Implementation**: Once a task is IN_PROGRESS, execute it immediately.
@@ -16,10 +16,10 @@
 We adhere to the **MVC (Model-View-Controller)** pattern for this Python CLI application.
 
 ## Directory Structure
-- **mini_nebulus/models/**: Data structures (Pydantic/Dataclasses).
-- **mini_nebulus/views/**: UI logic using `rich`.
-- **mini_nebulus/controllers/**: Orchestration logic.
-- **mini_nebulus/services/**: Integrations (OpenAI, Subprocess).
+- **nebulus_atom/models/**: Data structures (Pydantic/Dataclasses).
+- **nebulus_atom/views/**: UI logic using `rich`.
+- **nebulus_atom/controllers/**: Orchestration logic.
+- **nebulus_atom/services/**: Integrations (OpenAI, Subprocess).
 
 ## Coding Standards
 - **Type Hints**: Mandatory for all function signatures.

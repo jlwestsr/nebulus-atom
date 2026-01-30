@@ -9,14 +9,14 @@ This feature provides in-terminal access to the project s documentation. Users c
 - [x] **Doc Listing**: List available documentation files in `docs/` and its subdirectories.
 - [x] **Doc Viewing**: Render Markdown files in the terminal using `rich`.
 - [x] **Doc Searching**: Simple keyword search or RAG-based search (reusing `RagService` if applicable) for documentation.
-- [x] **CLI Command**: `mini-nebulus docs` subcommand.
+- [x] **CLI Command**: `nebulus-atom docs` subcommand.
 - [x] **Agent Tool**: `read_doc` and `list_docs` tools for the agent.
 
 ## 3. Technical Implementation
 - **Modules**:
-    - `mini_nebulus/services/doc_service.py`: Service to scan and read docs.
-    - `mini_nebulus/main.py`: Add `docs` subcommand.
-    - `mini_nebulus/services/tool_executor.py`: Add `read_doc`, `list_docs` tools.
+    - `nebulus_atom/services/doc_service.py`: Service to scan and read docs.
+    - `nebulus_atom/main.py`: Add `docs` subcommand.
+    - `nebulus_atom/services/tool_executor.py`: Add `read_doc`, `list_docs` tools.
 - **Dependencies**: `rich` (already installed).
 
 ## 4. Verification Plan
@@ -26,8 +26,8 @@ This feature provides in-terminal access to the project s documentation. Users c
     - Verify file reading.
 
 **Manual Verification**:
-- [x] Run `python -m mini_nebulus.main docs list`.
-- [x] Run `python -m mini_nebulus.main docs read features/task_management.md`.
+- [x] Run `python -m nebulus_atom.main docs list`.
+- [x] Run `python -m nebulus_atom.main docs read features/task_management.md`.
 
 ## 5. Workflow Checklist
 - [x] **Branch**: `feat/embedded-docs`

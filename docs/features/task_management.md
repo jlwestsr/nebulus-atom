@@ -6,7 +6,7 @@
 Currently, `TaskService` stores plans and tasks in memory. If the agent restarts, the plan is lost. This feature implements file-based persistence (JSON) so that the agent can resume long-running plans across sessions, maximizing the utility of the local LLM setup.
 
 ## 2. Requirements
-- [x] **Storage Location**: Store plans in `.mini_nebulus/sessions/<session_id>/plan.json`.
+- [x] **Storage Location**: Store plans in `.nebulus_atom/sessions/<session_id>/plan.json`.
 - [x] **Auto-Save**: Automatically save the plan whenever a task is created, added, or updated.
 - [x] **Auto-Load**: Automatically load the existing plan for the session upon `TaskService` initialization.
 - [x] **Data Model**: Ensure `Plan` and `Task` objects can be serialized/deserialized cleanly.
@@ -14,10 +14,10 @@ Currently, `TaskService` stores plans and tasks in memory. If the agent restarts
 
 ## 3. Technical Implementation
 - **Modules**:
-    - `mini_nebulus/services/task_service.py`: Add `load()` and `save()` methods; hook them into modification methods.
-    - `mini_nebulus/models/task.py`: Ensure `to_dict()` and `from_dict()` (or standard serialization) are robust.
+    - `nebulus_atom/services/task_service.py`: Add `load()` and `save()` methods; hook them into modification methods.
+    - `nebulus_atom/models/task.py`: Ensure `to_dict()` and `from_dict()` (or standard serialization) are robust.
 - **Data**:
-    - Directory structure: `.mini_nebulus/sessions/{session_id}/`
+    - Directory structure: `.nebulus_atom/sessions/{session_id}/`
 
 ## 4. Verification Plan
 **Automated Tests**:
@@ -28,7 +28,7 @@ Currently, `TaskService` stores plans and tasks in memory. If the agent restarts
     - Assert plan is loaded correctly.
 
 **Manual Verification**:
-- [x] Run `python -m mini_nebulus.main start --tui`.
+- [x] Run `python -m nebulus_atom.main start --tui`.
 - [x] Ask: "Create a plan to count to 3".
 - [x] Exit the app (`Ctrl+C`).
 - [x] Restart the app.

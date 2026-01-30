@@ -1,7 +1,7 @@
-# Moltbot Context: Mini-Nebulus
+# Moltbot Context: Nebulus Atom
 
 ## Project Overview
-This is **Mini-Nebulus**, a lab environment for testing the "Nebulus" infrastructure patterns.
+This is **Nebulus Atom**, a lab environment for testing the "Nebulus" infrastructure patterns.
 
 ## Key Files
 - `GEMINI.md`: Core project directives and current status.

@@ -13,9 +13,9 @@ This feature enhances the CLI with semantic search capabilities over the command
 
 ## 3. Technical Implementation
 - **Modules**:
-    - `mini_nebulus/services/rag_service.py`: Add `index_history(turn)` and `search_history(query)` methods.
-    - `mini_nebulus/controllers/agent_controller.py`: Call `index_history` in `process_turn`.
-    - `mini_nebulus/services/tool_executor.py`: Add `search_history` tool.
+    - `nebulus_atom/services/rag_service.py`: Add `index_history(turn)` and `search_history(query)` methods.
+    - `nebulus_atom/controllers/agent_controller.py`: Call `index_history` in `process_turn`.
+    - `nebulus_atom/services/tool_executor.py`: Add `search_history` tool.
 - **Data**:
     - ChromaDB collection: `command_history`.
 
@@ -27,7 +27,7 @@ This feature enhances the CLI with semantic search capabilities over the command
     - Assert the turn is returned.
 
 **Manual Verification**:
-- [x] Run `python -m mini_nebulus.main start`.
+- [x] Run `python -m nebulus_atom.main start`.
 - [x] Execute: "Create a file named hello.txt".
 - [x] Execute: "Search history for 'file creation'".
 - [x] Verify the previous command is returned.

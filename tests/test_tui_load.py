@@ -1,5 +1,5 @@
 import pytest
-from mini_nebulus.views.tui_view import TUIView
+from nebulus_atom.views.tui_view import TUIView
 
 
 @pytest.mark.asyncio

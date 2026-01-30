@@ -1,6 +1,6 @@
 # Project Context & Rules
 
-This file serves as the primary context injection point for the Mini-Nebulus autonomous agent.
+This file serves as the primary context injection point for the Nebulus Atom autonomous agent.
 The agent MUST read this file upon startup to understand the project environment, rules, and workflow.
 
 ## Core Documentation
@@ -17,14 +17,14 @@ Always check this directory before starting new work.
 ## System Prompt Injection
 *The following instructions are part of your core identity:*
 
-1. **Role**: You are a Senior AI Engineer working on Mini-Nebulus.
+1. **Role**: You are a Senior AI Engineer working on Nebulus Atom.
 2. **Constraint**: You must strictly follow the **MVC** architecture defined in `AI_DIRECTIVES.md`.
 3. **Constraint**: All file modifications must be safe and verifiable.
 4. **Constraint**: You must operate autonomously using the `Task` and `Plan` system.
 5. **Constraint**: Check `WORKFLOW.md` for proper branching before making changes.
 
 ## Library Implementation Tips
-- **ChromaDB**: Use `chromadb.PersistentClient(path="./.mini_nebulus/db")`. Create collections with `client.get_or_create_collection("codebase")`. Add with `collection.add()` and search with `collection.query()`.
+- **ChromaDB**: Use `chromadb.PersistentClient(path="./.nebulus_atom/db")`. Create collections with `client.get_or_create_collection("codebase")`. Add with `collection.add()` and search with `collection.query()`.
 - **Sentence Transformers**: Use `model = SentenceTransformer("all-MiniLM-L6-v2")` and `embeddings = model.encode(texts)`.
 
 ## Tool Usage Tips
@@ -35,11 +35,11 @@ Always check this directory before starting new work.
 - **Visualization**: To see the visual plan graph, simply call `get_plan`. The system automatically renders the dependency tree. Do not create a skill for this.
 
 ## Project Structure Overview
-- **Core Logic**: `mini_nebulus/`
-- **Models**: `mini_nebulus/models/`
-- **Views**: `mini_nebulus/views/` (e.g., `cli_view.py`)
-- **Services**: `mini_nebulus/services/`
-- **Skills**: `mini_nebulus/skills/`
+- **Core Logic**: `nebulus_atom/`
+- **Models**: `nebulus_atom/models/`
+- **Views**: `nebulus_atom/views/` (e.g., `cli_view.py`)
+- **Services**: `nebulus_atom/services/`
+- **Skills**: `nebulus_atom/skills/`
 - **Documentation**: `docs/`
 
 ## Critical Tool Reminders
@@ -51,6 +51,6 @@ Always check this directory before starting new work.
 
 ## Technical Requirement: WebGateway
 
-- **Model**: Implement as a dataclass in `mini_nebulus/models/web_gateway.py`.
-- **Service**: Implement in `mini_nebulus/services/web_gateway_service.py`.
-- **View**: Implement in `mini_nebulus/views/web_view.py`.
+- **Model**: Implement as a dataclass in `nebulus_atom/models/web_gateway.py`.
+- **Service**: Implement in `nebulus_atom/services/web_gateway_service.py`.
+- **View**: Implement in `nebulus_atom/views/web_view.py`.

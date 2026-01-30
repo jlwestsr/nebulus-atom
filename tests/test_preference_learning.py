@@ -1,11 +1,11 @@
 import pytest
 import os
-from mini_nebulus.services.preference_service import PreferenceService
+from nebulus_atom.services.preference_service import PreferenceService
 
 
 @pytest.fixture
 def clean_prefs():
-    path = ".mini_nebulus/test_preferences.json"
+    path = ".nebulus_atom/test_preferences.json"
     if os.path.exists(path):
         os.remove(path)
     yield path

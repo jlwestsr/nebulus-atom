@@ -1,9 +1,9 @@
 import pytest
 import os
-from mini_nebulus.services.telemetry_service import TelemetryService
-from mini_nebulus.services.tool_executor import ToolExecutor
+from nebulus_atom.services.telemetry_service import TelemetryService
+from nebulus_atom.services.tool_executor import ToolExecutor
 
-TEST_DB_PATH = "mini_nebulus/data/test_telemetry.db"
+TEST_DB_PATH = "nebulus_atom/data/test_telemetry.db"
 
 
 @pytest.fixture

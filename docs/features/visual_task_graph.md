@@ -15,9 +15,9 @@ List specific, testable requirements:
 
 ## 3. Technical Implementation
 - **Modules**:
-    - `mini_nebulus/models/task.py` (Add dependencies field).
-    - `mini_nebulus/views/cli_view.py` (Implement `print_plan_tree`).
-    - `mini_nebulus/views/discord_view.py` (Implement Xprint_plan_mermaid`).
+    - `nebulus_atom/models/task.py` (Add dependencies field).
+    - `nebulus_atom/views/cli_view.py` (Implement `print_plan_tree`).
+    - `nebulus_atom/views/discord_view.py` (Implement Xprint_plan_mermaid`).
 - **Dependencies**: `rich` (already included).
 - **Data**: Task graph structure in memory.
 
@@ -29,7 +29,7 @@ List specific, testable requirements:
     - Verify visualization output string contains correct hierarchy.
 
 **Manual Verification**:
-- [x] Step 1: Run `mini-nebulus start`
+- [x] Step 1: Run `nebulus-atom start`
 - [x] Step 2: Create a plan with dependencies (e.g. "Build" depends on "Compile").
 - [x] Step 3: Run `visualize_plan`.
 - [x] Step 4: Verify the tree structure in the terminal.

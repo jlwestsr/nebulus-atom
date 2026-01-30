@@ -1,6 +1,6 @@
 # AI Insights & Lessons Learned
 
-This document captures the nuances, architectural decisions, and "lessons learned" regarding the AI's behavior within the Mini-Nebulus project.
+This document captures the nuances, architectural decisions, and "lessons learned" regarding the AI's behavior within the Nebulus Atom project.
 
 **Project Mandate**: Future AI agents working on this project are **explicitly encouraged** to recommend, document, or append new insights to this file when they discover patterns that affect performance, autonomy, or user experience.
 

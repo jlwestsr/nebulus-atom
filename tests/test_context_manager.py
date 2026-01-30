@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import patch
-from mini_nebulus.services.context_service import ContextService, ContextServiceManager
+from nebulus_atom.services.context_service import ContextService, ContextServiceManager
 
 
 class TestContextService(unittest.TestCase):
@@ -40,7 +40,7 @@ class TestContextService(unittest.TestCase):
         service.MAX_CONTEXT_CHARS = 200
 
         with patch("os.path.exists", return_value=True), patch(
-            "mini_nebulus.services.file_service.FileService.read_file"
+            "nebulus_atom.services.file_service.FileService.read_file"
         ) as mock_read:
             # File content is 300 chars, limit allows only ~80
             mock_read.return_value = "A" * 300

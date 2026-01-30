@@ -52,3 +52,5 @@ tmp/
 .gemini/
 .scratchpad/
 .mini_nebulus_history
+**/*.sqlite3
+.nebulus_atom/db/

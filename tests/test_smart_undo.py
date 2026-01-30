@@ -2,7 +2,7 @@ import time
 import pytest
 import os
 import shutil
-from mini_nebulus.services.checkpoint_service import CheckpointService
+from nebulus_atom.services.checkpoint_service import CheckpointService
 
 
 @pytest.fixture
@@ -18,7 +18,7 @@ def clean_env():
     os.chdir(test_dir)
 
     # Create checkpoint dir
-    os.makedirs(".mini_nebulus/checkpoints", exist_ok=True)
+    os.makedirs(".nebulus_atom/checkpoints", exist_ok=True)
 
     yield
 

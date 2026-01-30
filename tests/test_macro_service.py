@@ -1,6 +1,6 @@
 import os
 import stat
-from mini_nebulus.services.macro_service import MacroService
+from nebulus_atom.services.macro_service import MacroService
 
 
 def test_create_macro(tmp_path):

@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import AsyncMock, patch
-from mini_nebulus.controllers.agent_controller import AgentController
-from mini_nebulus.services.tool_executor import ToolExecutor
+from nebulus_atom.controllers.agent_controller import AgentController
+from nebulus_atom.services.tool_executor import ToolExecutor
 
 
 def test_rag_tools_exposed():
@@ -24,7 +24,7 @@ async def test_rag_dispatch():
     mock_rag.search_code.return_value = [{"content": "found code"}]
 
     with patch(
-        "mini_nebulus.services.tool_executor.ToolExecutor.rag_manager.get_service",
+        "nebulus_atom.services.tool_executor.ToolExecutor.rag_manager.get_service",
         return_value=mock_rag,
     ):
         # Test search_memory -> search_history
