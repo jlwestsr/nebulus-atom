@@ -1,4 +1,4 @@
-# GEMINI Project Context
+# Nebulus Atom Project Context
 
 ## Project Overview
 This is a custom, lightweight CLI agent built to interact directly with a local Nebulus (Ollama) server, bypassing complex abstractions.
