@@ -140,6 +140,21 @@ class AgentController:
                     },
                 },
             },
+            {
+                "type": "function",
+                "function": {
+                    "name": "create_skill",
+                    "description": "Create a reusable Python skill (tool). The code must define a function.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "name": {"type": "string"},
+                            "code": {"type": "string"},
+                        },
+                        "required": ["name", "code"],
+                    },
+                },
+            },
         ]
 
         self.pending_tdd_goal = None
