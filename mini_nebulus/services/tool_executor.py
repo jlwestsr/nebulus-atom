@@ -15,6 +15,7 @@ from mini_nebulus.services.ast_service import ASTServiceManager
 from mini_nebulus.services.macro_service import MacroServiceManager
 from mini_nebulus.services.docker_service import DockerServiceManager
 from mini_nebulus.services.error_recovery_service import ErrorRecoveryServiceManager
+from mini_nebulus.services.telemetry_service import TelemetryServiceManager
 from mini_nebulus.models.task import TaskStatus
 from mini_nebulus.utils.logger import setup_logger
 
@@ -37,6 +38,7 @@ class ToolExecutor:
     history_manager = None  # Set by AgentController
     docker_manager = DockerServiceManager()
     recovery_manager = ErrorRecoveryServiceManager()
+    telemetry_manager = TelemetryServiceManager()
 
     @staticmethod
     def initialize():
@@ -45,9 +47,21 @@ class ToolExecutor:
 
     @staticmethod
     async def dispatch(tool_name: str, args: dict, session_id: str = "default"):
-        logger.info(
-            f"Dispatching tool '{tool_name}' with args: {str(args)[:200]}..."
-        )  # Truncate args for log safety
+        logger.info(f"Dispatching tool '{tool_name}' with args: {str(args)[:200]}...")
+        telemetry_service = ToolExecutor.telemetry_manager.get_service(session_id)
+
+        # Log Call
+        telemetry_service.log_tool_call(session_id, tool_name, args)
+
+        result = await ToolExecutor._dispatch_impl(tool_name, args, session_id)
+
+        # Log Result (or error, which acts as result string)
+        telemetry_service.log_tool_result(session_id, tool_name, str(result))
+
+        return result
+
+    @staticmethod
+    async def _dispatch_impl(tool_name: str, args: dict, session_id: str):
         try:
             task_service = ToolExecutor.task_manager.get_service(session_id)
             context_service = ToolExecutor.context_manager.get_service(session_id)
@@ -210,6 +224,13 @@ class ToolExecutor:
             logger.error(f"Error executing {tool_name}: {str(e)}", exc_info=True)
             try:
                 recovery_service = ToolExecutor.recovery_manager.get_service(session_id)
+
+                # Log the raw error as well
+                telemetry_service = ToolExecutor.telemetry_manager.get_service(
+                    session_id
+                )
+                telemetry_service.log_error(session_id, tool_name, str(e))
+
                 return recovery_service.analyze_error(tool_name, str(e), args)
             except Exception as e2:
                 logger.error(f"CRITICAL: Recovery Service Failed: {e2}", exc_info=True)

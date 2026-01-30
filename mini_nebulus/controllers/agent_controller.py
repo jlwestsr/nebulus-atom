@@ -556,6 +556,20 @@ class AgentController:
                                 tool_name = extracted.get("name", "run_shell_command")
                                 thought = extracted.get("thought")
 
+                                # Log thought telemetry
+                                if thought:
+                                    try:
+                                        telemetry_service = (
+                                            ToolExecutor.telemetry_manager.get_service(
+                                                session_id
+                                            )
+                                        )
+                                        telemetry_service.log_thought(
+                                            session_id, thought
+                                        )
+                                    except Exception:
+                                        pass  # Don't crash on telemetry failure
+
                                 # Print thought if present
                                 if thought and isinstance(self.view, CLIView):
                                     self.view.console.print(
