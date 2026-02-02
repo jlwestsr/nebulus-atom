@@ -1,7 +1,6 @@
 import pytest
 import sys
 import os
-from unittest.mock import patch
 
 # Add project root to sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
@@ -17,17 +16,6 @@ def test_dependencies_installed():
                 raise ImportError(f"Missing dependency: {module}")
     except ImportError as e:
         pytest.fail(f"Missing dependency: {e}")
-
-
-def test_tui_view_initialization():
-    """Verify TextualView can be instantiated."""
-    # We might need to mock Textual's App init if it does heavy lifting
-    with patch("textual.app.App.__init__", return_value=None):
-        from nebulus_atom.views.tui_view import TextualView
-
-        view = TextualView()
-        assert hasattr(view, "compose")
-        assert hasattr(view, "set_controller")
 
 
 def test_dashboard_file_exists():

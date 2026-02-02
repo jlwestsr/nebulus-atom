@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 from nebulus_atom.services.image_service import ImageService
 from nebulus_atom.services.tool_executor import ToolExecutor
 
@@ -16,8 +16,18 @@ async def test_tool_executor_scan_image():
     mock_service = MagicMock()
     mock_service.encode_image.return_value = "data:image/png;base64,mock"
 
-    ToolExecutor.image_manager.get_service = MagicMock(return_value=mock_service)
+    # Mock telemetry service to avoid database issues
+    mock_telemetry = MagicMock()
+    mock_telemetry.log_tool_call = MagicMock()
 
-    result = await ToolExecutor.dispatch("scan_image", {"path": "test.png"})
-    assert result == "data:image/png;base64,mock"
-    mock_service.encode_image.assert_called_with("test.png")
+    with patch.object(
+        ToolExecutor, "image_manager"
+    ) as mock_image_manager, patch.object(
+        ToolExecutor, "telemetry_manager"
+    ) as mock_telemetry_manager:
+        mock_image_manager.get_service.return_value = mock_service
+        mock_telemetry_manager.get_service.return_value = mock_telemetry
+
+        result = await ToolExecutor.dispatch("scan_image", {"path": "test.png"})
+        assert result == "data:image/png;base64,mock"
+        mock_service.encode_image.assert_called_with("test.png")

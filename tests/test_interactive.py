@@ -64,10 +64,17 @@ async def test_interactive_clarification():
     # Verify ask_user_input was called
     mock_view.ask_user_input.assert_called_with("What is your name?")
 
-    # Verify history has the tool output
+    # Verify history has the tool output (stored as user message with Tool prefix)
     history = controller.history_manager.get_session("default").get()
 
-    # Find tool message
-    tool_msg = next((m for m in history if m["role"] == "tool"), None)
+    # Find user message containing tool output
+    tool_msg = next(
+        (
+            m
+            for m in history
+            if m["role"] == "user" and "Tool 'ask_user'" in m.get("content", "")
+        ),
+        None,
+    )
     assert tool_msg is not None, f"Tool message not found in history: {history}"
-    assert tool_msg["content"] == "My name is User"
+    assert "My name is User" in tool_msg["content"]

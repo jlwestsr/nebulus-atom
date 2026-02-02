@@ -1,6 +1,5 @@
 import pytest
 from unittest.mock import MagicMock, patch
-from nebulus_atom.services.rag_service import RagService
 
 
 @pytest.fixture
@@ -20,10 +19,13 @@ def mock_sentence_transformer():
         yield mock
 
 
-def test_index_history(mock_chroma, mock_sentence_transformer):
+@pytest.mark.asyncio
+async def test_index_history(mock_chroma, mock_sentence_transformer):
+    from nebulus_atom.services.rag_service import RagService
+
     service = RagService()
 
-    service.index_history("user", "Hello world", "test_session")
+    await service.index_history("user", "Hello world", "test_session")
 
     # Verify add was called on history_collection
     service.history_collection.add.assert_called_once()
@@ -33,7 +35,10 @@ def test_index_history(mock_chroma, mock_sentence_transformer):
     assert call_kwargs["metadatas"][0]["session_id"] == "test_session"
 
 
-def test_search_history(mock_chroma, mock_sentence_transformer):
+@pytest.mark.asyncio
+async def test_search_history(mock_chroma, mock_sentence_transformer):
+    from nebulus_atom.services.rag_service import RagService
+
     service = RagService()
 
     # Mock query result
@@ -44,7 +49,7 @@ def test_search_history(mock_chroma, mock_sentence_transformer):
         "metadatas": [[{"role": "user"}]],
     }
 
-    results = service.search_history("Hello")
+    results = await service.search_history("Hello")
 
     assert len(results) == 1
     assert results[0]["content"] == "Hello world"
