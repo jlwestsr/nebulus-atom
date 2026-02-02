@@ -28,6 +28,7 @@ class ResponseParser:
         - Arrays of tool calls
         - Mixed text and JSON
         - Python dict literals (single quotes)
+        - JSON with unescaped newlines in strings (common with local models)
 
         Args:
             text: Raw LLM response text.
@@ -42,10 +43,16 @@ class ResponseParser:
             try:
                 obj = json.loads(candidate)
             except json.JSONDecodeError:
+                # Try to fix unescaped newlines in JSON strings
+                fixed = self._fix_json_newlines(candidate)
                 try:
-                    obj = ast.literal_eval(candidate)
-                except Exception:
-                    continue
+                    obj = json.loads(fixed)
+                except json.JSONDecodeError:
+                    # Fall back to Python literal eval (existing code, handles single quotes)
+                    try:
+                        obj = ast.literal_eval(candidate)  # noqa: S307
+                    except Exception:
+                        continue
 
             if isinstance(obj, list):
                 results.extend(
@@ -58,6 +65,44 @@ class ResponseParser:
                     results.append(obj)
 
         return results
+
+    def _fix_json_newlines(self, text: str) -> str:
+        """
+        Fix unescaped newlines in JSON strings.
+
+        Some local models return JSON with actual newline characters
+        inside string values instead of escaped \\n sequences.
+
+        Args:
+            text: JSON text with potential unescaped newlines.
+
+        Returns:
+            JSON text with newlines properly escaped within strings.
+        """
+        result = []
+        in_string = False
+        escape_next = False
+
+        for char in text:
+            if escape_next:
+                result.append(char)
+                escape_next = False
+            elif char == "\\":
+                result.append(char)
+                escape_next = True
+            elif char == '"':
+                result.append(char)
+                in_string = not in_string
+            elif char == "\n" and in_string:
+                # Replace actual newline with escaped version
+                result.append("\\n")
+            elif char == "\t" and in_string:
+                # Also handle tabs
+                result.append("\\t")
+            else:
+                result.append(char)
+
+        return "".join(result)
 
     def _find_json_objects(self, text: str) -> Generator[str, None, None]:
         """
