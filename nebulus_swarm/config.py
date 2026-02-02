@@ -24,6 +24,9 @@ class GitHubConfig:
     """GitHub integration configuration."""
 
     token: str = field(default_factory=lambda: os.getenv("GITHUB_TOKEN", ""))
+    default_repo: str = field(
+        default_factory=lambda: os.getenv("GITHUB_DEFAULT_REPO", "")
+    )
     watched_repos: List[str] = field(default_factory=list)
     work_label: str = "nebulus-ready"
     in_progress_label: str = "in-progress"
@@ -122,6 +125,8 @@ class SwarmConfig:
 
         if not self.slack.bot_token:
             errors.append("SLACK_BOT_TOKEN is required")
+        if not self.slack.app_token:
+            errors.append("SLACK_APP_TOKEN is required (for Socket Mode)")
         if not self.slack.channel_id:
             errors.append("SLACK_CHANNEL_ID is required")
         if not self.github.token:
