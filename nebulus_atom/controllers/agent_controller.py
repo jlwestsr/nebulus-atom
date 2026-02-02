@@ -24,14 +24,6 @@ class AgentController:
 
         self.auto_mode = False
 
-        self.context_loaded = False
-        try:
-            # Context disabled to prevent overflow on local backends
-            context_content = ""
-            self.context_loaded = True
-        except Exception:
-            context_content = "Context file not found."
-
         self.base_tools = [
             {
                 "type": "function",
@@ -158,48 +150,30 @@ class AgentController:
         ]
 
         self.pending_tdd_goal = None
-        system_prompt = (
-            "Your ONLY goal is to execute tasks. NEVER explain what you are going to do.\n"
-            "NEVER use markdown code blocks like ```python unless you are calling a tool.\n"
-            "ALWAYS use tools to perform actions.\n\n"
-            "### PROJECT PROTOCOL (STRICT COMPLIANCE) ###\n"
-            "1. **Architecture**: Python MVC. Models=DataClasses/Pydantic. Config=`config.py`. Services=Integrations.\n"
-            "2. **Workflow**: Gitflow-lite. Work on `feat/<name>` or `develop`. `main` is production.\n"
-            "3. **Coding**: Python 3.12+, Type Hints, AsyncIO, SOLID Principles.\n"
-            "4. **Autonomy**: Execute tasks immediately. Use JSON tools. No `ask_user` unless blocked.\n"
-            "5. **Context Strategy**: These rules are PRE-LOADED. Do NOT read `AI_DIRECTIVES.md`, `WORKFLOW.md`, `CONTEXT.md` unless verifying a specific line.\n\n"
-            "### AUTONOMY RULES ###\n"
-            "1. **INITIAL STATE**: You are IDLE. Wait for the user to provide a specific goal. Do NOT auto-start tasks.\n"
-            "2. Infer goals ONLY from the user's prompt (e.g., 'Do X').\n"
-            "3. **ONE SHOT RULE**: Once you have completed the user's explicit request (e.g., listed files), STOP. Do NOT perform any follow-up actions (like reading files, searching memory) unless explicitly asked.\n"
-            "3. Use tools to perform actions. Output ONLY valid JSON.\n"
-            "4. Do NOT hallucinate features. Stick to the request. Do NOT demonstrate features (like Context Manager) unless asked.\n"
-            "5. **CRITICAL**: Do NOT read general documentation files. Trust the 'PROJECT PROTOCOL' above.\n\n"
-            "### TOOL USAGE RULES ###\n"
-            "1. You MUST ONLY use the provided tools. Do NOT invent new tools.\n"
-            "2. To list files, use `run_shell_command` with `ls`.\n\n"
-            "### HOW TO CALL TOOLS ###\n"
-            "Output ONLY a raw JSON object (no markdown, no code blocks).\n"
-            "Format: {\"thought\": \"<reasoning>\", \"name\": \"<tool_name>\", \"arguments\": {<args>}}\n\n"
-            "Example (DO NOT EXECUTE THIS, just follow the format):\n"
-            "{\"thought\": \"I need to list files.\", \"name\": \"run_shell_command\", \"arguments\": {\"command\": \"ls -la\"}}\n\n"
-            "CRITICAL:\n"
-            "- You MUST include a \"thought\" field explaining WHY you are taking this action.\n"
-            "- Do NOT nest JSON inside JSON strings.\n"
-            "- Do NOT use 'parameters' field, use 'arguments'.\n"
-            "- Output valid JSON only.\n\n"
-            "### PROJECT CONTEXT ###\n"
-            f"{context_content}\n\n"
-            "### FILE SYSTEM RULES ###\n"
-            "1. You have access to a `.scratchpad/` directory for temporary files.\n"
-            "2. ALWAYS use `.scratchpad/` for experiments.\n\n"
-            "### MEMORY CAPABILITIES ###\n"
-            "1. **Recall**: You have long-term memory. Use `search_memory` to recall past conversations.\n"
-            "2. **Knowledge**: Use `search_knowledge` to find code snippets or documentation in the repo.\n"
-            "3. **Pragmatism**: Only search memory or knowledge if explicitly relevant to the user request. Do not perform unprompted searches.\n\n"
-            "### AVAILABLE TOOLS ###\n"
-            f"{json.dumps([t['function'] for t in self.get_current_tools()], indent=2)}"
+
+        # Build compact tool list (name: description)
+        tool_list = "\n".join(
+            f"- {t['function']['name']}: {t['function'].get('description', 'No description')}"
+            for t in self.get_current_tools()
         )
+
+        system_prompt = f"""You are an autonomous coding assistant. Execute tasks using tools.
+
+## How to Call Tools
+Output a JSON object (no markdown):
+{{"thought": "why", "name": "tool_name", "arguments": {{...}}}}
+
+Example:
+{{"thought": "List directory contents", "name": "run_shell_command", "arguments": {{"command": "ls -la"}}}}
+
+## Rules
+1. Use tools to act. Do not just describe what you would do.
+2. One task at a time. Stop after completing the user's request.
+3. Only use the tools listed below. Do not invent tools.
+
+## Available Tools
+{tool_list}
+"""
         self.history_manager = HistoryManager(system_prompt)
         ToolExecutor.history_manager = self.history_manager
         self.openai = OpenAIService()
