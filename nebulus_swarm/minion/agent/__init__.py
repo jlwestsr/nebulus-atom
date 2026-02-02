@@ -7,6 +7,11 @@ from nebulus_swarm.minion.agent.minion_agent import (
     MinionAgent,
     ToolResult,
 )
+from nebulus_swarm.minion.agent.prompt_builder import (
+    IssueContext,
+    build_initial_message,
+    build_system_prompt,
+)
 from nebulus_swarm.minion.agent.tool_executor import ToolExecutor
 from nebulus_swarm.minion.agent.tools import (
     MINION_TOOLS,
@@ -26,4 +31,7 @@ __all__ = [
     "MINION_TOOLS",
     "get_tool_names",
     "get_tool_by_name",
+    "IssueContext",
+    "build_system_prompt",
+    "build_initial_message",
 ]
