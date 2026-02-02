@@ -7,6 +7,7 @@ import signal
 from datetime import datetime, timedelta
 from typing import Optional
 
+import aiohttp
 from aiohttp import web
 from croniter import croniter
 
@@ -580,6 +581,51 @@ class Overlord:
 
         logger.info("Cron scheduler stopped")
 
+    async def _warm_up_llm(self) -> bool:
+        """Send a small request to warm up the LLM backend.
+
+        This is useful for MLX servers that may have cold-start latency.
+
+        Returns:
+            True if warm-up succeeded, False otherwise.
+        """
+        try:
+            base_url = self.config.llm.base_url
+            timeout = aiohttp.ClientTimeout(total=30)
+
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                # Try models endpoint first (lightweight)
+                try:
+                    async with session.get(f"{base_url}/models") as resp:
+                        if resp.status == 200:
+                            logger.info("LLM warm-up: models endpoint OK")
+                            return True
+                except Exception:
+                    pass
+
+                # Try a minimal completion request
+                payload = {
+                    "model": self.config.llm.model,
+                    "messages": [{"role": "user", "content": "hi"}],
+                    "max_tokens": 1,
+                }
+                async with session.post(
+                    f"{base_url}/chat/completions", json=payload
+                ) as resp:
+                    if resp.status == 200:
+                        logger.info("LLM warm-up: completion request OK")
+                        return True
+                    else:
+                        logger.warning(f"LLM warm-up: status {resp.status}")
+                        return False
+
+        except asyncio.TimeoutError:
+            logger.warning("LLM warm-up: timeout")
+            return False
+        except Exception as e:
+            logger.warning(f"LLM warm-up failed: {e}")
+            return False
+
     async def _sweep_queue(self) -> None:
         """Sweep GitHub queue and spawn minions for pending work."""
         if self._paused:
@@ -608,6 +654,9 @@ class Overlord:
                     f"Queue sweep: {len(issues)} pending, but no available slots"
                 )
                 return
+
+            # Warm up LLM before spawning minions
+            await self._warm_up_llm()
 
             # Spawn minions for top priority issues
             spawned = 0
