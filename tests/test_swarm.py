@@ -193,11 +193,11 @@ class TestOverlordState:
 
 
 class TestDockerManager:
-    """Tests for Docker manager stub."""
+    """Tests for Docker manager (stub mode)."""
 
     @pytest.fixture
     def docker_manager(self):
-        """Create a Docker manager for testing."""
+        """Create a Docker manager for testing in stub mode."""
         minion_config = MinionConfig()
         llm_config = LLMConfig()
         return DockerManager(
@@ -205,6 +205,7 @@ class TestDockerManager:
             llm_config=llm_config,
             github_token="test-token",
             overlord_callback_url="http://test:8080/minion/report",
+            stub_mode=True,
         )
 
     def test_spawn_minion(self, docker_manager):
