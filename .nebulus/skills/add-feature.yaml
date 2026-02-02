@@ -1,0 +1,57 @@
+name: add-feature
+description: Add new functionality to the codebase
+version: 1.0.0
+tags:
+  - feature
+  - enhancement
+  - development
+
+triggers:
+  keywords:
+    - add
+    - implement
+    - create
+    - new feature
+    - enhancement
+    - support
+  labels:
+    - feature
+    - enhancement
+
+instructions: |
+  When adding a new feature:
+
+  1. **Understand the requirements**
+     - Read the issue description thoroughly
+     - Identify acceptance criteria
+     - Note any constraints or dependencies
+
+  2. **Explore existing patterns**
+     - Find similar features in the codebase
+     - Note the architectural patterns used
+     - Identify where new code should go
+
+  3. **Plan the implementation**
+     - List the files that need to be created/modified
+     - Identify interfaces and dependencies
+     - Consider edge cases
+
+  4. **Implement incrementally**
+     - Start with the core functionality
+     - Follow existing code style and patterns
+     - Add error handling
+     - Keep functions small and focused
+
+  5. **Write tests**
+     - Add tests as you implement
+     - Cover happy path and edge cases
+     - Run tests frequently
+
+  6. **Verify completeness**
+     - Review the original requirements
+     - Run the full test suite
+     - Check for any TODOs you added
+
+examples:
+  - input: "Add CSV export for reports"
+    approach: "Find report code, look for existing export patterns, add CSV formatter, add tests"

@@ -1,0 +1,55 @@
+name: write-tests
+description: Write unit tests for existing code
+version: 1.0.0
+tags:
+  - testing
+  - python
+  - quality
+
+triggers:
+  keywords:
+    - test
+    - tests
+    - testing
+    - coverage
+    - unit test
+  labels:
+    - testing
+    - needs-tests
+  file_patterns:
+    - "**/test_*.py"
+    - "**/*_test.py"
+
+instructions: |
+  When writing tests:
+
+  1. **Understand the code first**
+     - Read the file(s) to be tested
+     - Identify public functions/methods that need testing
+     - Note edge cases and error conditions
+
+  2. **Follow existing test patterns**
+     - Look for existing tests in the project (search for test_*.py)
+     - Match the testing framework (pytest, unittest)
+     - Use the same assertion style and fixtures
+
+  3. **Write comprehensive tests**
+     - Test the happy path first
+     - Add edge case tests (empty inputs, None, boundaries)
+     - Test error conditions and exceptions
+     - Use descriptive test names: test_<function>_<scenario>_<expected>
+
+  4. **Run and verify**
+     - Run the tests with: python -m pytest <test_file> -v
+     - Ensure all tests pass
+     - Check for any warnings
+
+  5. **Best practices**
+     - One assertion per test when possible
+     - Use fixtures for shared setup
+     - Mock external dependencies
+     - Keep tests independent
+
+examples:
+  - input: "Add tests for the UserService class"
+    approach: "Read UserService, find existing tests, write pytest tests matching project style"
