@@ -1,0 +1,51 @@
+# Nebulus Swarm Overlord systemd service file
+#
+# Installation:
+#   sudo cp scripts/swarm/nebulus-overlord.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable nebulus-overlord
+#   sudo systemctl start nebulus-overlord
+#
+# View logs:
+#   journalctl -u nebulus-overlord -f
+
+[Unit]
+Description=Nebulus Swarm Overlord
+Documentation=https://github.com/jlwestsr/nebulus-atom
+After=docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=simple
+User=root
+Group=docker
+
+# Environment file with secrets
+EnvironmentFile=/etc/nebulus-swarm/overlord.env
+
+# Working directory
+WorkingDirectory=/opt/nebulus-atom
+
+# Start command using docker-compose
+ExecStartPre=/usr/bin/docker-compose -f docker-compose.swarm.yml pull overlord
+ExecStart=/usr/bin/docker-compose -f docker-compose.swarm.yml up --no-build overlord
+ExecStop=/usr/bin/docker-compose -f docker-compose.swarm.yml down
+
+# Restart policy
+Restart=always
+RestartSec=10
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=nebulus-overlord
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/overlord /var/run/docker.sock
+
+[Install]
+WantedBy=multi-user.target

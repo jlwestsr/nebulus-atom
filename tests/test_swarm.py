@@ -428,12 +428,14 @@ class TestGitHubQueue:
     @patch("nebulus_swarm.overlord.github_queue.Github")
     def test_get_rate_limit(self, mock_github_class):
         """Test rate limit status retrieval."""
+        from datetime import timezone
+
         from nebulus_swarm.overlord.github_queue import GitHubQueue
 
         mock_rate = mock_github_class.return_value.get_rate_limit.return_value
         mock_rate.core.remaining = 4500
         mock_rate.core.limit = 5000
-        mock_rate.core.reset = datetime.now()
+        mock_rate.core.reset = datetime.now(timezone.utc)
 
         queue = GitHubQueue(token="test", watched_repos=["owner/repo"])
         rate_limit = queue.get_rate_limit()
@@ -441,6 +443,8 @@ class TestGitHubQueue:
         assert rate_limit["remaining"] == 4500
         assert rate_limit["limit"] == 5000
         assert "reset_at" in rate_limit
+        assert "is_rate_limited" in rate_limit
+        assert rate_limit["is_rate_limited"] is False  # 4500 > threshold
 
 
 class TestCronScheduler:
@@ -464,6 +468,174 @@ class TestCronScheduler:
         next_run = cron.get_next(datetime)
         assert next_run.hour == 1
         assert next_run.minute == 0
+
+
+class TestStructuredLogging:
+    """Tests for structured logging functionality."""
+
+    def test_json_formatter_basic(self):
+        """Test JSON formatter produces valid JSON."""
+        import json
+        import logging
+
+        from nebulus_swarm.logging import JSONFormatter
+
+        formatter = JSONFormatter()
+
+        # Create a log record
+        record = logging.LogRecord(
+            name="test.logger",
+            level=logging.INFO,
+            pathname="test.py",
+            lineno=10,
+            msg="Test message",
+            args=(),
+            exc_info=None,
+        )
+
+        output = formatter.format(record)
+
+        # Should be valid JSON
+        data = json.loads(output)
+        assert data["message"] == "Test message"
+        assert data["level"] == "INFO"
+        assert data["logger"] == "test.logger"
+        assert "timestamp" in data
+        assert "correlation_id" in data
+
+    def test_json_formatter_with_exception(self):
+        """Test JSON formatter includes exception info."""
+        import json
+        import logging
+        import sys
+
+        from nebulus_swarm.logging import JSONFormatter
+
+        formatter = JSONFormatter()
+
+        try:
+            raise ValueError("Test error")
+        except ValueError:
+            exc_info = sys.exc_info()
+
+        record = logging.LogRecord(
+            name="test",
+            level=logging.ERROR,
+            pathname="test.py",
+            lineno=20,
+            msg="Error occurred",
+            args=(),
+            exc_info=exc_info,
+        )
+
+        output = formatter.format(record)
+        data = json.loads(output)
+
+        assert "exception" in data
+        assert "ValueError" in data["exception"]
+        assert "location" in data  # Added for ERROR level
+
+    def test_correlation_id_context(self):
+        """Test correlation ID context management."""
+        from nebulus_swarm.logging import (
+            get_correlation_id,
+            set_correlation_id,
+        )
+
+        # Set a correlation ID
+        set_correlation_id("test-123")
+        assert get_correlation_id() == "test-123"
+
+        # Generate new one
+        set_correlation_id(None)
+        cid = get_correlation_id()
+        assert cid is not None
+        assert len(cid) == 8  # UUID prefix length
+
+    def test_log_context_manager(self):
+        """Test LogContext context manager exists and works."""
+        from nebulus_swarm.logging import LogContext
+
+        # Test that LogContext can be used as context manager
+        with LogContext(minion_id="minion-123", repo="owner/repo") as ctx:
+            assert ctx.extras["minion_id"] == "minion-123"
+            assert ctx.extras["repo"] == "owner/repo"
+
+    def test_console_formatter(self):
+        """Test console formatter produces readable output."""
+        import logging
+
+        from nebulus_swarm.logging import ConsoleFormatter
+
+        formatter = ConsoleFormatter()
+
+        record = logging.LogRecord(
+            name="test.logger",
+            level=logging.INFO,
+            pathname="test.py",
+            lineno=10,
+            msg="Test message",
+            args=(),
+            exc_info=None,
+        )
+
+        output = formatter.format(record)
+
+        # Should contain key parts
+        assert "test.logger" in output
+        assert "Test message" in output
+        assert "I" in output  # INFO level indicator
+
+
+class TestRateLimiting:
+    """Tests for GitHub API rate limiting."""
+
+    @patch("nebulus_swarm.overlord.github_queue.Github")
+    def test_is_rate_limited_false(self, mock_github_class):
+        """Test is_rate_limited returns False when quota available."""
+        from nebulus_swarm.overlord.github_queue import GitHubQueue
+
+        mock_rate = mock_github_class.return_value.get_rate_limit.return_value
+        mock_rate.core.remaining = 4500  # Above threshold
+
+        queue = GitHubQueue(token="test", watched_repos=["owner/repo"])
+        assert queue.is_rate_limited() is False
+
+    @patch("nebulus_swarm.overlord.github_queue.Github")
+    def test_is_rate_limited_true(self, mock_github_class):
+        """Test is_rate_limited returns True when quota low."""
+        from nebulus_swarm.overlord.github_queue import (
+            RATE_LIMIT_THRESHOLD,
+            GitHubQueue,
+        )
+
+        mock_rate = mock_github_class.return_value.get_rate_limit.return_value
+        mock_rate.core.remaining = RATE_LIMIT_THRESHOLD - 1  # Below threshold
+
+        queue = GitHubQueue(token="test", watched_repos=["owner/repo"])
+        assert queue.is_rate_limited() is True
+
+    @patch("nebulus_swarm.overlord.github_queue.Github")
+    def test_can_perform_sweep_true(self, mock_github_class):
+        """Test can_perform_sweep returns True with sufficient quota."""
+        from nebulus_swarm.overlord.github_queue import GitHubQueue
+
+        mock_rate = mock_github_class.return_value.get_rate_limit.return_value
+        mock_rate.core.remaining = 5000  # Plenty of quota
+
+        queue = GitHubQueue(token="test", watched_repos=["owner/repo"])
+        assert queue.can_perform_sweep() is True
+
+    @patch("nebulus_swarm.overlord.github_queue.Github")
+    def test_can_perform_sweep_false(self, mock_github_class):
+        """Test can_perform_sweep returns False with low quota."""
+        from nebulus_swarm.overlord.github_queue import GitHubQueue
+
+        mock_rate = mock_github_class.return_value.get_rate_limit.return_value
+        mock_rate.core.remaining = 50  # Not enough
+
+        queue = GitHubQueue(token="test", watched_repos=["owner/repo"])
+        assert queue.can_perform_sweep() is False
 
 
 class TestLLMWarmup:
