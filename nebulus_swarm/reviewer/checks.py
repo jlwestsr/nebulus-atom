@@ -137,6 +137,7 @@ class CheckRunner:
         report.results.append(self.check_security_patterns(python_files))
         report.results.append(self.check_complexity(python_files))
         report.results.append(self.check_file_sizes(changed_files))
+        report.results.append(self.check_skill_changes(changed_files))
 
         return report
 
@@ -407,3 +408,60 @@ class CheckRunner:
                 message=f"{len(issues)} large files",
                 file_issues=issues,
             )
+
+    def check_skill_changes(self, changed_files: List[str]) -> CheckResult:
+        """Check for skill file changes and validate them.
+
+        Skill changes require special handling:
+        - Security validation of skill instructions
+        - Human approval required (blocks auto-merge)
+        """
+        from nebulus_swarm.minion.skills.validator import (
+            is_skill_change,
+            validate_skill_changes,
+        )
+
+        if not is_skill_change(changed_files):
+            return CheckResult(
+                name="Skill Changes",
+                status=CheckStatus.SKIPPED,
+                message="No skill files changed",
+            )
+
+        # Validate skill files
+        results = validate_skill_changes(changed_files, self.repo_path)
+
+        issues = []
+        security_issues = []
+
+        for result in results:
+            if result.errors:
+                issues.extend(result.errors)
+            if result.security_flags:
+                security_issues.extend(result.security_flags)
+
+        # Security issues are failures
+        if security_issues:
+            return CheckResult(
+                name="Skill Changes",
+                status=CheckStatus.FAILED,
+                message=f"SECURITY: {len(security_issues)} forbidden patterns found",
+                file_issues=security_issues,
+            )
+
+        # Schema errors are failures
+        if issues:
+            return CheckResult(
+                name="Skill Changes",
+                status=CheckStatus.FAILED,
+                message=f"{len(issues)} skill validation errors",
+                file_issues=issues,
+            )
+
+        # Skill changes require human review (warning blocks auto-merge)
+        return CheckResult(
+            name="Skill Changes",
+            status=CheckStatus.WARNING,
+            message="Skill changes detected - human approval required",
+            file_issues=["PR modifies .nebulus/skills/ - auto-merge blocked"],
+        )
