@@ -1,7 +1,6 @@
 """Overlord main entry point and orchestration."""
 
 import asyncio
-import logging
 import os
 import signal
 from datetime import datetime, timedelta
@@ -12,6 +11,12 @@ from aiohttp import web
 from croniter import croniter
 
 from nebulus_swarm.config import SwarmConfig
+from nebulus_swarm.logging import (
+    LogContext,
+    configure_logging,
+    get_logger,
+    set_correlation_id,
+)
 from nebulus_swarm.models.minion import Minion, MinionStatus
 from nebulus_swarm.overlord.command_parser import CommandParser, CommandType
 from nebulus_swarm.overlord.docker_manager import DockerManager
@@ -19,7 +24,7 @@ from nebulus_swarm.overlord.github_queue import GitHubQueue
 from nebulus_swarm.overlord.slack_bot import SlackBot
 from nebulus_swarm.overlord.state import OverlordState
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Watchdog configuration
 WATCHDOG_INTERVAL = 60  # Check every 60 seconds
@@ -361,7 +366,14 @@ class Overlord:
             message = data.get("message", "")
             report_data = data.get("data", {})
 
-            logger.info(f"Minion report: {minion_id} -> {event}: {message}")
+            # Set correlation ID for log tracing
+            cid = (
+                data.get("correlation_id") or minion_id[:8] if minion_id else "unknown"
+            )
+            set_correlation_id(cid)
+
+            with LogContext(minion_id=minion_id, event=event, issue=issue):
+                logger.info(f"Minion report: {minion_id} -> {event}: {message}")
 
             if not minion_id:
                 return web.json_response(
@@ -806,9 +818,15 @@ class Overlord:
 
 async def main() -> None:
     """Main entry point."""
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    # Configure structured logging from environment
+    log_level = os.environ.get("LOG_LEVEL", "INFO")
+    log_format = os.environ.get("LOG_FORMAT", "console")  # "json" for production
+    log_file = os.environ.get("LOG_FILE")
+
+    configure_logging(
+        level=log_level,
+        json_output=log_format.lower() == "json",
+        log_file=log_file,
     )
 
     # Check for stub mode from environment
