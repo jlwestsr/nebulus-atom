@@ -33,6 +33,10 @@ HEARTBEAT_TIMEOUT = 300  # 5 minutes without heartbeat = stuck
 # Default cron schedule (2 AM daily)
 DEFAULT_CRON_SCHEDULE = "0 2 * * *"
 
+# Shutdown configuration
+SHUTDOWN_TIMEOUT = 30  # Max seconds to wait for graceful shutdown
+MINION_DRAIN_TIMEOUT = 60  # Max seconds to wait for minions to drain
+
 
 class Overlord:
     """Main Overlord controller that orchestrates Minions."""
@@ -711,51 +715,108 @@ class Overlord:
         except Exception as e:
             logger.exception(f"Queue sweep failed: {e}")
 
-    async def _shutdown(self) -> None:
-        """Perform graceful shutdown."""
+    async def _shutdown(self, drain_minions: bool = True) -> None:
+        """Perform graceful shutdown.
+
+        Args:
+            drain_minions: If True, wait for active minions to complete.
+        """
         logger.info("Shutting down Overlord...")
 
         self._running = False
 
-        # Cancel background tasks
-        if self._watchdog_task:
-            self._watchdog_task.cancel()
-            try:
-                await self._watchdog_task
-            except asyncio.CancelledError:
-                pass
+        # Notify Slack about shutdown
+        try:
+            active_minions = self.state.get_active_minions()
+            if active_minions:
+                minion_list = ", ".join(f"`{m.id}`" for m in active_minions)
+                await self.slack.post_message(
+                    f"🛑 *Overlord shutting down*\n"
+                    f"Active minions ({len(active_minions)}): {minion_list}\n"
+                    f"Waiting up to {MINION_DRAIN_TIMEOUT}s for completion..."
+                )
+            else:
+                await self.slack.post_message("🛑 *Overlord shutting down*")
+        except Exception as e:
+            logger.warning(f"Failed to send shutdown notification: {e}")
 
-        if self._cleanup_task:
-            self._cleanup_task.cancel()
-            try:
-                await self._cleanup_task
-            except asyncio.CancelledError:
-                pass
+        # Wait for active minions to drain (with timeout)
+        if drain_minions and self.state.get_active_minions():
+            logger.info("Waiting for active minions to complete...")
+            drain_start = datetime.now()
 
-        if self._cron_task:
-            self._cron_task.cancel()
-            try:
-                await self._cron_task
-            except asyncio.CancelledError:
-                pass
+            while self.state.get_active_minions():
+                elapsed = (datetime.now() - drain_start).total_seconds()
+                if elapsed >= MINION_DRAIN_TIMEOUT:
+                    remaining = len(self.state.get_active_minions())
+                    logger.warning(
+                        f"Drain timeout reached, {remaining} minions still active"
+                    )
+                    break
+
+                # Check for minion completions via container status
+                await self._sync_container_states()
+                await asyncio.sleep(2)
+
+            logger.info("Minion drain complete")
+
+        # Cancel background tasks with timeout
+        background_tasks = [
+            ("watchdog", self._watchdog_task),
+            ("cleanup", self._cleanup_task),
+            ("cron", self._cron_task),
+        ]
+
+        for name, task in background_tasks:
+            if task:
+                task.cancel()
+                try:
+                    await asyncio.wait_for(task, timeout=5)
+                except asyncio.CancelledError:
+                    pass
+                except asyncio.TimeoutError:
+                    logger.warning(f"Timeout waiting for {name} task to cancel")
 
         # Close GitHub queue client
         if self.github_queue:
-            self.github_queue.close()
+            try:
+                self.github_queue.close()
+            except Exception as e:
+                logger.warning(f"Error closing GitHub queue: {e}")
+
+        # Final Slack notification
+        try:
+            await self.slack.post_message("👋 *Overlord offline*")
+        except Exception:
+            pass
 
         # Stop Slack bot
-        await self.slack.stop()
+        try:
+            await self.slack.stop()
+        except Exception as e:
+            logger.warning(f"Error stopping Slack bot: {e}")
 
         # Stop health server
         if self._health_runner:
-            await self._health_runner.cleanup()
+            try:
+                await self._health_runner.cleanup()
+            except Exception as e:
+                logger.warning(f"Error stopping health server: {e}")
 
         self._shutdown_event.set()
         logger.info("Overlord shutdown complete")
 
     def _signal_handler(self, sig: signal.Signals) -> None:
         """Handle shutdown signals."""
-        logger.info(f"Received signal {sig.name}, initiating shutdown...")
+        if not self._running:
+            # Already shutting down, force exit on second signal
+            logger.warning(f"Received {sig.name} during shutdown, forcing exit...")
+            import sys
+
+            sys.exit(1)
+
+        logger.info(f"Received signal {sig.name}, initiating graceful shutdown...")
+        logger.info("Send signal again to force immediate exit")
         asyncio.create_task(self._shutdown())
 
     async def run(self) -> None:
