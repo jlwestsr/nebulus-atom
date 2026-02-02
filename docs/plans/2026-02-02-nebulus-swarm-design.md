@@ -457,6 +457,25 @@ echo "5. Verifying PR..."
 - [ ] Documentation and runbooks
 - [ ] Deployment scripts for Nebulus server
 
+### Phase 6: Automated PR Review (Future)
+
+> **Note:** Initially, all Minion PRs will be reviewed manually by the human operator.
+> This allows us to catch local LLM quirks, build a "failure corpus" for prompt tuning,
+> and understand when 8B vs 30B models are appropriate. Phase 6 should only be
+> implemented after sufficient manual review experience.
+
+- [ ] AI Reviewer agent examines Minion PRs before notifying human
+- [ ] Automated checks: tests pass, code style, security scan, complexity analysis
+- [ ] Reviewer adds inline comments on concerning code
+- [ ] Reviewer posts summary: approval or request-changes with reasoning
+- [ ] Human receives pre-screened PRs with AI review notes
+- [ ] Configurable auto-merge for low-risk, reviewer-approved PRs
+
+**Review Flow (Phase 6):**
+```
+Minion creates PR → AI Reviewer examines → Posts review notes → Human final approval
+```
+
 ### Stretch Goals (Future)
 - [ ] Overlord uses LLM for natural language understanding
 - [ ] Minion can ask clarifying questions via Slack before starting
@@ -477,3 +496,4 @@ echo "5. Verifying PR..."
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-02-02 | @jlwestsr, Claude | Initial design |
+| 2026-02-02 | @jlwestsr, Claude | Added Phase 6: Automated PR Review |
