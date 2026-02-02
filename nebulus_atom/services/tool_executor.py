@@ -16,6 +16,7 @@ from nebulus_atom.services.macro_service import MacroServiceManager
 from nebulus_atom.services.docker_service import DockerServiceManager
 from nebulus_atom.services.error_recovery_service import ErrorRecoveryServiceManager
 from nebulus_atom.services.telemetry_service import TelemetryServiceManager
+from nebulus_atom.services.cognition_service import CognitionServiceManager
 from nebulus_atom.models.task import TaskStatus
 from nebulus_atom.utils.logger import setup_logger
 
@@ -39,6 +40,7 @@ class ToolExecutor:
     docker_manager = DockerServiceManager()
     recovery_manager = ErrorRecoveryServiceManager()
     telemetry_manager = TelemetryServiceManager()
+    cognition_manager = CognitionServiceManager()
 
     @staticmethod
     def initialize():

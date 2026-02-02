@@ -22,8 +22,7 @@ We have successfully built and deployed **Nebulus Atom V1**:
 
 ## Future Horizons (V2)
 The foundation is complete. Future work will focus on:
-1.  **Cloud Integration**: Connecting Atom to Nebulus Cloud.
-2.  **Advanced Cognition**: Implementing "System 2" thinking loops.
-3.  **Marketplace**: Sharing skills via community registry.
+1.  **Advanced Cognition**: Implementing "System 2" thinking loops for deeper reasoning.
+2.  **Marketplace**: Sharing skills via community registry.
 
 **Status**: V1 STABLE / PRODUCTION READY

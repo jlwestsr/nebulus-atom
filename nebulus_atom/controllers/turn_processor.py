@@ -2,6 +2,7 @@
 Turn processor for handling single conversation turns.
 
 Manages LLM streaming, response parsing, and tool execution dispatch.
+Integrates cognitive analysis for complex task handling.
 """
 
 import json
@@ -12,6 +13,7 @@ from typing import Optional, List, Dict, Any, Callable
 from nebulus_atom.services.openai_service import OpenAIService
 from nebulus_atom.services.response_parser import ResponseParser
 from nebulus_atom.services.tool_executor import ToolExecutor
+from nebulus_atom.models.cognition import TaskComplexity, CognitionResult
 from nebulus_atom.views.base_view import BaseView
 from nebulus_atom.utils.logger import setup_logger
 
@@ -24,6 +26,7 @@ class TurnCallbacks:
 
     on_tdd_start: Optional[Callable[[str], None]] = None
     on_auto_mode_start: Optional[Callable[[], None]] = None
+    on_cognition_analysis: Optional[Callable[[CognitionResult], None]] = None
 
 
 @dataclass
@@ -63,6 +66,7 @@ class TurnProcessor:
         session_id: str,
         pinned_content: Optional[str] = None,
         callbacks: Optional[TurnCallbacks] = None,
+        enable_cognition: bool = True,
     ) -> TurnResult:
         """
         Process a single conversation turn.
@@ -72,6 +76,7 @@ class TurnProcessor:
             session_id: Session identifier.
             pinned_content: Optional pinned context to inject.
             callbacks: Optional callbacks for state changes.
+            enable_cognition: Whether to perform cognitive analysis.
 
         Returns:
             TurnResult indicating what happened during the turn.
@@ -80,6 +85,12 @@ class TurnProcessor:
         result = TurnResult(finished=False)
 
         messages = history.get()
+
+        # Perform cognitive analysis on the last user message
+        if enable_cognition and messages:
+            cognition_result = await self._analyze_task(messages, session_id)
+            if cognition_result:
+                await self._display_cognition(cognition_result, callbacks)
 
         if pinned_content:
             messages = [m.copy() for m in messages]
@@ -100,6 +111,96 @@ class TurnProcessor:
                 result.finished = True
 
         return result
+
+    async def _analyze_task(
+        self,
+        messages: List[Dict[str, Any]],
+        session_id: str,
+    ) -> Optional[CognitionResult]:
+        """
+        Analyze the last user message for task complexity.
+
+        Args:
+            messages: Conversation messages.
+            session_id: Session identifier.
+
+        Returns:
+            CognitionResult if analysis was performed, None otherwise.
+        """
+        # Find the last user message
+        last_user_msg = None
+        for msg in reversed(messages):
+            if msg.get("role") == "user":
+                content = msg.get("content", "")
+                # Skip tool output messages
+                if not content.startswith("Tool '"):
+                    last_user_msg = content
+                    break
+
+        if not last_user_msg:
+            return None
+
+        try:
+            cognition_service = ToolExecutor.cognition_manager.get_service(session_id)
+            result = cognition_service.analyze_task(last_user_msg)
+
+            # Record the analysis as a thought
+            cognition_service.record_thought(
+                session_id=session_id,
+                thought_type="analysis",
+                content=f"Task complexity: {result.task_complexity.value}, "
+                f"confidence: {result.confidence:.0%}",
+                confidence=result.confidence,
+            )
+
+            return result
+        except Exception as e:
+            logger.warning(f"Cognition analysis failed: {e}")
+            return None
+
+    async def _display_cognition(
+        self,
+        result: CognitionResult,
+        callbacks: TurnCallbacks,
+    ) -> None:
+        """
+        Display cognitive analysis results for complex tasks.
+
+        Args:
+            result: The cognition analysis result.
+            callbacks: Turn callbacks (may include cognition handler).
+        """
+        # Only display for complex tasks or low confidence
+        if result.task_complexity == TaskComplexity.SIMPLE and result.confidence > 0.8:
+            return
+
+        # Notify via callback if provided
+        if callbacks.on_cognition_analysis:
+            callbacks.on_cognition_analysis(result)
+
+        # Display reasoning for non-simple tasks
+        if hasattr(self._view, "print_cognition"):
+            await self._view.print_cognition(result)
+        elif result.task_complexity != TaskComplexity.SIMPLE:
+            # Fallback: print basic info via thought display
+            complexity_emoji = {
+                TaskComplexity.SIMPLE: "🟢",
+                TaskComplexity.MODERATE: "🟡",
+                TaskComplexity.COMPLEX: "🔴",
+            }
+            emoji = complexity_emoji.get(result.task_complexity, "⚪")
+
+            if hasattr(self._view, "print_thought"):
+                thought_msg = (
+                    f"{emoji} Task Analysis: {result.task_complexity.value} "
+                    f"(confidence: {result.confidence:.0%})"
+                )
+                self._view.print_thought(thought_msg)
+
+                # Show risks if any
+                if result.potential_risks:
+                    for risk in result.potential_risks[:2]:
+                        self._view.print_thought(f"⚠️ {risk}")
 
     async def _process_single_iteration(
         self,
