@@ -46,12 +46,12 @@ async def test_interactive_clarification():
 
     # Synchronous generator
     async def mock_stream_sequence(*args, **kwargs):
-        if controller.openai.create_chat_completion.call_count == 1:
+        if controller._openai.create_chat_completion.call_count == 1:
             yield mock_response
         else:
             yield mock_response_2
 
-    controller.openai.create_chat_completion = MagicMock(
+    controller._openai.create_chat_completion = MagicMock(
         side_effect=mock_stream_sequence
     )
 

@@ -3,7 +3,6 @@
 import pytest
 from unittest.mock import MagicMock, patch
 from nebulus_atom.views.cli_view import CLIView
-from nebulus_atom.controllers.agent_controller import AgentController
 
 
 class TestSlashCommands:
@@ -62,33 +61,32 @@ class TestSlashCommands:
 
 
 class TestToolDeduplication:
-    """Test tool deduplication in AgentController."""
+    """Test tool deduplication in ToolRegistry."""
 
     def test_get_current_tools_deduplicates(self):
         """Test that duplicate tools are removed."""
-        mock_view = MagicMock()
-        mock_view.console = MagicMock()
-        controller = AgentController(view=mock_view)
+        from nebulus_atom.services.tool_registry import ToolRegistry
 
-        # Create duplicate tools
-        tool1 = {"function": {"name": "read_file", "description": "Read file"}}
-        tool2 = {
-            "function": {"name": "read_file", "description": "Read file duplicate"}
-        }
-        tool3 = {"function": {"name": "write_file", "description": "Write file"}}
+        registry = ToolRegistry()
 
-        controller.base_tools = [tool1, tool2, tool3]
+        # Create a mock skill service that returns a duplicate tool
+        mock_skill_service = MagicMock()
+        mock_skill_service.get_tool_definitions.return_value = [
+            {
+                "type": "function",
+                "function": {"name": "read_file", "description": "Duplicate read file"},
+            }
+        ]
 
-        # Mock skill and MCP services to return empty
-        with patch.object(
-            controller, "get_current_tools", wraps=controller.get_current_tools
-        ):
-            tools = controller.get_current_tools()
+        # Get tools with the mock skill service
+        tools = registry.get_all_tools(skill_service=mock_skill_service)
 
-        # Should have deduplicated - only one read_file
+        # Should have deduplicated - only one read_file (the base one takes priority)
         names = [t["function"]["name"] for t in tools]
         assert names.count("read_file") == 1
-        assert "write_file" in names
+        # Verify it kept the base tool (first occurrence)
+        read_file_tool = next(t for t in tools if t["function"]["name"] == "read_file")
+        assert read_file_tool["function"]["description"] == "Read file."
 
 
 class TestPromptMessage:

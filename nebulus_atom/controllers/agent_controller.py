@@ -1,15 +1,21 @@
+"""
+Agent controller orchestrating conversation flow.
+
+Coordinates tool registry, response parsing, and turn processing
+to manage CLI and TUI interactions.
+"""
+
 import asyncio
-import json
-import re
-import time
-import ast
-from typing import Optional, List
+from typing import Optional
 
 from nebulus_atom.config import Config
 from nebulus_atom.models.history import HistoryManager
 from nebulus_atom.models.task import TaskStatus
 from nebulus_atom.services.openai_service import OpenAIService
 from nebulus_atom.services.tool_executor import ToolExecutor
+from nebulus_atom.services.tool_registry import ToolRegistry
+from nebulus_atom.services.response_parser import ResponseParser
+from nebulus_atom.controllers.turn_processor import TurnProcessor, TurnCallbacks
 from nebulus_atom.views.base_view import BaseView
 from nebulus_atom.views.cli_view import CLIView
 from nebulus_atom.utils.logger import setup_logger
@@ -18,146 +24,45 @@ logger = setup_logger(__name__)
 
 
 class AgentController:
-    def __init__(self, view: Optional[BaseView] = None):
+    """Orchestrates conversation flow between user, LLM, and tools."""
+
+    def __init__(self, view: Optional[BaseView] = None) -> None:
+        """
+        Initialize the agent controller.
+
+        Args:
+            view: Optional view for rendering. Defaults to CLIView.
+        """
         logger.info("Initializing AgentController")
         ToolExecutor.initialize()
 
         self.auto_mode = False
+        self.pending_tdd_goal: Optional[str] = None
 
-        self.base_tools = [
-            {
-                "type": "function",
-                "function": {
-                    "name": "run_shell_command",
-                    "description": "Run shell cmd.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {"command": {"type": "string"}},
-                        "required": ["command"],
-                    },
-                },
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "read_file",
-                    "description": "Read file.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {"path": {"type": "string"}},
-                        "required": ["path"],
-                    },
-                },
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "write_file",
-                    "description": "Write file.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "path": {"type": "string"},
-                            "content": {"type": "string"},
-                        },
-                        "required": ["path", "content"],
-                    },
-                },
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "create_plan",
-                    "description": "Init plan.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {"goal": {"type": "string"}},
-                        "required": ["goal"],
-                    },
-                },
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "execute_plan",
-                    "description": "Auto-execute plan.",
-                    "parameters": {"type": "object", "properties": {}, "required": []},
-                },
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "list_context",
-                    "description": "List pinned files.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {},
-                        "required": [],
-                    },
-                },
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "pin_file",
-                    "description": "Pin file.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {"path": {"type": "string"}},
-                        "required": ["path"],
-                    },
-                },
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "search_memory",
-                    "description": "Search past conversation history.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {"query": {"type": "string"}},
-                        "required": ["query"],
-                    },
-                },
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "search_knowledge",
-                    "description": "Search indexed codebase.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {"query": {"type": "string"}},
-                        "required": ["query"],
-                    },
-                },
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "create_skill",
-                    "description": "Create a reusable Python skill (tool). The code must define a function.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "name": {"type": "string"},
-                            "code": {"type": "string"},
-                        },
-                        "required": ["name", "code"],
-                    },
-                },
-            },
-        ]
+        self._tool_registry = ToolRegistry()
+        self._response_parser = ResponseParser()
+        self._openai = OpenAIService()
+        self.view = view if view else CLIView()
 
-        self.pending_tdd_goal = None
-
-        # Build compact tool list (name: description)
-        tool_list = "\n".join(
-            f"- {t['function']['name']}: {t['function'].get('description', 'No description')}"
-            for t in self.get_current_tools()
+        self._turn_processor = TurnProcessor(
+            self._openai, self.view, self._response_parser
         )
 
-        system_prompt = f"""You are an autonomous coding assistant. Execute tasks using tools.
+        system_prompt = self._build_system_prompt()
+        self.history_manager = HistoryManager(system_prompt)
+        ToolExecutor.history_manager = self.history_manager
+
+        if hasattr(self.view, "set_controller"):
+            self.view.set_controller(self)
+
+    def _build_system_prompt(self) -> str:
+        """Build the system prompt with current tool list."""
+        tool_list = self._tool_registry.get_tool_list_string(
+            skill_service=ToolExecutor.skill_service,
+            mcp_service=ToolExecutor.mcp_service,
+        )
+
+        return f"""You are an autonomous coding assistant. Execute tasks using tools.
 
 ## How to Call Tools
 Output a JSON object (no markdown):
@@ -174,38 +79,53 @@ Example:
 ## Available Tools
 {tool_list}
 """
-        self.history_manager = HistoryManager(system_prompt)
-        ToolExecutor.history_manager = self.history_manager
-        self.openai = OpenAIService()
-        self.view = view if view else CLIView()
-        if hasattr(self.view, "set_controller"):
-            self.view.set_controller(self)
+
+    @property
+    def base_tools(self):
+        """Backward compatibility: access base tools from registry."""
+        return self._tool_registry.base_tools
+
+    def get_current_tools(self):
+        """Get merged tool list (base + skills + MCP)."""
+        return self._tool_registry.get_all_tools(
+            ToolExecutor.skill_service,
+            ToolExecutor.mcp_service,
+        )
 
     async def start(
         self, initial_prompt: Optional[str] = None, session_id: str = "default"
-    ):
+    ) -> None:
+        """
+        Start the agent interaction loop.
+
+        Args:
+            initial_prompt: Optional initial user prompt.
+            session_id: Session identifier.
+        """
         await self.view.print_welcome()
 
-        # session_id passed from main
         if initial_prompt:
             self.history_manager.get_session(session_id).add("user", initial_prompt)
-            # CLIView handles spinners synchronously, so we must AWAIT the turn.
-            # Only Textual TUI needs create_task to unblock the rendering loop.
             if hasattr(self.view, "start_app") and not isinstance(self.view, CLIView):
                 asyncio.create_task(self.process_turn(session_id))
             else:
                 await self.process_turn(session_id)
 
-        # Check if we are using TUI
         if hasattr(self.view, "start_app"):
-            # In TUI mode, we hand over control to the View's event loop
             await self.view.start_app()
         else:
-            # CLI mode uses the standard loop
             await self.chat_loop(session_id)
 
-    async def handle_tui_input(self, user_input: str, session_id: str = "default"):
-        """Callback for TUI to push input to the controller."""
+    async def handle_tui_input(
+        self, user_input: str, session_id: str = "default"
+    ) -> None:
+        """
+        Handle input from TUI.
+
+        Args:
+            user_input: User input text.
+            session_id: Session identifier.
+        """
         try:
             if user_input.lower() in Config.EXIT_COMMANDS:
                 await self.view.print_goodbye()
@@ -214,99 +134,37 @@ Example:
                 sys.exit(0)
 
             self.history_manager.get_session(session_id).add("user", user_input)
-
-            # Process the initial user input
             await self.process_turn(session_id)
 
-            # Check for autonomous continuation (TDD or Auto Mode)
-            # We loop here to handle the entire chain of autonomous actions
             while self.pending_tdd_goal or self.auto_mode:
                 if self.pending_tdd_goal:
                     await self.run_tdd_cycle(self.pending_tdd_goal, session_id)
-                    # run_tdd_cycle clears pending_tdd_goal when done
                 elif self.auto_mode:
-                    # Re-run process_turn to pick up next task
                     await self.process_turn(session_id)
+
         except Exception as e:
             await self.view.print_error(f"Error in handle_tui_input: {e}")
             import traceback
 
             traceback.print_exc()
 
-            # Breaker: If plan is empty/done, auto_mode is set to False in process_turn
-            # But we need to ensure we don't infinite loop if it fails to clear
-            # process_turn logic handles auto_mode clearing.
+    async def chat_loop(self, session_id: str = "default") -> None:
+        """
+        Main CLI chat loop.
 
-    async def chat_loop(self, session_id: str = "default"):
+        Args:
+            session_id: Session identifier.
+        """
         while True:
             if self.pending_tdd_goal:
                 await self.run_tdd_cycle(self.pending_tdd_goal, session_id)
                 continue
+
             try:
                 if self.auto_mode:
-                    # Autonomous Logic
-                    task_service = ToolExecutor.task_manager.get_service(session_id)
-                    plan = task_service.current_plan
-
-                    if not plan:
-                        self.auto_mode = False
-                        if isinstance(self.view, CLIView):
-                            self.view.console.print(
-                                "No active plan. Stopping auto-execution.",
-                                style="bold red",
-                            )
+                    should_continue = await self._handle_auto_mode(session_id)
+                    if not should_continue:
                         continue
-
-                    # Find next PENDING task
-                    next_task = None
-                    for task in plan.tasks:
-                        if task.status == TaskStatus.PENDING:
-                            next_task = task
-                            break
-
-                    if next_task:
-                        if isinstance(self.view, CLIView):
-                            self.view.console.print(
-                                f"🤖 Auto-Executing Task: {next_task.description}",
-                                style="bold cyan",
-                            )
-
-                        # Update status to IN_PROGRESS
-                        task_service.update_task_status(
-                            next_task.id, TaskStatus.IN_PROGRESS
-                        )
-
-                        # Formulate prompt
-                        user_input = (
-                            f"Execute this task: {next_task.description}. "
-                            "Mark it as COMPLETED when done."
-                        )
-
-                        self.history_manager.get_session(session_id).add(
-                            "user", user_input
-                        )
-                        await self.process_turn(session_id)
-
-                        # Check if task was completed by the agent
-                        updated_task = task_service.get_task(next_task.id)
-                        if updated_task.status != TaskStatus.COMPLETED:
-                            # If task failed or wasn't completed, stop auto-execution for safety
-                            if updated_task.status == TaskStatus.FAILED:
-                                self.auto_mode = False
-                                if isinstance(self.view, CLIView):
-                                    self.view.console.print(
-                                        "Task failed. Stopping auto-execution.",
-                                        style="bold red",
-                                    )
-                    else:
-                        self.auto_mode = False
-                        if isinstance(self.view, CLIView):
-                            self.view.console.print(
-                                "All tasks completed. Stopping auto-execution.",
-                                style="bold green",
-                            )
-                        continue
-
                 else:
                     user_input = await self.view.prompt_user()
                     if not user_input.strip():
@@ -324,10 +182,80 @@ Example:
                 await self.view.print_goodbye()
                 break
 
-    async def run_tdd_cycle(self, goal: str, session_id: str):
+    async def _handle_auto_mode(self, session_id: str) -> bool:
+        """
+        Handle autonomous execution mode.
+
+        Args:
+            session_id: Session identifier.
+
+        Returns:
+            True if should continue loop, False to restart loop iteration.
+        """
+        task_service = ToolExecutor.task_manager.get_service(session_id)
+        plan = task_service.current_plan
+
+        if not plan:
+            self.auto_mode = False
+            if isinstance(self.view, CLIView):
+                self.view.console.print(
+                    "No active plan. Stopping auto-execution.",
+                    style="bold red",
+                )
+            return False
+
+        next_task = None
+        for task in plan.tasks:
+            if task.status == TaskStatus.PENDING:
+                next_task = task
+                break
+
+        if next_task:
+            if isinstance(self.view, CLIView):
+                self.view.console.print(
+                    f"🤖 Auto-Executing Task: {next_task.description}",
+                    style="bold cyan",
+                )
+
+            task_service.update_task_status(next_task.id, TaskStatus.IN_PROGRESS)
+
+            user_input = (
+                f"Execute this task: {next_task.description}. "
+                "Mark it as COMPLETED when done."
+            )
+
+            self.history_manager.get_session(session_id).add("user", user_input)
+            await self.process_turn(session_id)
+
+            updated_task = task_service.get_task(next_task.id)
+            if updated_task.status != TaskStatus.COMPLETED:
+                if updated_task.status == TaskStatus.FAILED:
+                    self.auto_mode = False
+                    if isinstance(self.view, CLIView):
+                        self.view.console.print(
+                            "Task failed. Stopping auto-execution.",
+                            style="bold red",
+                        )
+            return True
+        else:
+            self.auto_mode = False
+            if isinstance(self.view, CLIView):
+                self.view.console.print(
+                    "All tasks completed. Stopping auto-execution.",
+                    style="bold green",
+                )
+            return False
+
+    async def run_tdd_cycle(self, goal: str, session_id: str) -> None:
+        """
+        Run a TDD cycle for the given goal.
+
+        Args:
+            goal: TDD goal description.
+            session_id: Session identifier.
+        """
         await self.view.print_agent_response(f"🔄 Starting TDD Cycle for: {goal}")
 
-        # 1. Generate Test
         prompt_test = (
             f"TDD Step 1: Write a failing pytest file for the goal: '{goal}'. "
             "Use '{write_file}' to create it in 'tests/'. "
@@ -336,17 +264,20 @@ Example:
         self.history_manager.get_session(session_id).add("user", prompt_test)
         await self.process_turn(session_id)
 
-        # 2. Run Test (Expect Fail)
-        prompt_run_fail = "Now run the test you just created using 'run_shell_command' with pytest. It should fail."
+        prompt_run_fail = (
+            "Now run the test you just created using 'run_shell_command' "
+            "with pytest. It should fail."
+        )
         self.history_manager.get_session(session_id).add("user", prompt_run_fail)
         await self.process_turn(session_id)
 
-        # 3. Implement
-        prompt_impl = "TDD Step 2: Write the implementation file to satisfy the test. Use '{write_file}'."
+        prompt_impl = (
+            "TDD Step 2: Write the implementation file to satisfy the test. "
+            "Use '{write_file}'."
+        )
         self.history_manager.get_session(session_id).add("user", prompt_impl)
         await self.process_turn(session_id)
 
-        # 4. Run Test (Expect Pass)
         prompt_run_pass = "Now run the test again. It should pass."
         self.history_manager.get_session(session_id).add("user", prompt_run_pass)
         await self.process_turn(session_id)
@@ -354,337 +285,42 @@ Example:
         self.pending_tdd_goal = None
         await self.view.print_agent_response("✅ TDD Cycle Completed.")
 
-    def extract_json(self, text: str) -> List[dict]:
-        text = re.sub(r"<\|.*?\|>", "", text).strip()
-        results = []
+    async def process_turn(self, session_id: str = "default") -> None:
+        """
+        Process a single conversation turn.
 
-        def find_json_objects(s: str):
-            stack = []
-            start = -1
-            for i, char in enumerate(s):
-                if char == "{":
-                    if not stack:
-                        start = i
-                    stack.append("{")
-                elif char == "}":
-                    if stack:
-                        stack.pop()
-                        if not stack:
-                            yield s[start : i + 1]
-                elif char == "[":
-                    if not stack:
-                        start = i
-                    stack.append("[")
-                elif char == "]":
-                    if stack:
-                        stack.pop()
-                        if not stack:
-                            yield s[start : i + 1]
-
-        for cand in find_json_objects(text):
-            try:
-                # Try standard JSON first
-                obj = json.loads(cand)
-            except json.JSONDecodeError:
-                try:
-                    # Fallback to Python literal eval (handles single quotes)
-                    obj = ast.literal_eval(cand)
-                except Exception:
-                    continue
-
-            if isinstance(obj, list):
-                # Handle list of tool calls (legacy/fallback support)
-                results.extend(
-                    [
-                        o
-                        for o in obj
-                        if isinstance(o, dict) and ("name" in o or "command" in o)
-                    ]
-                )
-            elif isinstance(obj, dict):
-                # Handle single tool call with optional Thought
-                if "name" in obj or "command" in obj:
-                    results.append(obj)
-
-        return results
-
-    def get_current_tools(self):
-        """Merges base tools, dynamic skills, and MCP tools (deduplicated by name)."""
-        try:
-            skill_defs = ToolExecutor.skill_service.get_tool_definitions()
-            mcp_defs = ToolExecutor.mcp_service.get_tools()
-            all_tools = self.base_tools + skill_defs + mcp_defs
-        except Exception:
-            all_tools = self.base_tools
-
-        # Deduplicate by name, keeping first occurrence (base tools take priority)
-        seen = set()
-        unique_tools = []
-        for tool in all_tools:
-            name = tool["function"]["name"]
-            if name not in seen:
-                seen.add(name)
-                unique_tools.append(tool)
-        return unique_tools
-
-    async def process_turn(self, session_id: str = "default"):
-        finished_turn = False
-        history = self.history_manager.get_session(session_id)
+        Args:
+            session_id: Session identifier.
+        """
         logger.info(f"Processing turn for session {session_id}")
+        history = self.history_manager.get_session(session_id)
 
-        # Inject Pinned Context dynamically into each turn
         context_service = ToolExecutor.context_manager.get_service(session_id)
         rag_service = ToolExecutor.rag_manager.get_service(session_id)
-        # preference_service removed as unused
         pinned_content = context_service.get_context_string()
 
-        # Update TUI Context View
         if hasattr(self.view, "print_context"):
-            # Assuming list_context returns a list of strings
             context_list = context_service.list_context()
             if isinstance(context_list, list):
                 await self.view.print_context(context_list)
 
         messages = history.get()
-        # Index the last user message
         last_msg = messages[-1] if messages else None
         if last_msg and last_msg["role"] == "user":
             with self.view.create_spinner("Updating Context..."):
                 await rag_service.index_history("user", last_msg["content"], session_id)
 
-        if pinned_content:
-            messages = [m.copy() for m in messages]
-            messages.append({"role": "system", "content": pinned_content})
+        def on_tdd_start(goal: str) -> None:
+            self.pending_tdd_goal = goal
 
-        while not finished_turn:
-            # Determine spinner text based on context
-            current_messages = history.get()
-            last_role = current_messages[-1]["role"] if current_messages else "user"
-            spinner_text = "Thinking..."
-            if last_role == "tool":
-                spinner_text = "Analyzing Tool Output..."
-            elif last_role == "user":
-                spinner_text = "Processing Request..."
+        def on_auto_mode_start() -> None:
+            self.auto_mode = True
 
-            try:
-                # Start spinner manually so we can exit it when streaming begins
-                spinner_ctx = self.view.create_spinner(spinner_text)
-                spinner_ctx.__enter__()
-                spinner_active = True
-                stream_started = False
+        callbacks = TurnCallbacks(
+            on_tdd_start=on_tdd_start,
+            on_auto_mode_start=on_auto_mode_start,
+        )
 
-                response_stream = self.openai.create_chat_completion(
-                    messages,
-                    tools=None,  # FORCE PROMPT ONLY to bypass TabbyAPI 400
-                )
-                full_response = ""
-                tool_calls = []
-                tool_calls_map = {}
-
-                # Buffer to detect JSON vs natural language
-                stream_buffer = ""
-                stream_decision_made = False
-
-                async for chunk in response_stream:
-                    if not chunk.choices:
-                        continue
-                    delta = chunk.choices[0].delta
-
-                    if delta.content:
-                        content = delta.content
-                        full_response += content
-
-                        # Exit spinner on first content
-                        if spinner_active:
-                            spinner_ctx.__exit__(None, None, None)
-                            spinner_active = False
-
-                        # Buffer content until we can decide if it's JSON or text
-                        if not stream_decision_made:
-                            stream_buffer += content
-                            # Once we have enough content, decide
-                            if len(stream_buffer) >= 20 or "{" in stream_buffer:
-                                stream_decision_made = True
-                                # If it looks like JSON, don't stream
-                                stripped = stream_buffer.strip()
-                                if stripped.startswith("{") or '{"' in stripped:
-                                    stream_started = False
-                                else:
-                                    # Natural text - start streaming with buffered content
-                                    self.view.print_stream_start()
-                                    self.view.print_stream_chunk(stream_buffer)
-                                    stream_started = True
-                        elif stream_started:
-                            # Continue streaming
-                            self.view.print_stream_chunk(content)
-
-                    if delta.tool_calls:
-                        for tc in delta.tool_calls:
-                            if tc.index not in tool_calls_map:
-                                tool_calls_map[tc.index] = {
-                                    "id": tc.id or f"call_{int(time.time())}",
-                                    "type": "function",
-                                    "function": {"name": "", "arguments": ""},
-                                }
-                            if tc.function.name:
-                                tool_calls_map[tc.index]["function"][
-                                    "name"
-                                ] += tc.function.name
-                            if tc.function.arguments:
-                                tool_calls_map[tc.index]["function"][
-                                    "arguments"
-                                ] += tc.function.arguments
-
-                # End streaming if we started
-                if stream_started:
-                    self.view.print_stream_end()
-
-                # Clean up spinner if still active
-                if spinner_active:
-                    spinner_ctx.__exit__(None, None, None)
-                    spinner_active = False
-
-                tool_calls = list(tool_calls_map.values())
-
-                if not tool_calls:
-                    extracted_list = self.extract_json(full_response)
-                    if extracted_list:
-                        for i, extracted in enumerate(extracted_list):
-                            args = (
-                                extracted.get("arguments")
-                                or extracted.get("parameters")
-                                or extracted
-                            )
-
-                            # Handle stringified JSON (common local model hallucination)
-                            if isinstance(args, str):
-                                try:
-                                    args = json.loads(args)
-                                except Exception:
-                                    pass  # Keep as string if parsing fails, might be intended
-
-                            # Fallback: if 'command' is at root, treat root as args
-                            if (
-                                isinstance(args, dict)
-                                and "command" not in args
-                                and "command" in extracted
-                            ):
-                                args = extracted
-
-                            tool_name = extracted.get("name", "run_shell_command")
-                            thought = extracted.get("thought")
-
-                            # Log thought telemetry
-                            if thought:
-                                try:
-                                    telemetry_service = (
-                                        ToolExecutor.telemetry_manager.get_service(
-                                            session_id
-                                        )
-                                    )
-                                    telemetry_service.log_thought(session_id, thought)
-                                except Exception:
-                                    pass  # Don't crash on telemetry failure
-
-                            # Print thought if present
-                            if thought and hasattr(self.view, "print_thought"):
-                                self.view.print_thought(thought)
-
-                            tool_calls.append(
-                                {
-                                    "id": f"manual_{int(time.time())}_{i}",
-                                    "type": "function",
-                                    "function": {
-                                        "name": tool_name,
-                                        "arguments": json.dumps(args)
-                                        if isinstance(args, dict)
-                                        else args,
-                                    },
-                                }
-                            )
-                        full_response = ""
-
-                if tool_calls:
-                    history.add(
-                        "assistant",
-                        content=full_response.strip() or None,
-                        tool_calls=tool_calls,
-                    )
-                    if full_response.strip() and not stream_started:
-                        await self.view.print_agent_response(full_response)
-
-                    for tc in tool_calls:
-                        name = tc["function"]["name"]
-                        args_str = tc["function"]["arguments"]
-                        try:
-                            args = (
-                                json.loads(args_str)
-                                if isinstance(args_str, str)
-                                else args_str
-                            )
-                        except Exception as e:
-                            output_str = f"Error parsing JSON arguments: {str(e)}"
-                            history.add(
-                                "user",
-                                content=f"System Error: {output_str}",
-                                tool_call_id=None,
-                            )
-                            continue
-
-                        if name == "ask_user":
-                            question = args.get("question", "")
-                            if question:
-                                output = await self.view.ask_user_input(question)
-                            else:
-                                output = "Error: No question provided."
-                        elif name == "start_tdd":
-                            self.pending_tdd_goal = args.get("goal")
-                            output = f"TDD Loop scheduled for: {self.pending_tdd_goal}"
-                            finished_turn = True
-                        elif name == "execute_plan":
-                            self.auto_mode = True
-                            output = "Autonomous execution started. I will now proceed to execute tasks one by one."
-                            finished_turn = True
-                        else:
-                            with self.view.create_spinner(f"Executing {name}"):
-                                output = await ToolExecutor.dispatch(
-                                    name, args, session_id=session_id
-                                )
-                        if isinstance(output, dict):
-                            await self.view.print_plan(output)
-                            output_str = json.dumps(output)
-                        else:
-                            output_str = str(output)
-                            await self.view.print_tool_output(
-                                output_str, tool_name=name
-                            )
-
-                            # Convert tool output to user message
-                            history.add(
-                                "user",
-                                content=f"Tool '{name}' output:\n{output_str}",
-                                tool_call_id=None,
-                            )
-                            # FORCE STOP: Enforce strict "One Shot" behavior.
-                            # The agent must return control to the user after every tool execution.
-                            finished_turn = True
-                else:
-                    # No tool calls - this is a text response
-                    if full_response.strip():
-                        full_response = re.sub(r"<\|.*?\|>", "", full_response).strip()
-                        # Only print if we didn't already stream it
-                        if full_response and not stream_started:
-                            await self.view.print_agent_response(full_response)
-                        await self.view.print_telemetry(
-                            getattr(self.openai, "last_telemetry", {})
-                        )
-                        history.add("assistant", full_response)
-                        with self.view.create_spinner("Updating Context..."):
-                            await rag_service.index_history(
-                                "assistant", full_response, session_id
-                            )
-                    finished_turn = True
-            except Exception as e:
-                logger.error(f"Error in process_turn: {str(e)}", exc_info=True)
-                await self.view.print_error(str(e))
-                finished_turn = True
+        await self._turn_processor.process(
+            history, session_id, pinned_content, callbacks
+        )
