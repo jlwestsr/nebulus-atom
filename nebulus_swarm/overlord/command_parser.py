@@ -16,6 +16,7 @@ class CommandType(Enum):
     PAUSE = "pause"
     RESUME = "resume"
     HISTORY = "history"
+    REVIEW = "review"
     HELP = "help"
     UNKNOWN = "unknown"
 
@@ -27,6 +28,7 @@ class Command:
     type: CommandType
     repo: Optional[str] = None
     issue_number: Optional[int] = None
+    pr_number: Optional[int] = None
     minion_id: Optional[str] = None
     raw_text: str = ""
 
@@ -87,6 +89,13 @@ class CommandParser:
             r"show (?:me )?history",
             r"recent (?:work|prs?|completions?)",
             r"what (?:did|have) (?:the )?minions? (?:do|done)",
+        ],
+        # "review PR #42" or "review owner/repo#42"
+        CommandType.REVIEW: [
+            r"review (?:pr )?#?(\d+)",
+            r"review (?:pr )?([a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+)#(\d+)",
+            r"check (?:pr )?#?(\d+)",
+            r"check (?:pr )?([a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+)#(\d+)",
         ],
         # "help" or "commands" or "what can you do"
         CommandType.HELP: [
@@ -160,6 +169,16 @@ class CommandParser:
                 except ValueError:
                     cmd.minion_id = groups[0]
 
+        elif cmd_type == CommandType.REVIEW:
+            if len(groups) == 2:
+                # repo/name#pr format
+                cmd.repo = groups[0]
+                cmd.pr_number = int(groups[1])
+            elif len(groups) == 1:
+                # just PR number
+                cmd.pr_number = int(groups[0])
+                cmd.repo = self.default_repo
+
         return cmd
 
     def format_help(self) -> str:
@@ -180,6 +199,10 @@ class CommandParser:
 • `work on owner/repo#42` - Start on specific repo
 • `stop #42` - Stop the minion working on issue #42
 • `stop minion-abc123` - Stop a specific minion
+
+*PR Review:*
+• `review #42` - Review PR #42 with AI
+• `review owner/repo#42` - Review PR on specific repo
 
 *Queue Control:*
 • `pause` - Pause automatic queue processing

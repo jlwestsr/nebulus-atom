@@ -23,6 +23,7 @@ from nebulus_swarm.overlord.docker_manager import DockerManager
 from nebulus_swarm.overlord.github_queue import GitHubQueue
 from nebulus_swarm.overlord.slack_bot import SlackBot
 from nebulus_swarm.overlord.state import OverlordState
+from nebulus_swarm.reviewer.workflow import ReviewConfig, ReviewWorkflow
 
 logger = get_logger(__name__)
 
@@ -90,6 +91,21 @@ class Overlord:
         self._cleanup_task: Optional[asyncio.Task] = None
         self._cron_task: Optional[asyncio.Task] = None
 
+        # PR reviewer (if enabled)
+        self._reviewer: Optional[ReviewWorkflow] = None
+        if config.reviewer.enabled:
+            review_config = ReviewConfig(
+                github_token=config.github.token,
+                llm_base_url=config.llm.base_url,
+                llm_model=config.llm.model,
+                llm_timeout=config.llm.timeout,
+                auto_merge_enabled=config.reviewer.auto_merge,
+                merge_method=config.reviewer.merge_method,
+                min_confidence_for_approve=config.reviewer.min_confidence,
+                run_local_checks=False,  # Don't run local checks from Overlord
+            )
+            self._reviewer = ReviewWorkflow(review_config)
+
         # Cron configuration
         self._cron_enabled = config.cron.enabled
         self._cron_schedule = config.cron.schedule or DEFAULT_CRON_SCHEDULE
@@ -118,6 +134,7 @@ class Overlord:
             CommandType.PAUSE: self._handle_pause,
             CommandType.RESUME: self._handle_resume,
             CommandType.HISTORY: self._handle_history,
+            CommandType.REVIEW: self._handle_review,
             CommandType.HELP: self._handle_help,
             CommandType.UNKNOWN: self._handle_unknown,
         }
@@ -301,6 +318,66 @@ class Overlord:
 
         return "\n".join(lines)
 
+    def _handle_review(self, command) -> str:
+        """Handle review command - AI review a PR."""
+        if not self._reviewer:
+            return "❌ PR reviewer is not enabled."
+
+        if not command.pr_number:
+            return "❌ Please specify a PR number (e.g., `review #42`)"
+
+        repo = command.repo or self.config.github.default_repo
+        if not repo:
+            return "❌ Please specify a repository or set a default"
+
+        # Run review asynchronously
+        asyncio.create_task(self._run_review_async(repo, command.pr_number))
+
+        return f"🔍 Starting AI review of {repo}#{command.pr_number}..."
+
+    async def _run_review_async(self, repo: str, pr_number: int) -> None:
+        """Run PR review asynchronously and report results to Slack."""
+        try:
+            result = self._reviewer.review_pr(
+                repo=repo,
+                pr_number=pr_number,
+                post_review=True,
+                auto_merge=self.config.reviewer.auto_merge,
+            )
+
+            # Build result message
+            emoji = {
+                "APPROVE": "✅",
+                "REQUEST_CHANGES": "❌",
+                "COMMENT": "💬",
+            }.get(result.llm_result.decision.value, "🔍")
+
+            lines = [
+                f"{emoji} *Review Complete: {repo}#{pr_number}*",
+                f"Decision: {result.llm_result.decision.value}",
+                f"Confidence: {result.llm_result.confidence:.0%}",
+            ]
+
+            if result.llm_result.summary:
+                lines.append(f"\n> {result.llm_result.summary[:200]}...")
+
+            if result.review_posted:
+                lines.append("\n_Review posted to GitHub_")
+
+            if result.merged:
+                lines.append("🎉 _PR was auto-merged!_")
+
+            if result.error:
+                lines.append(f"\n⚠️ Error: {result.error}")
+
+            await self.slack.post_message("\n".join(lines))
+
+        except Exception as e:
+            logger.exception(f"Review failed for {repo}#{pr_number}: {e}")
+            await self.slack.post_message(
+                f"❌ Review failed for {repo}#{pr_number}: {e}"
+            )
+
     def _handle_help(self, command) -> str:
         """Handle help command."""
         return self.parser.format_help()
@@ -435,6 +512,10 @@ class Overlord:
                     msg += f" → PR #{pr_number}"
 
                 asyncio.create_task(self.slack.post_message(msg))
+
+                # Auto-review the PR if enabled
+                if pr_number and self._reviewer and self.config.reviewer.auto_review:
+                    asyncio.create_task(self._run_review_async(minion.repo, pr_number))
 
                 # Clean up container
                 self.docker.kill_minion(minion_id)
@@ -792,6 +873,13 @@ class Overlord:
                 self.github_queue.close()
             except Exception as e:
                 logger.warning(f"Error closing GitHub queue: {e}")
+
+        # Close reviewer
+        if self._reviewer:
+            try:
+                self._reviewer.close()
+            except Exception as e:
+                logger.warning(f"Error closing reviewer: {e}")
 
         # Final Slack notification
         try:
