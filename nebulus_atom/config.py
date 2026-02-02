@@ -6,13 +6,22 @@ load_dotenv(os.path.join(os.getcwd(), ".env"))
 
 
 class Config:
+    # User config directory
+    USER_CONFIG_DIR = os.path.expanduser("~/.nebulus_atom")
+    HISTORY_FILE = os.path.join(USER_CONFIG_DIR, "history")
+
     NEBULUS_BASE_URL = os.getenv("NEBULUS_BASE_URL")
     NEBULUS_API_KEY = os.getenv("NEBULUS_API_KEY")
     NEBULUS_MODEL = os.getenv("NEBULUS_MODEL", "qwen3:30b-a3b")
     EXIT_COMMANDS = ["exit", "quit", "/exit", "/quit"]
     SANDBOX_MODE = os.getenv("SANDBOX_MODE", "false").lower() == "true"
-    GLOBAL_SKILLS_PATH = os.path.expanduser("~/.nebulus_atom/skills")
+    GLOBAL_SKILLS_PATH = os.path.join(USER_CONFIG_DIR, "skills")
     GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+
+    @classmethod
+    def ensure_config_dir(cls):
+        """Ensure the user config directory exists."""
+        os.makedirs(cls.USER_CONFIG_DIR, exist_ok=True)
 
     # Logging Configuration
     LOG_DIR = os.path.join(os.getcwd(), "logs")

@@ -590,10 +590,8 @@ class AgentController:
                                     pass  # Don't crash on telemetry failure
 
                             # Print thought if present
-                            if thought and isinstance(self.view, CLIView):
-                                self.view.console.print(
-                                    f"💭 {thought}", style="dim cyan"
-                                )
+                            if thought and hasattr(self.view, "print_thought"):
+                                self.view.print_thought(thought)
 
                             tool_calls.append(
                                 {
@@ -655,10 +653,6 @@ class AgentController:
                                 output = await ToolExecutor.dispatch(
                                     name, args, session_id=session_id
                                 )
-                        if isinstance(self.view, CLIView):
-                            self.view.console.print(
-                                f"✔ Executed: {name}", style="dim green"
-                            )
                         if isinstance(output, dict):
                             await self.view.print_plan(output)
                             output_str = json.dumps(output)
