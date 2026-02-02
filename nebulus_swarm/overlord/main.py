@@ -7,12 +7,15 @@ import signal
 from datetime import datetime, timedelta
 from typing import Optional
 
+import aiohttp
 from aiohttp import web
+from croniter import croniter
 
 from nebulus_swarm.config import SwarmConfig
 from nebulus_swarm.models.minion import Minion, MinionStatus
 from nebulus_swarm.overlord.command_parser import CommandParser, CommandType
 from nebulus_swarm.overlord.docker_manager import DockerManager
+from nebulus_swarm.overlord.github_queue import GitHubQueue
 from nebulus_swarm.overlord.slack_bot import SlackBot
 from nebulus_swarm.overlord.state import OverlordState
 
@@ -21,6 +24,9 @@ logger = logging.getLogger(__name__)
 # Watchdog configuration
 WATCHDOG_INTERVAL = 60  # Check every 60 seconds
 HEARTBEAT_TIMEOUT = 300  # 5 minutes without heartbeat = stuck
+
+# Default cron schedule (2 AM daily)
+DEFAULT_CRON_SCHEDULE = "0 2 * * *"
 
 
 class Overlord:
@@ -58,6 +64,14 @@ class Overlord:
             message_handler=self._handle_message,
         )
 
+        # GitHub queue scanner (only if we have watched repos)
+        self.github_queue: Optional[GitHubQueue] = None
+        if config.github.watched_repos:
+            self.github_queue = GitHubQueue(
+                token=config.github.token,
+                watched_repos=config.github.watched_repos,
+            )
+
         # Health check server
         self._health_app: Optional[web.Application] = None
         self._health_runner: Optional[web.AppRunner] = None
@@ -65,6 +79,11 @@ class Overlord:
         # Background tasks
         self._watchdog_task: Optional[asyncio.Task] = None
         self._cleanup_task: Optional[asyncio.Task] = None
+        self._cron_task: Optional[asyncio.Task] = None
+
+        # Cron configuration
+        self._cron_enabled = config.cron.enabled
+        self._cron_schedule = config.cron.schedule or DEFAULT_CRON_SCHEDULE
 
         # Queue processing state
         self._paused = False
@@ -163,6 +182,10 @@ class Overlord:
             )
             self.state.add_minion(minion)
 
+            # Mark issue as in-progress on GitHub
+            if self.github_queue:
+                self.github_queue.mark_in_progress(command.repo, command.issue_number)
+
             return f"🚀 Spawning minion `{minion_id}` to work on {command.repo}#{command.issue_number}"
 
         except Exception as e:
@@ -207,8 +230,36 @@ class Overlord:
 
     def _handle_queue(self, command) -> str:
         """Handle queue command - show pending work."""
-        # TODO: In Phase 4, this will query GitHub for labeled issues
-        return "📋 *Pending Work Queue:*\n(GitHub integration coming in Phase 4)"
+        if not self.github_queue:
+            return "❌ No watched repositories configured."
+
+        try:
+            issues = self.github_queue.scan_queue()
+
+            if not issues:
+                return "📋 *Pending Work Queue:*\nNo issues with `nebulus-ready` label found."
+
+            lines = [f"📋 *Pending Work Queue ({len(issues)} issues):*"]
+            for issue in issues[:10]:  # Show top 10
+                priority_icon = "🔥" if issue.priority > 0 else "📌"
+                lines.append(
+                    f"• {priority_icon} {issue.repo}#{issue.number}: {issue.title}"
+                )
+
+            if len(issues) > 10:
+                lines.append(f"_... and {len(issues) - 10} more_")
+
+            # Show rate limit status
+            rate_limit = self.github_queue.get_rate_limit()
+            lines.append(
+                f"\n_API: {rate_limit['remaining']}/{rate_limit['limit']} requests remaining_"
+            )
+
+            return "\n".join(lines)
+
+        except Exception as e:
+            logger.exception(f"Failed to scan queue: {e}")
+            return f"❌ Failed to scan queue: {e}"
 
     def _handle_pause(self, command) -> str:
         """Handle pause command."""
@@ -354,6 +405,12 @@ class Overlord:
                     pr_number=pr_number,
                 )
 
+                # Mark issue as in-review on GitHub
+                if self.github_queue and pr_number:
+                    self.github_queue.mark_in_review(
+                        minion.repo, minion.issue_number, pr_number
+                    )
+
                 # Notify Slack
                 msg = f"✅ Minion `{minion_id}` completed #{issue}"
                 if pr_url:
@@ -369,12 +426,19 @@ class Overlord:
             elif event == "error":
                 error_type = report_data.get("error_type", "unknown")
                 details = report_data.get("details", "")
+                error_msg = f"{error_type}: {message}"
 
                 self.state.record_completion(
                     minion,
                     MinionStatus.FAILED,
-                    error_message=f"{error_type}: {message}",
+                    error_message=error_msg,
                 )
+
+                # Mark issue as needs-attention on GitHub
+                if self.github_queue:
+                    self.github_queue.mark_failed(
+                        minion.repo, minion.issue_number, error_msg
+                    )
 
                 # Notify Slack
                 msg = f"❌ Minion `{minion_id}` failed on #{issue}: {message}"
@@ -482,6 +546,159 @@ class Overlord:
             # Run every 5 minutes
             await asyncio.sleep(300)
 
+    async def _cron_loop(self) -> None:
+        """Background task that triggers queue sweeps on cron schedule."""
+        if not self._cron_enabled:
+            logger.info("Cron scheduler disabled")
+            return
+
+        logger.info(f"Cron scheduler started with schedule: {self._cron_schedule}")
+
+        while self._running:
+            try:
+                # Calculate time until next cron trigger
+                cron = croniter(self._cron_schedule, datetime.now())
+                next_run = cron.get_next(datetime)
+                wait_seconds = (next_run - datetime.now()).total_seconds()
+
+                logger.debug(f"Next cron run at {next_run} ({wait_seconds:.0f}s)")
+
+                # Wait until next cron time (check every minute if we should stop)
+                while wait_seconds > 0 and self._running:
+                    sleep_time = min(wait_seconds, 60)
+                    await asyncio.sleep(sleep_time)
+                    wait_seconds -= sleep_time
+
+                if not self._running:
+                    break
+
+                # Trigger queue sweep
+                await self._sweep_queue()
+
+            except Exception as e:
+                logger.exception(f"Cron error: {e}")
+                await asyncio.sleep(60)  # Wait before retry
+
+        logger.info("Cron scheduler stopped")
+
+    async def _warm_up_llm(self) -> bool:
+        """Send a small request to warm up the LLM backend.
+
+        This is useful for MLX servers that may have cold-start latency.
+
+        Returns:
+            True if warm-up succeeded, False otherwise.
+        """
+        try:
+            base_url = self.config.llm.base_url
+            timeout = aiohttp.ClientTimeout(total=30)
+
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                # Try models endpoint first (lightweight)
+                try:
+                    async with session.get(f"{base_url}/models") as resp:
+                        if resp.status == 200:
+                            logger.info("LLM warm-up: models endpoint OK")
+                            return True
+                except Exception:
+                    pass
+
+                # Try a minimal completion request
+                payload = {
+                    "model": self.config.llm.model,
+                    "messages": [{"role": "user", "content": "hi"}],
+                    "max_tokens": 1,
+                }
+                async with session.post(
+                    f"{base_url}/chat/completions", json=payload
+                ) as resp:
+                    if resp.status == 200:
+                        logger.info("LLM warm-up: completion request OK")
+                        return True
+                    else:
+                        logger.warning(f"LLM warm-up: status {resp.status}")
+                        return False
+
+        except asyncio.TimeoutError:
+            logger.warning("LLM warm-up: timeout")
+            return False
+        except Exception as e:
+            logger.warning(f"LLM warm-up failed: {e}")
+            return False
+
+    async def _sweep_queue(self) -> None:
+        """Sweep GitHub queue and spawn minions for pending work."""
+        if self._paused:
+            logger.info("Queue sweep skipped - processing paused")
+            return
+
+        if not self.github_queue:
+            logger.warning("Queue sweep skipped - no GitHub queue configured")
+            return
+
+        logger.info("Starting queue sweep")
+
+        try:
+            issues = self.github_queue.scan_queue()
+
+            if not issues:
+                logger.info("Queue sweep complete - no pending issues")
+                return
+
+            # Calculate available slots
+            active_count = len(self.state.get_active_minions())
+            available_slots = self.config.minions.max_concurrent - active_count
+
+            if available_slots <= 0:
+                logger.info(
+                    f"Queue sweep: {len(issues)} pending, but no available slots"
+                )
+                return
+
+            # Warm up LLM before spawning minions
+            await self._warm_up_llm()
+
+            # Spawn minions for top priority issues
+            spawned = 0
+            for issue in issues[:available_slots]:
+                # Check if already working on this issue
+                existing = self.state.get_minion_by_issue(issue.repo, issue.number)
+                if existing:
+                    logger.debug(f"Skipping {issue} - already in progress")
+                    continue
+
+                try:
+                    minion_id = self.docker.spawn_minion(issue.repo, issue.number)
+
+                    minion = Minion(
+                        id=minion_id,
+                        repo=issue.repo,
+                        issue_number=issue.number,
+                        status=MinionStatus.STARTING,
+                        started_at=datetime.now(),
+                        last_heartbeat=datetime.now(),
+                    )
+                    self.state.add_minion(minion)
+
+                    # Mark issue as in-progress on GitHub
+                    self.github_queue.mark_in_progress(issue.repo, issue.number)
+
+                    # Notify Slack
+                    await self.slack.post_message(
+                        f"🤖 Cron: Spawning minion `{minion_id}` for {issue}"
+                    )
+
+                    spawned += 1
+                    logger.info(f"Spawned minion for {issue}")
+
+                except Exception as e:
+                    logger.error(f"Failed to spawn minion for {issue}: {e}")
+
+            logger.info(f"Queue sweep complete - spawned {spawned} minions")
+
+        except Exception as e:
+            logger.exception(f"Queue sweep failed: {e}")
+
     async def _shutdown(self) -> None:
         """Perform graceful shutdown."""
         logger.info("Shutting down Overlord...")
@@ -502,6 +719,17 @@ class Overlord:
                 await self._cleanup_task
             except asyncio.CancelledError:
                 pass
+
+        if self._cron_task:
+            self._cron_task.cancel()
+            try:
+                await self._cron_task
+            except asyncio.CancelledError:
+                pass
+
+        # Close GitHub queue client
+        if self.github_queue:
+            self.github_queue.close()
 
         # Stop Slack bot
         await self.slack.stop()
@@ -547,16 +775,27 @@ class Overlord:
         # Start background tasks
         self._watchdog_task = asyncio.create_task(self._watchdog_loop())
         self._cleanup_task = asyncio.create_task(self._cleanup_loop())
+        self._cron_task = asyncio.create_task(self._cron_loop())
 
         # Start Slack bot
         await self.slack.start()
 
         # Post startup message
+        cron_status = (
+            f"enabled ({self._cron_schedule})" if self._cron_enabled else "disabled"
+        )
+        repos_status = (
+            ", ".join(self.config.github.watched_repos)
+            if self.config.github.watched_repos
+            else "none"
+        )
         await self.slack.post_message(
             "🤖 *Overlord Online*\n"
             f"Monitoring channel. Type `help` for commands.\n"
             f"Queue processing: {'paused' if self._paused else 'active'}\n"
-            f"Max concurrent minions: {self.config.minions.max_concurrent}"
+            f"Max concurrent minions: {self.config.minions.max_concurrent}\n"
+            f"Cron: {cron_status}\n"
+            f"Watched repos: {repos_status}"
         )
 
         logger.info("Overlord is running")

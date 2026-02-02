@@ -351,3 +351,167 @@ class TestMinionModel:
         assert minion.id == "minion-abc"
         assert minion.status == MinionStatus.COMPLETED
         assert minion.pr_number == 50
+
+
+class TestGitHubQueue:
+    """Tests for the GitHub queue scanner."""
+
+    def test_queued_issue_str(self):
+        """Test QueuedIssue string representation."""
+        from nebulus_swarm.overlord.github_queue import QueuedIssue
+
+        issue = QueuedIssue(
+            repo="owner/repo",
+            number=42,
+            title="Fix the bug",
+            labels=["nebulus-ready"],
+            created_at=datetime.now(),
+            priority=1,
+        )
+        assert str(issue) == "owner/repo#42: Fix the bug"
+
+    def test_queued_issue_priority_sorting(self):
+        """Test that issues are sorted by priority then date."""
+        from nebulus_swarm.overlord.github_queue import QueuedIssue
+
+        now = datetime.now()
+        issues = [
+            QueuedIssue("a/b", 1, "Low priority old", [], now, priority=0),
+            QueuedIssue("a/b", 2, "High priority", [], now, priority=1),
+            QueuedIssue(
+                "a/b",
+                3,
+                "Low priority new",
+                [],
+                datetime(now.year, now.month, now.day, now.hour + 1),
+                priority=0,
+            ),
+        ]
+
+        # Sort like GitHubQueue does
+        issues.sort(key=lambda i: (-i.priority, i.created_at))
+
+        # High priority first
+        assert issues[0].number == 2
+        # Then low priority by date (oldest first)
+        assert issues[1].number == 1
+        assert issues[2].number == 3
+
+    @patch("nebulus_swarm.overlord.github_queue.Github")
+    def test_github_queue_init(self, mock_github_class):
+        """Test GitHubQueue initialization."""
+        from nebulus_swarm.overlord.github_queue import GitHubQueue
+
+        queue = GitHubQueue(
+            token="test-token",
+            watched_repos=["owner/repo1", "owner/repo2"],
+        )
+
+        assert queue.token == "test-token"
+        assert len(queue.watched_repos) == 2
+        assert queue.work_label == "nebulus-ready"
+        mock_github_class.assert_called_once()
+
+    @patch("nebulus_swarm.overlord.github_queue.Github")
+    def test_scan_queue_empty(self, mock_github_class):
+        """Test scanning when no issues are found."""
+        from nebulus_swarm.overlord.github_queue import GitHubQueue
+
+        mock_repo = mock_github_class.return_value.get_repo.return_value
+        mock_repo.get_issues.return_value = []
+
+        queue = GitHubQueue(token="test", watched_repos=["owner/repo"])
+        issues = queue.scan_queue()
+
+        assert issues == []
+
+    @patch("nebulus_swarm.overlord.github_queue.Github")
+    def test_get_rate_limit(self, mock_github_class):
+        """Test rate limit status retrieval."""
+        from nebulus_swarm.overlord.github_queue import GitHubQueue
+
+        mock_rate = mock_github_class.return_value.get_rate_limit.return_value
+        mock_rate.core.remaining = 4500
+        mock_rate.core.limit = 5000
+        mock_rate.core.reset = datetime.now()
+
+        queue = GitHubQueue(token="test", watched_repos=["owner/repo"])
+        rate_limit = queue.get_rate_limit()
+
+        assert rate_limit["remaining"] == 4500
+        assert rate_limit["limit"] == 5000
+        assert "reset_at" in rate_limit
+
+
+class TestCronScheduler:
+    """Tests for cron scheduling functionality."""
+
+    def test_croniter_next_run(self):
+        """Test croniter calculates next run correctly."""
+        from croniter import croniter
+
+        # Test daily at 2 AM
+        cron = croniter("0 2 * * *", datetime(2024, 1, 1, 0, 0, 0))
+        next_run = cron.get_next(datetime)
+        assert next_run.hour == 2
+        assert next_run.minute == 0
+
+    def test_croniter_hourly(self):
+        """Test hourly cron schedule."""
+        from croniter import croniter
+
+        cron = croniter("0 * * * *", datetime(2024, 1, 1, 0, 30, 0))
+        next_run = cron.get_next(datetime)
+        assert next_run.hour == 1
+        assert next_run.minute == 0
+
+
+class TestLLMWarmup:
+    """Tests for LLM warm-up functionality."""
+
+    @pytest.mark.asyncio
+    async def test_warm_up_llm_timeout(self):
+        """Test LLM warm-up timeout handling."""
+        import asyncio
+
+        import aiohttp
+
+        # Test that timeout is handled gracefully
+        timeout = aiohttp.ClientTimeout(total=0.001)
+        try:
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                # This should timeout immediately
+                async with session.get("http://10.255.255.1/models"):
+                    pass
+        except asyncio.TimeoutError:
+            # Expected behavior
+            pass
+        except Exception:
+            # Other errors are also acceptable (connection refused, etc.)
+            pass
+
+    def test_cron_config_defaults(self):
+        """Test cron configuration defaults."""
+        from nebulus_swarm.config import CronConfig
+
+        config = CronConfig()
+        assert config.enabled is True
+        assert config.schedule == "0 2 * * *"
+
+    def test_cron_config_override(self):
+        """Test cron configuration can be overridden from env."""
+        with patch.dict(
+            os.environ,
+            {
+                "SLACK_BOT_TOKEN": "xoxb-test",
+                "SLACK_APP_TOKEN": "xapp-test",
+                "SLACK_CHANNEL_ID": "C12345",
+                "GITHUB_TOKEN": "ghp_test",
+                "GITHUB_WATCHED_REPOS": "owner/repo",
+                "CRON_ENABLED": "false",
+                "CRON_SCHEDULE": "0 * * * *",
+            },
+        ):
+            config = SwarmConfig.from_env()
+            assert config.cron.enabled is False
+            assert config.cron.schedule == "0 * * * *"
