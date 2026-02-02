@@ -409,14 +409,23 @@ Example:
         return results
 
     def get_current_tools(self):
-        """Merges base tools, dynamic skills, and MCP tools."""
-        # Check if services are initialized (ToolExecutor might not be fully ready during init)
+        """Merges base tools, dynamic skills, and MCP tools (deduplicated by name)."""
         try:
             skill_defs = ToolExecutor.skill_service.get_tool_definitions()
             mcp_defs = ToolExecutor.mcp_service.get_tools()
-            return self.base_tools + skill_defs + mcp_defs
+            all_tools = self.base_tools + skill_defs + mcp_defs
         except Exception:
-            return self.base_tools
+            all_tools = self.base_tools
+
+        # Deduplicate by name, keeping first occurrence (base tools take priority)
+        seen = set()
+        unique_tools = []
+        for tool in all_tools:
+            name = tool["function"]["name"]
+            if name not in seen:
+                seen.add(name)
+                unique_tools.append(tool)
+        return unique_tools
 
     async def process_turn(self, session_id: str = "default"):
         finished_turn = False
