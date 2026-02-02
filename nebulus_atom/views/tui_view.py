@@ -222,3 +222,18 @@ class TextualView(App):
             yield
         finally:
             self.sub_title = original_sub
+
+    # Streaming output methods (TUI accumulates and displays at end)
+    def print_stream_start(self):
+        """Called before streaming response begins."""
+        self._stream_buffer = ""
+
+    def print_stream_chunk(self, text: str):
+        """Called for each chunk of streamed text."""
+        self._stream_buffer = getattr(self, "_stream_buffer", "") + text
+
+    def print_stream_end(self):
+        """Called when streaming response is complete."""
+        if hasattr(self, "_stream_buffer") and self._stream_buffer:
+            self.logger.write(f"[bold green]Agent:[/bold green] {self._stream_buffer}")
+            self._stream_buffer = ""

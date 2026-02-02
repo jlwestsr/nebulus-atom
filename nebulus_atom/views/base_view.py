@@ -52,3 +52,16 @@ class BaseView(ABC):
     def create_spinner(self, text: str) -> ContextManager:
         """Creates a context manager for a loading spinner."""
         pass
+
+    # Streaming output methods (with default no-op implementations for backwards compatibility)
+    def print_stream_start(self):
+        """Called before streaming response begins."""
+        pass
+
+    def print_stream_chunk(self, text: str):
+        """Called for each chunk of streamed text."""
+        pass
+
+    def print_stream_end(self):
+        """Called when streaming response is complete."""
+        pass

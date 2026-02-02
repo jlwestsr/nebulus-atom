@@ -47,21 +47,13 @@ def _start_agent(prompt: Optional[List[str]], tui: bool, session_id: str = "defa
 
         view = CLIView()
 
-    # from nebulus_atom.controllers.agent_controller import AgentController
-    from nebulus_atom.swarm.orchestrator import SwarmOrchestrator
+    from nebulus_atom.controllers.agent_controller import AgentController
 
-    # controller = AgentController(view=view)
-    # view.set_controller(controller)
+    # Direct mode - bypass swarm routing for faster response
+    controller = AgentController(view=view)
 
-    # Swarm Mode
-    orchestrator = SwarmOrchestrator(view=view)
-    # We bridge the view to the CoderAgent inside the orchestrator
-    coder = orchestrator.agents["coder"]
-    view.set_controller(coder)
-
-    # Start the orchestrator loop
     try:
-        asyncio.run(orchestrator.start(initial_prompt, session_id=session_id))
+        asyncio.run(controller.start(initial_prompt, session_id=session_id))
     except (KeyboardInterrupt, SystemExit):
         pass
 

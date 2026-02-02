@@ -25,25 +25,30 @@ class CLIView(BaseView):
     async def print_welcome(self):
         """Displays the welcome message in a panel."""
         from rich.panel import Panel
-        from rich.table import Table
+        from rich.text import Text
         from rich import box
 
-        grid = Table.grid(expand=True)
-        grid.add_column(justify="center", ratio=1)
-        grid.add_column(justify="right")
-        grid.add_row(
-            "[bold cyan]Nebulus Atom Agent[/bold cyan]",
-            f"[dim]Model: {os.environ.get('NEBULUS_MODEL', 'qwen2.5-coder')}[/dim]",
-        )
+        model = os.environ.get("NEBULUS_MODEL", Config.NEBULUS_MODEL)
+
+        welcome_text = Text()
+        welcome_text.append("Nebulus Atom", style="bold cyan")
+        welcome_text.append(" · ", style="dim")
+        welcome_text.append(model, style="dim")
 
         self.console.print(
             Panel(
-                grid,
+                welcome_text,
                 style="cyan",
                 box=box.ROUNDED,
-                width=60,
+                padding=(0, 1),
             )
         )
+
+        # Quick help
+        self.console.print(
+            "[dim]Ask me to read files, run commands, write code, or search the codebase.[/dim]"
+        )
+        self.console.print("[dim]Type [bold]exit[/bold] to quit · History: ↑/↓[/dim]\n")
 
     def __init__(self):
         # Force writing to the real stdout to avoid patch_stdout/Typer encoding issues
@@ -105,10 +110,6 @@ class CLIView(BaseView):
     async def start_app(self):
         """Starts the persistent REPL loop with streaming output."""
         from prompt_toolkit.patch_stdout import patch_stdout
-
-        self.console.print(
-            "[dim]Type 'exit' to quit. Use Up/Down arrows for history.[/dim]\n"
-        )
 
         kb = self.create_key_bindings()
 
@@ -298,3 +299,16 @@ class CLIView(BaseView):
 
     async def print_goodbye(self):
         self.console.print("[bold cyan]👋 Goodbye![/bold cyan]")
+
+    # Streaming output methods
+    def print_stream_start(self):
+        """Called before streaming response begins."""
+        self.console.print("[bold green]Agent:[/bold green] ", end="")
+
+    def print_stream_chunk(self, text: str):
+        """Called for each chunk of streamed text."""
+        self.console.print(text, end="", highlight=False)
+
+    def print_stream_end(self):
+        """Called when streaming response is complete."""
+        self.console.print()  # Final newline

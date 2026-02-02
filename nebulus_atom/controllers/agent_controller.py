@@ -211,12 +211,6 @@ class AgentController:
         self, initial_prompt: Optional[str] = None, session_id: str = "default"
     ):
         await self.view.print_welcome()
-        if isinstance(self.view, CLIView):
-            if self.context_loaded:
-                self.view.console.print("✔ Loaded @CONTEXT.md", style="dim green")
-                self.view.console.print(
-                    "  • Adhering to AI Directives & MVC", style="dim green"
-                )
 
         # session_id passed from main
         if initial_prompt:
@@ -489,189 +483,217 @@ class AgentController:
             elif last_role == "user":
                 spinner_text = "Processing Request..."
 
-            with self.view.create_spinner(spinner_text):
-                try:
-                    response_stream = self.openai.create_chat_completion(
-                        messages,
-                        tools=None,  # FORCE PROMPT ONLY to bypass TabbyAPI 400
-                    )
-                    full_response = ""
-                    tool_calls = []
-                    tool_calls_map = {}
-                    async for chunk in response_stream:
-                        if not chunk.choices:
-                            continue
-                        delta = chunk.choices[0].delta
-                        if delta.content:
-                            full_response += delta.content
-                        if delta.tool_calls:
-                            for tc in delta.tool_calls:
-                                if tc.index not in tool_calls_map:
-                                    tool_calls_map[tc.index] = {
-                                        "id": tc.id or f"call_{int(time.time())}",
-                                        "type": "function",
-                                        "function": {"name": "", "arguments": ""},
-                                    }
-                                if tc.function.name:
-                                    tool_calls_map[tc.index]["function"][
-                                        "name"
-                                    ] += tc.function.name
-                                if tc.function.arguments:
-                                    tool_calls_map[tc.index]["function"][
-                                        "arguments"
-                                    ] += tc.function.arguments
+            try:
+                # Start spinner manually so we can exit it when streaming begins
+                spinner_ctx = self.view.create_spinner(spinner_text)
+                spinner_ctx.__enter__()
+                spinner_active = True
+                stream_started = False
 
-                    tool_calls = list(tool_calls_map.values())
+                response_stream = self.openai.create_chat_completion(
+                    messages,
+                    tools=None,  # FORCE PROMPT ONLY to bypass TabbyAPI 400
+                )
+                full_response = ""
+                tool_calls = []
+                tool_calls_map = {}
 
-                    if not tool_calls:
-                        extracted_list = self.extract_json(full_response)
-                        if extracted_list:
-                            for i, extracted in enumerate(extracted_list):
-                                args = (
-                                    extracted.get("arguments")
-                                    or extracted.get("parameters")
-                                    or extracted
-                                )
+                async for chunk in response_stream:
+                    if not chunk.choices:
+                        continue
+                    delta = chunk.choices[0].delta
 
-                                # Handle stringified JSON (common local model hallucination)
-                                if isinstance(args, str):
-                                    try:
-                                        args = json.loads(args)
-                                    except Exception:
-                                        pass  # Keep as string if parsing fails, might be intended
+                    if delta.content:
+                        content = delta.content
+                        full_response += content
 
-                                # Fallback: if 'command' is at root, treat root as args
-                                if (
-                                    isinstance(args, dict)
-                                    and "command" not in args
-                                    and "command" in extracted
-                                ):
-                                    args = extracted
+                        # On first content, exit spinner and start streaming
+                        if not stream_started:
+                            if spinner_active:
+                                spinner_ctx.__exit__(None, None, None)
+                                spinner_active = False
+                            # Only stream if it doesn't look like JSON (tool call)
+                            if not content.strip().startswith("{"):
+                                self.view.print_stream_start()
+                                stream_started = True
 
-                                tool_name = extracted.get("name", "run_shell_command")
-                                thought = extracted.get("thought")
+                        # Stream the content if we started streaming
+                        if stream_started:
+                            self.view.print_stream_chunk(content)
 
-                                # Log thought telemetry
-                                if thought:
-                                    try:
-                                        telemetry_service = (
-                                            ToolExecutor.telemetry_manager.get_service(
-                                                session_id
-                                            )
+                    if delta.tool_calls:
+                        for tc in delta.tool_calls:
+                            if tc.index not in tool_calls_map:
+                                tool_calls_map[tc.index] = {
+                                    "id": tc.id or f"call_{int(time.time())}",
+                                    "type": "function",
+                                    "function": {"name": "", "arguments": ""},
+                                }
+                            if tc.function.name:
+                                tool_calls_map[tc.index]["function"][
+                                    "name"
+                                ] += tc.function.name
+                            if tc.function.arguments:
+                                tool_calls_map[tc.index]["function"][
+                                    "arguments"
+                                ] += tc.function.arguments
+
+                # End streaming if we started
+                if stream_started:
+                    self.view.print_stream_end()
+
+                # Clean up spinner if still active
+                if spinner_active:
+                    spinner_ctx.__exit__(None, None, None)
+                    spinner_active = False
+
+                tool_calls = list(tool_calls_map.values())
+
+                if not tool_calls:
+                    extracted_list = self.extract_json(full_response)
+                    if extracted_list:
+                        for i, extracted in enumerate(extracted_list):
+                            args = (
+                                extracted.get("arguments")
+                                or extracted.get("parameters")
+                                or extracted
+                            )
+
+                            # Handle stringified JSON (common local model hallucination)
+                            if isinstance(args, str):
+                                try:
+                                    args = json.loads(args)
+                                except Exception:
+                                    pass  # Keep as string if parsing fails, might be intended
+
+                            # Fallback: if 'command' is at root, treat root as args
+                            if (
+                                isinstance(args, dict)
+                                and "command" not in args
+                                and "command" in extracted
+                            ):
+                                args = extracted
+
+                            tool_name = extracted.get("name", "run_shell_command")
+                            thought = extracted.get("thought")
+
+                            # Log thought telemetry
+                            if thought:
+                                try:
+                                    telemetry_service = (
+                                        ToolExecutor.telemetry_manager.get_service(
+                                            session_id
                                         )
-                                        telemetry_service.log_thought(
-                                            session_id, thought
-                                        )
-                                    except Exception:
-                                        pass  # Don't crash on telemetry failure
-
-                                # Print thought if present
-                                if thought and isinstance(self.view, CLIView):
-                                    self.view.console.print(
-                                        f"💭 {thought}", style="dim cyan"
                                     )
+                                    telemetry_service.log_thought(session_id, thought)
+                                except Exception:
+                                    pass  # Don't crash on telemetry failure
 
-                                tool_calls.append(
-                                    {
-                                        "id": f"manual_{int(time.time())}_{i}",
-                                        "type": "function",
-                                        "function": {
-                                            "name": tool_name,
-                                            "arguments": json.dumps(args)
-                                            if isinstance(args, dict)
-                                            else args,
-                                        },
-                                    }
-                                )
-                            full_response = ""
-
-                    if tool_calls:
-                        history.add(
-                            "assistant",
-                            content=full_response.strip() or None,
-                            tool_calls=tool_calls,
-                        )
-                        if full_response.strip():
-                            await self.view.print_agent_response(full_response)
-
-                        for tc in tool_calls:
-                            name = tc["function"]["name"]
-                            args_str = tc["function"]["arguments"]
-                            try:
-                                args = (
-                                    json.loads(args_str)
-                                    if isinstance(args_str, str)
-                                    else args_str
-                                )
-                            except Exception as e:
-                                output_str = f"Error parsing JSON arguments: {str(e)}"
-                                history.add(
-                                    "user",
-                                    content=f"System Error: {output_str}",
-                                    tool_call_id=None,
-                                )
-                                continue
-
-                            if name == "ask_user":
-                                question = args.get("question", "")
-                                if question:
-                                    output = await self.view.ask_user_input(question)
-                                else:
-                                    output = "Error: No question provided."
-                            elif name == "start_tdd":
-                                self.pending_tdd_goal = args.get("goal")
-                                output = (
-                                    f"TDD Loop scheduled for: {self.pending_tdd_goal}"
-                                )
-                                finished_turn = True
-                            elif name == "execute_plan":
-                                self.auto_mode = True
-                                output = "Autonomous execution started. I will now proceed to execute tasks one by one."
-                                finished_turn = True
-                            else:
-                                with self.view.create_spinner(f"Executing {name}"):
-                                    output = await ToolExecutor.dispatch(
-                                        name, args, session_id=session_id
-                                    )
-                            if isinstance(self.view, CLIView):
+                            # Print thought if present
+                            if thought and isinstance(self.view, CLIView):
                                 self.view.console.print(
-                                    f"✔ Executed: {name}", style="dim green"
-                                )
-                            if isinstance(output, dict):
-                                await self.view.print_plan(output)
-                                output_str = json.dumps(output)
-                            else:
-                                output_str = str(output)
-                                await self.view.print_tool_output(
-                                    output_str, tool_name=name
+                                    f"💭 {thought}", style="dim cyan"
                                 )
 
-                                # Convert tool output to user message
-                                history.add(
-                                    "user",
-                                    content=f"Tool '{name}' output:\n{output_str}",
-                                    tool_call_id=None,
+                            tool_calls.append(
+                                {
+                                    "id": f"manual_{int(time.time())}_{i}",
+                                    "type": "function",
+                                    "function": {
+                                        "name": tool_name,
+                                        "arguments": json.dumps(args)
+                                        if isinstance(args, dict)
+                                        else args,
+                                    },
+                                }
+                            )
+                        full_response = ""
+
+                if tool_calls:
+                    history.add(
+                        "assistant",
+                        content=full_response.strip() or None,
+                        tool_calls=tool_calls,
+                    )
+                    if full_response.strip() and not stream_started:
+                        await self.view.print_agent_response(full_response)
+
+                    for tc in tool_calls:
+                        name = tc["function"]["name"]
+                        args_str = tc["function"]["arguments"]
+                        try:
+                            args = (
+                                json.loads(args_str)
+                                if isinstance(args_str, str)
+                                else args_str
+                            )
+                        except Exception as e:
+                            output_str = f"Error parsing JSON arguments: {str(e)}"
+                            history.add(
+                                "user",
+                                content=f"System Error: {output_str}",
+                                tool_call_id=None,
+                            )
+                            continue
+
+                        if name == "ask_user":
+                            question = args.get("question", "")
+                            if question:
+                                output = await self.view.ask_user_input(question)
+                            else:
+                                output = "Error: No question provided."
+                        elif name == "start_tdd":
+                            self.pending_tdd_goal = args.get("goal")
+                            output = f"TDD Loop scheduled for: {self.pending_tdd_goal}"
+                            finished_turn = True
+                        elif name == "execute_plan":
+                            self.auto_mode = True
+                            output = "Autonomous execution started. I will now proceed to execute tasks one by one."
+                            finished_turn = True
+                        else:
+                            with self.view.create_spinner(f"Executing {name}"):
+                                output = await ToolExecutor.dispatch(
+                                    name, args, session_id=session_id
                                 )
-                                # FORCE STOP: Enforce strict "One Shot" behavior.
-                                # The agent must return control to the user after every tool execution.
-                                finished_turn = True
-                    else:
-                        if full_response.strip():
-                            full_response = re.sub(
-                                r"<\|.*?\|>", "", full_response
-                            ).strip()
-                            if full_response:
-                                await self.view.print_agent_response(full_response)
-                                await self.view.print_telemetry(
-                                    getattr(self.openai, "last_telemetry", {})
-                                )
-                                history.add("assistant", full_response)
-                            with self.view.create_spinner("Updating Context..."):
-                                await rag_service.index_history(
-                                    "assistant", full_response, session_id
-                                )
-                        finished_turn = True
-                except Exception as e:
-                    logger.error(f"Error in process_turn: {str(e)}", exc_info=True)
-                    await self.view.print_error(str(e))
+                        if isinstance(self.view, CLIView):
+                            self.view.console.print(
+                                f"✔ Executed: {name}", style="dim green"
+                            )
+                        if isinstance(output, dict):
+                            await self.view.print_plan(output)
+                            output_str = json.dumps(output)
+                        else:
+                            output_str = str(output)
+                            await self.view.print_tool_output(
+                                output_str, tool_name=name
+                            )
+
+                            # Convert tool output to user message
+                            history.add(
+                                "user",
+                                content=f"Tool '{name}' output:\n{output_str}",
+                                tool_call_id=None,
+                            )
+                            # FORCE STOP: Enforce strict "One Shot" behavior.
+                            # The agent must return control to the user after every tool execution.
+                            finished_turn = True
+                else:
+                    # No tool calls - this is a text response
+                    if full_response.strip():
+                        full_response = re.sub(r"<\|.*?\|>", "", full_response).strip()
+                        # Only print if we didn't already stream it
+                        if full_response and not stream_started:
+                            await self.view.print_agent_response(full_response)
+                        await self.view.print_telemetry(
+                            getattr(self.openai, "last_telemetry", {})
+                        )
+                        history.add("assistant", full_response)
+                        with self.view.create_spinner("Updating Context..."):
+                            await rag_service.index_history(
+                                "assistant", full_response, session_id
+                            )
                     finished_turn = True
+            except Exception as e:
+                logger.error(f"Error in process_turn: {str(e)}", exc_info=True)
+                await self.view.print_error(str(e))
+                finished_turn = True
