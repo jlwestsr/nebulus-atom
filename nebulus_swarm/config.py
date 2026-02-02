@@ -73,6 +73,29 @@ class CronConfig:
 
 
 @dataclass
+class ReviewerConfig:
+    """PR reviewer configuration."""
+
+    enabled: bool = field(
+        default_factory=lambda: os.getenv("REVIEWER_ENABLED", "true").lower() == "true"
+    )
+    auto_review: bool = field(
+        default_factory=lambda: os.getenv("REVIEWER_AUTO_REVIEW", "true").lower()
+        == "true"
+    )
+    auto_merge: bool = field(
+        default_factory=lambda: os.getenv("REVIEWER_AUTO_MERGE", "false").lower()
+        == "true"
+    )
+    merge_method: str = field(
+        default_factory=lambda: os.getenv("REVIEWER_MERGE_METHOD", "squash")
+    )
+    min_confidence: float = field(
+        default_factory=lambda: float(os.getenv("REVIEWER_MIN_CONFIDENCE", "0.8"))
+    )
+
+
+@dataclass
 class SwarmConfig:
     """Main configuration for Nebulus Swarm."""
 
@@ -81,6 +104,7 @@ class SwarmConfig:
     minions: MinionConfig = field(default_factory=MinionConfig)
     llm: LLMConfig = field(default_factory=LLMConfig)
     cron: CronConfig = field(default_factory=CronConfig)
+    reviewer: ReviewerConfig = field(default_factory=ReviewerConfig)
 
     # Overlord settings
     state_db_path: str = field(
