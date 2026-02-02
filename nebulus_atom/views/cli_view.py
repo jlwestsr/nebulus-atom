@@ -53,8 +53,11 @@ class CLIView(BaseView):
     def __init__(self):
         # Force writing to the real stdout to avoid patch_stdout/Typer encoding issues
         self.console = Console(file=sys.__stdout__, force_terminal=True)
-        # Initialize PromptSession with persistent history
-        self.session = PromptSession(history=FileHistory(".nebulus_atom_history"))
+
+        # Ensure config directory exists and initialize history
+        Config.ensure_config_dir()
+        self.session = PromptSession(history=FileHistory(Config.HISTORY_FILE))
+
         self.controller = None
         self.status_message = ""
         self.is_thinking = False
@@ -135,6 +138,11 @@ class CLIView(BaseView):
                 if not user_input.strip():
                     continue
 
+                # Handle slash commands
+                if user_input.strip().startswith("/"):
+                    if await self._handle_slash_command(user_input.strip()):
+                        continue  # Command handled, prompt again
+
                 # 2. Execution Phase (No patch, direct stdout)
                 # Handle Input Routing
                 if self.input_future and not self.input_future.done():
@@ -155,6 +163,83 @@ class CLIView(BaseView):
                 import traceback
 
                 traceback.print_exc()
+
+    async def _handle_slash_command(self, command: str) -> bool:
+        """Handle slash commands. Returns True if command was handled."""
+        parts = command.split()
+        cmd = parts[0].lower()
+        # args = parts[1:] if len(parts) > 1 else []  # Reserved for future use
+
+        if cmd in ("/exit", "/quit", "/q"):
+            self.console.print("[bold cyan]👋 Goodbye![/bold cyan]")
+            import sys
+
+            sys.exit(0)
+
+        elif cmd in ("/clear", "/cls"):
+            self.console.clear()
+            return True
+
+        elif cmd in ("/help", "/?"):
+            self._print_help()
+            return True
+
+        elif cmd == "/context":
+            # Show pinned context files
+            if self.controller and hasattr(self.controller, "history_manager"):
+                from nebulus_atom.services.tool_executor import ToolExecutor
+
+                ctx_service = ToolExecutor.context_manager.get_service("default")
+                files = ctx_service.list_context()
+                if files:
+                    self.console.print("[bold]Pinned files:[/bold]")
+                    for f in files:
+                        self.console.print(f"  • {f}", style="dim")
+                else:
+                    self.console.print("[dim]No files pinned to context[/dim]")
+            return True
+
+        elif cmd == "/model":
+            self.console.print(f"[bold]Model:[/bold] {Config.NEBULUS_MODEL}")
+            return True
+
+        else:
+            self.console.print(f"[yellow]Unknown command: {cmd}[/yellow]")
+            self.console.print("[dim]Type /help for available commands[/dim]")
+            return True
+
+    def _print_help(self):
+        """Print help information."""
+        from rich.table import Table
+        from rich.panel import Panel
+
+        help_table = Table(show_header=False, box=None, padding=(0, 2))
+        help_table.add_column("Command", style="cyan")
+        help_table.add_column("Description")
+
+        help_table.add_row("/help", "Show this help message")
+        help_table.add_row("/clear", "Clear the screen")
+        help_table.add_row("/context", "Show pinned context files")
+        help_table.add_row("/model", "Show current model")
+        help_table.add_row("/exit", "Exit the CLI")
+        help_table.add_row("", "")
+        help_table.add_row("[dim]exit[/dim]", "[dim]Also exits the CLI[/dim]")
+
+        self.console.print(
+            Panel(
+                help_table,
+                title="[bold]Commands[/bold]",
+                border_style="dim",
+            )
+        )
+
+        self.console.print("\n[bold]Capabilities:[/bold]")
+        self.console.print("  • Read and write files")
+        self.console.print("  • Run shell commands")
+        self.console.print("  • Search codebase (RAG)")
+        self.console.print("  • Create and execute plans")
+        self.console.print("  • Pin files to context")
+        self.console.print()
 
     def _get_rich_toolbar(self):
         """Generates a Rich renderable for the bottom toolbar."""
@@ -261,17 +346,33 @@ class CLIView(BaseView):
         return await self.input_future
 
     async def print_agent_response(self, text: str):
-        self.console.print(f"[bold green]Agent:[/bold green] {text}")
+        """Print agent's natural language response."""
+        # Clean, indented response with subtle styling
+        self.console.print()
+        for line in text.split("\n"):
+            self.console.print(f"  {line}", style="default")
+        self.console.print()
+
+    def print_thought(self, thought: str):
+        """Print agent's reasoning/thought (very subtle)."""
+        self.console.print(f"  [dim italic]💭 {thought}[/dim italic]")
 
     async def print_telemetry(self, metrics: Dict[str, Any]):
-        pass
+        """Print performance metrics (if any)."""
+        if metrics:
+            ttft = metrics.get("ttft_ms")
+            if ttft:
+                self.console.print(f"  [dim]⏱ {ttft:.0f}ms to first token[/dim]")
 
     async def print_tool_output(self, output: str, tool_name: str = ""):
-        self.console.print(f"[dim blue]✔ Executed: {tool_name}[/dim blue]")
-        if len(output) > 500:
-            self.console.print(f"  [dim]{output[:500]}... (truncated)[/dim]")
-        else:
-            self.console.print(f"  [dim]{output}[/dim]")
+        """Print tool execution result - compact format."""
+        # Compact one-liner for successful execution
+        preview = output.replace("\n", " ")[:80]
+        if len(output) > 80:
+            preview += "…"
+        self.console.print(
+            f"  [green]✓[/green] [dim]{tool_name}[/dim] → [dim]{preview}[/dim]"
+        )
 
     async def print_plan(self, plan_data: Dict[str, Any]):
         goal = plan_data.get("goal", "Unknown Goal")
@@ -295,7 +396,17 @@ class CLIView(BaseView):
         pass
 
     async def print_error(self, message: str):
-        self.console.print(f"[bold red]❌ {message}[/bold red]")
+        """Print error message with prominent styling."""
+        from rich.panel import Panel
+
+        self.console.print(
+            Panel(
+                f"[white]{message}[/white]",
+                title="[bold]Error[/bold]",
+                border_style="red",
+                padding=(0, 1),
+            )
+        )
 
     async def print_goodbye(self):
         self.console.print("[bold cyan]👋 Goodbye![/bold cyan]")
