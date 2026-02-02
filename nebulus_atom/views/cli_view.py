@@ -70,28 +70,16 @@ class CLIView(BaseView):
         self.controller = controller
 
     def get_prompt_message(self):
-        # Determine prompt style and label based on state
-        # Priority: Agent Asking Input > Agent Thinking > Standard User Input
-        # Use simple standard XML tags for colors which are more robust
-
+        # Determine prompt style based on state
         if self.input_future and not self.input_future.done():
-            # Agent needs input - Magenta Box
-            return HTML(
-                "<ansimagenta>╭─ Answer ──────────────╮</ansimagenta>\n"
-                "<ansimagenta>│</ansimagenta> ➤ "
-            )
+            # Agent needs input - Magenta
+            return HTML("<ansimagenta><b>?</b></ansimagenta> ")
         elif self.is_thinking:
-            # Agent is busy - Grey Box
-            return HTML(
-                "<ansigray>╭─ Processing... ───────╮</ansigray>\n"
-                "<ansigray>│</ansigray> ➤ "
-            )
+            # Agent is busy - Grey
+            return HTML("<ansigray>...</ansigray> ")
         else:
-            # Standard - Blue Box
-            return HTML(
-                "<ansiblue>╭─ Input ───────────────╮</ansiblue>\n"
-                "<ansiblue>│</ansiblue> ➤ "
-            )
+            # Standard input - Cyan
+            return HTML("<ansicyan><b>❯</b></ansicyan> ")
 
     def create_key_bindings(self):
         kb = KeyBindings()
