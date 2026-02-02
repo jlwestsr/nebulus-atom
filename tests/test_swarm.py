@@ -428,12 +428,14 @@ class TestGitHubQueue:
     @patch("nebulus_swarm.overlord.github_queue.Github")
     def test_get_rate_limit(self, mock_github_class):
         """Test rate limit status retrieval."""
+        from datetime import timezone
+
         from nebulus_swarm.overlord.github_queue import GitHubQueue
 
         mock_rate = mock_github_class.return_value.get_rate_limit.return_value
         mock_rate.core.remaining = 4500
         mock_rate.core.limit = 5000
-        mock_rate.core.reset = datetime.now()
+        mock_rate.core.reset = datetime.now(timezone.utc)
 
         queue = GitHubQueue(token="test", watched_repos=["owner/repo"])
         rate_limit = queue.get_rate_limit()
@@ -441,6 +443,8 @@ class TestGitHubQueue:
         assert rate_limit["remaining"] == 4500
         assert rate_limit["limit"] == 5000
         assert "reset_at" in rate_limit
+        assert "is_rate_limited" in rate_limit
+        assert rate_limit["is_rate_limited"] is False  # 4500 > threshold
 
 
 class TestCronScheduler:

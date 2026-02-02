@@ -1,14 +1,20 @@
 """GitHub issue queue scanner for Overlord."""
 
 import logging
+import time
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from github import Auth, Github
 from github.GithubException import GithubException, RateLimitExceededException
 
 logger = logging.getLogger(__name__)
+
+# Rate limit safety margin (don't operate if below this)
+RATE_LIMIT_THRESHOLD = 100
+# Minimum requests needed for a queue sweep
+REQUESTS_PER_SWEEP = 10
 
 
 @dataclass
@@ -272,11 +278,91 @@ class GitHubQueue:
             Dict with rate limit information.
         """
         rate = self._client.get_rate_limit()
+        reset_at = rate.core.reset
+        seconds_until_reset = max(
+            0, (reset_at - datetime.now(timezone.utc)).total_seconds()
+        )
+
         return {
             "remaining": rate.core.remaining,
             "limit": rate.core.limit,
-            "reset_at": rate.core.reset.isoformat(),
+            "reset_at": reset_at.isoformat(),
+            "seconds_until_reset": int(seconds_until_reset),
+            "is_rate_limited": rate.core.remaining < RATE_LIMIT_THRESHOLD,
         }
+
+    def is_rate_limited(self) -> bool:
+        """Check if we're currently rate limited.
+
+        Returns:
+            True if remaining requests are below threshold.
+        """
+        try:
+            rate = self._client.get_rate_limit()
+            if rate.core.remaining < RATE_LIMIT_THRESHOLD:
+                logger.warning(
+                    f"GitHub API rate limited: {rate.core.remaining} remaining, "
+                    f"resets at {rate.core.reset.isoformat()}"
+                )
+                return True
+            return False
+        except GithubException as e:
+            logger.error(f"Failed to check rate limit: {e}")
+            return True  # Assume rate limited on error
+
+    def can_perform_sweep(self) -> bool:
+        """Check if we have enough quota for a queue sweep.
+
+        Returns:
+            True if we have enough requests remaining.
+        """
+        try:
+            rate = self._client.get_rate_limit()
+            # Need at least threshold + requests per sweep
+            needed = RATE_LIMIT_THRESHOLD + REQUESTS_PER_SWEEP * len(self.watched_repos)
+            if rate.core.remaining < needed:
+                logger.info(
+                    f"Insufficient quota for sweep: {rate.core.remaining} < {needed}"
+                )
+                return False
+            return True
+        except GithubException as e:
+            logger.error(f"Failed to check quota: {e}")
+            return False
+
+    def wait_for_rate_limit(self, max_wait: int = 300) -> bool:
+        """Wait for rate limit to reset if currently limited.
+
+        Args:
+            max_wait: Maximum seconds to wait.
+
+        Returns:
+            True if rate limit reset (or not limited), False if max_wait exceeded.
+        """
+        try:
+            rate = self._client.get_rate_limit()
+            if rate.core.remaining >= RATE_LIMIT_THRESHOLD:
+                return True
+
+            reset_at = rate.core.reset
+            wait_seconds = (reset_at - datetime.now(timezone.utc)).total_seconds()
+
+            if wait_seconds <= 0:
+                return True
+
+            if wait_seconds > max_wait:
+                logger.warning(
+                    f"Rate limit reset in {wait_seconds:.0f}s, exceeds max wait of {max_wait}s"
+                )
+                return False
+
+            logger.info(f"Waiting {wait_seconds:.0f}s for rate limit reset...")
+            time.sleep(wait_seconds + 1)  # Add 1s buffer
+            return True
+
+        except GithubException as e:
+            logger.error(f"Failed to wait for rate limit: {e}")
+            return False
 
     def close(self) -> None:
         """Close the GitHub client."""

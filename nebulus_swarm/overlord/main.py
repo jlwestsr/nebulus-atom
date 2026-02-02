@@ -652,6 +652,15 @@ class Overlord:
             logger.warning("Queue sweep skipped - no GitHub queue configured")
             return
 
+        # Check rate limit before sweeping
+        if not self.github_queue.can_perform_sweep():
+            rate_info = self.github_queue.get_rate_limit()
+            logger.warning(
+                f"Queue sweep skipped - rate limited "
+                f"(resets in {rate_info['seconds_until_reset']}s)"
+            )
+            return
+
         logger.info("Starting queue sweep")
 
         try:
