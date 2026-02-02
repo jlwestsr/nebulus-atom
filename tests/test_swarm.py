@@ -687,3 +687,469 @@ class TestLLMWarmup:
             config = SwarmConfig.from_env()
             assert config.cron.enabled is False
             assert config.cron.schedule == "0 * * * *"
+
+
+class TestPRReviewer:
+    """Tests for PR reviewer functionality."""
+
+    def test_review_decision_enum(self):
+        """Test ReviewDecision enum values."""
+        from nebulus_swarm.reviewer.pr_reviewer import ReviewDecision
+
+        assert ReviewDecision.APPROVE.value == "APPROVE"
+        assert ReviewDecision.REQUEST_CHANGES.value == "REQUEST_CHANGES"
+        assert ReviewDecision.COMMENT.value == "COMMENT"
+
+    def test_file_change_total(self):
+        """Test FileChange total changes calculation."""
+        from nebulus_swarm.reviewer.pr_reviewer import FileChange
+
+        fc = FileChange(
+            filename="test.py",
+            status="modified",
+            additions=10,
+            deletions=5,
+        )
+        assert fc.total_changes == 15
+
+    def test_pr_details_total_changes(self):
+        """Test PRDetails total changes calculation."""
+        from nebulus_swarm.reviewer.pr_reviewer import PRDetails
+
+        pr = PRDetails(
+            repo="owner/repo",
+            number=42,
+            title="Test PR",
+            body="Test body",
+            author="testuser",
+            base_branch="main",
+            head_branch="feature",
+            created_at=datetime.now(),
+            additions=100,
+            deletions=50,
+        )
+        assert pr.total_changes == 150
+
+    def test_pr_details_diff_summary(self):
+        """Test PRDetails diff summary generation."""
+        from nebulus_swarm.reviewer.pr_reviewer import FileChange, PRDetails
+
+        pr = PRDetails(
+            repo="owner/repo",
+            number=42,
+            title="Test PR",
+            body="This is a test",
+            author="testuser",
+            base_branch="main",
+            head_branch="feature",
+            created_at=datetime.now(),
+            files=[
+                FileChange("test.py", "modified", 10, 5, None),
+            ],
+            additions=10,
+            deletions=5,
+        )
+        summary = pr.get_diff_summary()
+
+        assert "# PR #42: Test PR" in summary
+        assert "testuser" in summary
+        assert "feature → main" in summary
+        assert "test.py" in summary
+
+    def test_review_result_can_auto_merge(self):
+        """Test ReviewResult auto-merge eligibility."""
+        from nebulus_swarm.reviewer.pr_reviewer import ReviewDecision, ReviewResult
+
+        # Eligible for auto-merge
+        result = ReviewResult(
+            decision=ReviewDecision.APPROVE,
+            summary="LGTM",
+            checks_passed=True,
+            confidence=0.9,
+            issues=[],
+        )
+        assert result.can_auto_merge is True
+
+        # Not eligible - low confidence
+        result2 = ReviewResult(
+            decision=ReviewDecision.APPROVE,
+            summary="LGTM",
+            checks_passed=True,
+            confidence=0.5,
+            issues=[],
+        )
+        assert result2.can_auto_merge is False
+
+        # Not eligible - has issues
+        result3 = ReviewResult(
+            decision=ReviewDecision.APPROVE,
+            summary="LGTM",
+            checks_passed=True,
+            confidence=0.9,
+            issues=["Minor issue"],
+        )
+        assert result3.can_auto_merge is False
+
+        # Not eligible - checks failed
+        result4 = ReviewResult(
+            decision=ReviewDecision.APPROVE,
+            summary="LGTM",
+            checks_passed=False,
+            confidence=0.9,
+            issues=[],
+        )
+        assert result4.can_auto_merge is False
+
+
+class TestChecksRunner:
+    """Tests for automated checks runner."""
+
+    def test_check_status_enum(self):
+        """Test CheckStatus enum values."""
+        from nebulus_swarm.reviewer.checks import CheckStatus
+
+        assert CheckStatus.PASSED.value == "passed"
+        assert CheckStatus.FAILED.value == "failed"
+        assert CheckStatus.WARNING.value == "warning"
+        assert CheckStatus.SKIPPED.value == "skipped"
+
+    def test_check_result_creation(self):
+        """Test CheckResult dataclass."""
+        from nebulus_swarm.reviewer.checks import CheckResult, CheckStatus
+
+        result = CheckResult(
+            name="Test Check",
+            status=CheckStatus.PASSED,
+            message="All tests passed",
+            file_issues=["issue1", "issue2"],
+        )
+        assert result.name == "Test Check"
+        assert result.status == CheckStatus.PASSED
+        assert len(result.file_issues) == 2
+
+    def test_checks_report_all_passed(self):
+        """Test ChecksReport all_passed property."""
+        from nebulus_swarm.reviewer.checks import CheckResult, ChecksReport, CheckStatus
+
+        report = ChecksReport(
+            results=[
+                CheckResult("Test1", CheckStatus.PASSED, "OK"),
+                CheckResult("Test2", CheckStatus.PASSED, "OK"),
+            ]
+        )
+        assert report.all_passed is True
+        assert report.has_failures is False
+
+    def test_checks_report_with_failures(self):
+        """Test ChecksReport with failures."""
+        from nebulus_swarm.reviewer.checks import CheckResult, ChecksReport, CheckStatus
+
+        report = ChecksReport(
+            results=[
+                CheckResult("Test1", CheckStatus.PASSED, "OK"),
+                CheckResult("Test2", CheckStatus.FAILED, "Error"),
+            ]
+        )
+        assert report.all_passed is False
+        assert report.has_failures is True
+        assert report.passed_count == 1
+        assert report.failed_count == 1
+
+    def test_checks_report_warnings_allowed(self):
+        """Test ChecksReport allows warnings."""
+        from nebulus_swarm.reviewer.checks import CheckResult, ChecksReport, CheckStatus
+
+        report = ChecksReport(
+            results=[
+                CheckResult("Test1", CheckStatus.PASSED, "OK"),
+                CheckResult("Test2", CheckStatus.WARNING, "Minor issue"),
+            ]
+        )
+        assert report.all_passed is True  # Warnings are allowed
+        assert report.warning_count == 1
+
+    def test_checks_report_summary(self):
+        """Test ChecksReport summary generation."""
+        from nebulus_swarm.reviewer.checks import CheckResult, ChecksReport, CheckStatus
+
+        report = ChecksReport(
+            results=[
+                CheckResult("Tests", CheckStatus.PASSED, "42 passed"),
+                CheckResult("Lint", CheckStatus.WARNING, "5 issues"),
+            ]
+        )
+        summary = report.get_summary()
+
+        assert "Automated Checks Report" in summary
+        assert "Tests" in summary
+        assert "42 passed" in summary
+
+    def test_security_patterns(self):
+        """Test security pattern detection."""
+        from nebulus_swarm.reviewer.checks import CheckRunner
+
+        patterns = CheckRunner.SECURITY_PATTERNS
+
+        # Should have patterns for common security issues
+        pattern_texts = [p[1] for p in patterns]
+        assert any("eval" in t.lower() for t in pattern_texts)
+        assert any("exec" in t.lower() for t in pattern_texts)
+        assert any(
+            "password" in t.lower() or "secret" in t.lower() for t in pattern_texts
+        )
+
+
+class TestLLMReviewer:
+    """Tests for LLM-based code review."""
+
+    def test_llm_reviewer_init(self):
+        """Test LLMReviewer initialization."""
+        from nebulus_swarm.reviewer.llm_review import LLMReviewer
+
+        reviewer = LLMReviewer(
+            base_url="http://localhost:5000/v1",
+            model="test-model",
+            api_key="test-key",
+            timeout=60,
+        )
+        assert reviewer.model == "test-model"
+
+    def test_parse_review_response_valid_json(self):
+        """Test parsing valid JSON response."""
+        from nebulus_swarm.reviewer.llm_review import LLMReviewer
+        from nebulus_swarm.reviewer.pr_reviewer import ReviewDecision
+
+        reviewer = LLMReviewer(
+            base_url="http://localhost:5000/v1",
+            model="test-model",
+        )
+
+        response = """
+        Some text before JSON...
+        {
+            "decision": "APPROVE",
+            "confidence": 0.95,
+            "summary": "Code looks good",
+            "issues": [],
+            "suggestions": ["Consider adding tests"],
+            "inline_comments": [
+                {"path": "test.py", "line": 10, "body": "Nice code!"}
+            ]
+        }
+        Some text after JSON...
+        """
+
+        result = reviewer._parse_review_response(response)
+
+        assert result.decision == ReviewDecision.APPROVE
+        assert result.confidence == 0.95
+        assert result.summary == "Code looks good"
+        assert len(result.suggestions) == 1
+        assert len(result.inline_comments) == 1
+        assert result.inline_comments[0].path == "test.py"
+
+    def test_parse_review_response_no_json(self):
+        """Test parsing response with no JSON."""
+        from nebulus_swarm.reviewer.llm_review import LLMReviewer
+        from nebulus_swarm.reviewer.pr_reviewer import ReviewDecision
+
+        reviewer = LLMReviewer(
+            base_url="http://localhost:5000/v1",
+            model="test-model",
+        )
+
+        response = "Just some text without any JSON"
+        result = reviewer._parse_review_response(response)
+
+        assert result.decision == ReviewDecision.COMMENT
+        assert result.confidence == 0.0
+        assert "Could not parse" in result.summary
+
+    def test_parse_review_response_invalid_decision(self):
+        """Test parsing response with invalid decision."""
+        from nebulus_swarm.reviewer.llm_review import LLMReviewer
+        from nebulus_swarm.reviewer.pr_reviewer import ReviewDecision
+
+        reviewer = LLMReviewer(
+            base_url="http://localhost:5000/v1",
+            model="test-model",
+        )
+
+        response = '{"decision": "INVALID", "confidence": 0.8, "summary": "test"}'
+        result = reviewer._parse_review_response(response)
+
+        # Should default to COMMENT for invalid decision
+        assert result.decision == ReviewDecision.COMMENT
+
+    def test_create_review_summary(self):
+        """Test review summary creation."""
+        from nebulus_swarm.reviewer.llm_review import create_review_summary
+        from nebulus_swarm.reviewer.pr_reviewer import (
+            PRDetails,
+            ReviewDecision,
+            ReviewResult,
+        )
+
+        pr = PRDetails(
+            repo="owner/repo",
+            number=42,
+            title="Test PR",
+            body="",
+            author="testuser",
+            base_branch="main",
+            head_branch="feature",
+            created_at=datetime.now(),
+        )
+
+        result = ReviewResult(
+            decision=ReviewDecision.APPROVE,
+            summary="Looks good!",
+            confidence=0.9,
+            issues=["Minor issue"],
+            suggestions=["Add tests"],
+        )
+
+        summary = create_review_summary(pr, result)
+
+        assert "# AI Review" in summary
+        assert "owner/repo#42" in summary
+        assert "APPROVE" in summary
+        assert "90%" in summary  # confidence
+        assert "Minor issue" in summary
+        assert "Add tests" in summary
+
+
+class TestReviewWorkflow:
+    """Tests for review workflow orchestration."""
+
+    def test_review_config_defaults(self):
+        """Test ReviewConfig default values."""
+        from nebulus_swarm.reviewer.workflow import ReviewConfig
+
+        config = ReviewConfig(
+            github_token="test-token",
+            llm_base_url="http://localhost:5000/v1",
+            llm_model="test-model",
+        )
+        assert config.auto_merge_enabled is False
+        assert config.merge_method == "squash"
+        assert config.min_confidence_for_approve == 0.8
+
+    def test_workflow_result_summary(self):
+        """Test WorkflowResult summary generation."""
+        from nebulus_swarm.reviewer.pr_reviewer import (
+            PRDetails,
+            ReviewDecision,
+            ReviewResult,
+        )
+        from nebulus_swarm.reviewer.workflow import WorkflowResult
+
+        pr = PRDetails(
+            repo="owner/repo",
+            number=42,
+            title="Test",
+            body="",
+            author="user",
+            base_branch="main",
+            head_branch="feat",
+            created_at=datetime.now(),
+        )
+
+        llm_result = ReviewResult(
+            decision=ReviewDecision.APPROVE,
+            summary="LGTM",
+            confidence=0.9,
+        )
+
+        result = WorkflowResult(
+            pr_details=pr,
+            llm_result=llm_result,
+            review_posted=True,
+        )
+
+        summary = result.summary
+
+        assert "owner/repo#42" in summary
+        assert "APPROVE" in summary
+        assert "90%" in summary
+        assert "Review posted: Yes" in summary
+
+
+class TestReviewCommandParser:
+    """Tests for review command parsing."""
+
+    def test_parse_review_command(self):
+        """Test parsing review command."""
+        parser = CommandParser(default_repo="owner/repo")
+        cmd = parser.parse("review #42")
+        assert cmd.type == CommandType.REVIEW
+        assert cmd.pr_number == 42
+        assert cmd.repo == "owner/repo"
+
+    def test_parse_review_with_repo(self):
+        """Test parsing review command with repo."""
+        parser = CommandParser()
+        cmd = parser.parse("review myorg/myrepo#123")
+        assert cmd.type == CommandType.REVIEW
+        assert cmd.repo == "myorg/myrepo"
+        assert cmd.pr_number == 123
+
+    def test_parse_check_command(self):
+        """Test parsing check command as review alias."""
+        parser = CommandParser(default_repo="owner/repo")
+        cmd = parser.parse("check PR #42")
+        assert cmd.type == CommandType.REVIEW
+        assert cmd.pr_number == 42
+
+
+class TestReviewerConfig:
+    """Tests for reviewer configuration."""
+
+    def test_reviewer_config_defaults(self):
+        """Test ReviewerConfig default values."""
+        from nebulus_swarm.config import ReviewerConfig
+
+        with patch.dict(os.environ, {}, clear=True):
+            config = ReviewerConfig()
+            assert config.enabled is True
+            assert config.auto_review is True
+            assert config.auto_merge is False
+            assert config.merge_method == "squash"
+            assert config.min_confidence == 0.8
+
+    def test_reviewer_config_env_override(self):
+        """Test ReviewerConfig from environment."""
+        from nebulus_swarm.config import ReviewerConfig
+
+        with patch.dict(
+            os.environ,
+            {
+                "REVIEWER_ENABLED": "false",
+                "REVIEWER_AUTO_REVIEW": "false",
+                "REVIEWER_AUTO_MERGE": "true",
+                "REVIEWER_MERGE_METHOD": "rebase",
+                "REVIEWER_MIN_CONFIDENCE": "0.9",
+            },
+        ):
+            config = ReviewerConfig()
+            assert config.enabled is False
+            assert config.auto_review is False
+            assert config.auto_merge is True
+            assert config.merge_method == "rebase"
+            assert config.min_confidence == 0.9
+
+    def test_swarm_config_includes_reviewer(self):
+        """Test SwarmConfig includes reviewer config."""
+        with patch.dict(
+            os.environ,
+            {
+                "SLACK_BOT_TOKEN": "xoxb-test",
+                "SLACK_APP_TOKEN": "xapp-test",
+                "SLACK_CHANNEL_ID": "C12345",
+                "GITHUB_TOKEN": "ghp_test",
+                "GITHUB_WATCHED_REPOS": "owner/repo",
+            },
+        ):
+            config = SwarmConfig.from_env()
+            assert hasattr(config, "reviewer")
+            assert config.reviewer.enabled is True
