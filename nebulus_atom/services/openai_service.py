@@ -1,3 +1,4 @@
+import httpx
 from openai import AsyncOpenAI
 from nebulus_atom.config import Config
 from nebulus_atom.utils.logger import setup_logger
@@ -10,10 +11,19 @@ class OpenAIService:
         logger.info(
             f"Connecting to Nebulus at {Config.NEBULUS_BASE_URL} with model {Config.NEBULUS_MODEL}"
         )
+        logger.info(f"Request timeout: {Config.NEBULUS_TIMEOUT}s")
         try:
+            # Configure timeout for slow models (MLX, etc.)
+            timeout = httpx.Timeout(
+                connect=30.0,  # Connection timeout
+                read=Config.NEBULUS_TIMEOUT,  # Read timeout for streaming
+                write=30.0,  # Write timeout
+                pool=30.0,  # Pool timeout
+            )
             self.client = AsyncOpenAI(
                 base_url=Config.NEBULUS_BASE_URL,
                 api_key=Config.NEBULUS_API_KEY,
+                timeout=timeout,
             )
             self.model = Config.NEBULUS_MODEL
         except Exception as e:
@@ -24,47 +34,80 @@ class OpenAIService:
 
     async def create_chat_completion(self, messages, tools=None):
         import time
+        from types import SimpleNamespace
 
-        # logger.debug(
-        #     f"Creating chat completion with {len(messages)} messages and {len(tools) if tools else 0} tools"
-        # )
         start_time = time.time()
         self.last_telemetry = {
             "model": self.model,
             "ttft": None,
             "total_time": None,
             "usage": {
-                "prompt_tokens": "N/A",  # Stream doesn't always provide this
+                "prompt_tokens": "N/A",
                 "completion_tokens": 0,
                 "total_tokens": "N/A",
             },
         }
 
-        stream = await self.client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            stream=True,
-            # Force native tools off for Prompt-Based Tool Calling
-            tools=None,
-            tool_choice=None,
-            # stream_options={"include_usage": True},  # Request usage stats -- REMOVED for stability
-        )
+        if Config.NEBULUS_STREAMING:
+            # Streaming mode (default for servers that support SSE)
+            stream = await self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                stream=True,
+                tools=None,
+                tool_choice=None,
+            )
 
-        first_token = True
-        async for chunk in stream:
-            if first_token:
-                self.last_telemetry["ttft"] = time.time() - start_time
-                first_token = False
+            first_token = True
+            async for chunk in stream:
+                if first_token:
+                    self.last_telemetry["ttft"] = time.time() - start_time
+                    first_token = False
 
-            # OpenAI Streams provide usage in the last chunk
-            if hasattr(chunk, "usage") and chunk.usage:
+                if hasattr(chunk, "usage") and chunk.usage:
+                    self.last_telemetry["usage"] = {
+                        "prompt_tokens": chunk.usage.prompt_tokens,
+                        "completion_tokens": chunk.usage.completion_tokens,
+                        "total_tokens": chunk.usage.total_tokens,
+                    }
+
+                yield chunk
+        else:
+            # Non-streaming mode (for MLX and other servers without SSE support)
+            logger.info("Using non-streaming mode")
+            response = await self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                stream=False,
+                tools=None,
+                tool_choice=None,
+            )
+
+            self.last_telemetry["ttft"] = time.time() - start_time
+
+            # Convert response to streaming-like chunks for compatibility
+            content = response.choices[0].message.content or ""
+            # Yield single chunk with full content (simulates stream end)
+            fake_chunk = SimpleNamespace(
+                choices=[
+                    SimpleNamespace(
+                        delta=SimpleNamespace(
+                            content=content,
+                            tool_calls=None,
+                            role=None,
+                        ),
+                        finish_reason="stop",
+                    )
+                ]
+            )
+            yield fake_chunk
+
+            if response.usage:
                 self.last_telemetry["usage"] = {
-                    "prompt_tokens": chunk.usage.prompt_tokens,
-                    "completion_tokens": chunk.usage.completion_tokens,
-                    "total_tokens": chunk.usage.total_tokens,
+                    "prompt_tokens": response.usage.prompt_tokens,
+                    "completion_tokens": response.usage.completion_tokens,
+                    "total_tokens": response.usage.total_tokens,
                 }
-
-            yield chunk
 
         self.last_telemetry["total_time"] = time.time() - start_time
         logger.info(f"Completion finished. Stats: {self.last_telemetry}")

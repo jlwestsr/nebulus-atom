@@ -269,9 +269,11 @@ class TurnProcessor:
                     elif stream_started:
                         self._view.print_stream_chunk(content)
 
-                if delta.tool_calls:
+                # Handle tool_calls (use getattr for non-streaming compatibility)
+                delta_tool_calls = getattr(delta, "tool_calls", None)
+                if delta_tool_calls:
                     tool_calls_map = self._process_delta_tool_calls(
-                        delta.tool_calls, tool_calls_map
+                        delta_tool_calls, tool_calls_map
                     )
 
             if stream_started:
@@ -284,7 +286,11 @@ class TurnProcessor:
         tool_calls = list(tool_calls_map.values())
 
         if not tool_calls:
+            logger.debug(
+                f"Attempting to extract tool calls from: {full_response[:500]}..."
+            )
             extracted_list = self._parser.extract_tool_calls(full_response)
+            logger.debug(f"Extracted {len(extracted_list)} tool calls")
             if extracted_list:
                 tool_calls = self._normalize_extracted_calls(extracted_list, session_id)
                 full_response = ""

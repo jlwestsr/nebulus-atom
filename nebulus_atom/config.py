@@ -13,6 +13,10 @@ class Config:
     NEBULUS_BASE_URL = os.getenv("NEBULUS_BASE_URL")
     NEBULUS_API_KEY = os.getenv("NEBULUS_API_KEY")
     NEBULUS_MODEL = os.getenv("NEBULUS_MODEL", "qwen3:30b-a3b")
+    # Timeout in seconds for LLM requests (default 300s = 5 min for large models)
+    NEBULUS_TIMEOUT = float(os.getenv("NEBULUS_TIMEOUT", "300"))
+    # Enable/disable streaming (some MLX servers don't support SSE streaming)
+    NEBULUS_STREAMING = os.getenv("NEBULUS_STREAMING", "true").lower() == "true"
     EXIT_COMMANDS = ["exit", "quit", "/exit", "/quit"]
     SANDBOX_MODE = os.getenv("SANDBOX_MODE", "false").lower() == "true"
     GLOBAL_SKILLS_PATH = os.path.join(USER_CONFIG_DIR, "skills")
