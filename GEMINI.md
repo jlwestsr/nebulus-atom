@@ -5,7 +5,7 @@ This is a custom, lightweight CLI agent built to interact directly with a local 
 
 ## Technical Stack
 - **Language**: Python 3.12+
-- **Framework**: Typer (CLI)
+- **Framework**: Typer (CLI), Textual (TUI), Streamlit (Dashboard)
 - **UI**: Rich
 - **LLM Client**: OpenAI Python Library
 - **Architecture**: Strict MVC (Model-View-Controller) with OOP best practices.
@@ -13,11 +13,16 @@ This is a custom, lightweight CLI agent built to interact directly with a local 
 - **Model**: Meta-Llama-3.1-8B-Instruct-exl2-8_0
 
 ## Agent Instructions
-- Always work on the `develop` branch.
+- **Branching**: Follow the local feature branch workflow defined in `WORKFLOW.md`. Merge into `develop`.
 - Follow the directives in `AI_DIRECTIVES.md` (includes strict OOP/SOLID mandates).
-- Follow the workflow in `WORKFLOW.md`.
 - The main entry point is `nebulus_atom/main.py`.
 - Run via: `python3 -m nebulus_atom.main start`.
+
+## Key Features
+- **Context Manager**: Pin files to active context for awareness.
+- **Smart Undo**: Auto-checkpoints before risky operations.
+- **RAG**: Semantic code search using embeddings.
+- **Skill Library**: Persistent and shareable autonomous capabilities.
 
 ## Project Influences
 - **Gemini CLI**: https://github.com/google-gemini/gemini-cli
