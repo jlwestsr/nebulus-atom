@@ -498,6 +498,10 @@ class AgentController:
                 tool_calls = []
                 tool_calls_map = {}
 
+                # Buffer to detect JSON vs natural language
+                stream_buffer = ""
+                stream_decision_made = False
+
                 async for chunk in response_stream:
                     if not chunk.choices:
                         continue
@@ -507,18 +511,28 @@ class AgentController:
                         content = delta.content
                         full_response += content
 
-                        # On first content, exit spinner and start streaming
-                        if not stream_started:
-                            if spinner_active:
-                                spinner_ctx.__exit__(None, None, None)
-                                spinner_active = False
-                            # Only stream if it doesn't look like JSON (tool call)
-                            if not content.strip().startswith("{"):
-                                self.view.print_stream_start()
-                                stream_started = True
+                        # Exit spinner on first content
+                        if spinner_active:
+                            spinner_ctx.__exit__(None, None, None)
+                            spinner_active = False
 
-                        # Stream the content if we started streaming
-                        if stream_started:
+                        # Buffer content until we can decide if it's JSON or text
+                        if not stream_decision_made:
+                            stream_buffer += content
+                            # Once we have enough content, decide
+                            if len(stream_buffer) >= 20 or "{" in stream_buffer:
+                                stream_decision_made = True
+                                # If it looks like JSON, don't stream
+                                stripped = stream_buffer.strip()
+                                if stripped.startswith("{") or '{"' in stripped:
+                                    stream_started = False
+                                else:
+                                    # Natural text - start streaming with buffered content
+                                    self.view.print_stream_start()
+                                    self.view.print_stream_chunk(stream_buffer)
+                                    stream_started = True
+                        elif stream_started:
+                            # Continue streaming
                             self.view.print_stream_chunk(content)
 
                     if delta.tool_calls:
