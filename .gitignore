@@ -1,10 +1,11 @@
+# =============================================================================
 # Python
+# =============================================================================
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-env/
 build/
 develop-eggs/
 dist/
@@ -21,21 +22,65 @@ wheels/
 .installed.cfg
 *.egg
 
-# Virtual Environment
+# =============================================================================
+# Virtual Environments
+# =============================================================================
 venv/
 ENV/
+env/
+.venv/
 
-# IDEs
+# =============================================================================
+# IDEs and Editors
+# =============================================================================
 .vscode/
 .idea/
-.DS_Store
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
 
-# Environment / Secrets
+# =============================================================================
+# OS Generated
+# =============================================================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# =============================================================================
+# Environment / Secrets - CRITICAL FOR SECURITY
+# =============================================================================
 .env
 .env.local
 .env.*.local
+.env.production
+.env.staging
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+secrets/
+secrets.yaml
+secrets.yml
+secrets.json
+credentials.json
+service-account*.json
+*_credentials*
+*_secret*
+api_key*
+apikey*
+auth_token*
 
+# =============================================================================
 # Testing
+# =============================================================================
 .pytest_cache/
 .tox/
 .coverage
@@ -43,14 +88,60 @@ ENV/
 nosetests.xml
 coverage.xml
 *.cover
+htmlcov/
 .mypy_cache/
+.ruff_cache/
 
-# Project Specific
+# =============================================================================
+# Project Specific - Nebulus Atom
+# =============================================================================
+# Entire .nebulus_atom directory (user/session data)
+.nebulus_atom/
+
+# Legacy files (no longer used)
 .mini_nebulus/
-logs/
-tmp/
+.mini_nebulus_history
+.nebulus_atom_history
+
+# Other AI tool directories
 .gemini/
 .scratchpad/
-.mini_nebulus_history
+.aider/
+.claude/
+.serena/
+
+# Logs and temp files
+logs/
+*.log
+tmp/
+temp/
+
+# Database files
 **/*.sqlite3
-.nebulus_atom/db/
+**/*.db
+*.sqlite
+*.sqlite3
+
+# Backup and checkpoint files
+*.tar.gz
+*.bak
+*.backup
+
+# =============================================================================
+# Documentation Build
+# =============================================================================
+site/
+docs/_build/
+
+# =============================================================================
+# Jupyter Notebooks
+# =============================================================================
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# =============================================================================
+# Docker
+# =============================================================================
+# Don't ignore Dockerfiles, but ignore local overrides
+docker-compose.override.yml
+docker-compose.local.yml
