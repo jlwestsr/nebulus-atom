@@ -345,6 +345,47 @@ class CLIView(BaseView):
         """Print agent's reasoning/thought (very subtle)."""
         self.console.print(f"  [dim italic]💭 {thought}[/dim italic]")
 
+    async def print_cognition(self, result: Any):
+        """Print cognitive analysis for complex tasks."""
+        from nebulus_atom.models.cognition import TaskComplexity
+
+        # Emoji and color based on complexity
+        complexity_style = {
+            TaskComplexity.SIMPLE: ("🟢", "green"),
+            TaskComplexity.MODERATE: ("🟡", "yellow"),
+            TaskComplexity.COMPLEX: ("🔴", "red"),
+        }
+        emoji, color = complexity_style.get(result.task_complexity, ("⚪", "white"))
+
+        # Only show detailed analysis for non-simple tasks
+        if result.task_complexity == TaskComplexity.SIMPLE:
+            return
+
+        self.console.print()
+        self.console.print(
+            f"  [bold {color}]{emoji} Task Analysis:[/bold {color}] "
+            f"[{color}]{result.task_complexity.value}[/{color}] "
+            f"[dim](confidence: {result.confidence:.0%})[/dim]"
+        )
+
+        # Show reasoning chain for complex tasks
+        if result.task_complexity == TaskComplexity.COMPLEX and result.reasoning_chain:
+            for step in result.reasoning_chain[:3]:  # Show first 3 steps
+                self.console.print(f"    [dim]→ {step.conclusion}[/dim]")
+
+        # Show risks if any
+        if result.potential_risks:
+            for risk in result.potential_risks[:2]:
+                self.console.print(f"    [yellow]⚠ {risk}[/yellow]")
+
+        # Show recommended approach
+        if result.recommended_approach:
+            self.console.print(
+                f"  [dim italic]📋 {result.recommended_approach}[/dim italic]"
+            )
+
+        self.console.print()
+
     async def print_telemetry(self, metrics: Dict[str, Any]):
         """Print performance metrics (if any)."""
         if metrics:
