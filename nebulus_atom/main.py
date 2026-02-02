@@ -26,30 +26,21 @@ def start(
     prompt: Optional[List[str]] = typer.Argument(
         None, help="Initial prompt to execute immediately"
     ),
-    tui: bool = typer.Option(False, help="Enable Interactive Dashboard (Deprecated)"),
     session_id: str = typer.Option("default", help="Session ID for persistence"),
 ):
     """
     Start the Nebulus Atom AI Agent.
     """
-    _start_agent(prompt, tui, session_id)
+    _start_agent(prompt, session_id)
 
 
-def _start_agent(prompt: Optional[List[str]], tui: bool, session_id: str = "default"):
+def _start_agent(prompt: Optional[List[str]], session_id: str = "default"):
     initial_prompt = " ".join(prompt) if prompt else None
 
-    if tui:
-        from nebulus_atom.views.tui_view import TextualView
-
-        view = TextualView()
-    else:
-        from nebulus_atom.views.cli_view import CLIView
-
-        view = CLIView()
-
+    from nebulus_atom.views.cli_view import CLIView
     from nebulus_atom.controllers.agent_controller import AgentController
 
-    # Direct mode - bypass swarm routing for faster response
+    view = CLIView()
     controller = AgentController(view=view)
 
     try:
