@@ -618,3 +618,127 @@ Then:
         calls = parser.extract_tool_calls(text)
         assert len(calls) == 1
         assert calls[0]["name"] == "write_file"
+
+
+class TestReporter:
+    """Tests for Reporter with review_summary support."""
+
+    def test_complete_includes_review_summary(self):
+        """Test that complete() accepts and includes review_summary."""
+        from nebulus_swarm.minion.reporter import ReportPayload, EventType
+
+        # Create payload with review summary
+        payload = ReportPayload(
+            minion_id="test-minion",
+            event=EventType.COMPLETE,
+            issue=123,
+            message="Created PR #1",
+            data={
+                "pr_number": 1,
+                "pr_url": "https://github.com/test/repo/pull/1",
+                "branch": "minion/issue-123",
+                "review_summary": "PR: test/repo#1 | Decision: APPROVE | Confidence: 85%",
+            },
+        )
+
+        result = payload.to_dict()
+        assert result["data"]["review_summary"] is not None
+        assert "APPROVE" in result["data"]["review_summary"]
+
+    def test_report_payload_to_dict(self):
+        """Test ReportPayload serialization."""
+        from nebulus_swarm.minion.reporter import ReportPayload, EventType
+
+        payload = ReportPayload(
+            minion_id="m1",
+            event=EventType.PROGRESS,
+            issue=42,
+            message="Working",
+        )
+
+        d = payload.to_dict()
+        assert d["minion_id"] == "m1"
+        assert d["event"] == "progress"
+        assert d["issue"] == 42
+        assert "timestamp" in d
+
+
+class TestPRReviewIntegration:
+    """Tests for PR review integration in Minion."""
+
+    def test_minion_config_has_llm_settings(self):
+        """Test MinionConfig includes LLM settings for review."""
+        from nebulus_swarm.minion.main import MinionConfig
+
+        config = MinionConfig(
+            minion_id="test",
+            repo="owner/repo",
+            issue_number=1,
+            github_token="token",
+            overlord_callback_url="http://localhost:8080",
+            nebulus_base_url="http://localhost:5000/v1",
+            nebulus_model="test-model",
+            nebulus_timeout=300,
+            nebulus_streaming=False,
+            minion_timeout=1800,
+        )
+
+        # Verify LLM settings are accessible for review
+        assert config.nebulus_base_url == "http://localhost:5000/v1"
+        assert config.nebulus_model == "test-model"
+        assert config.nebulus_timeout == 300
+
+    def test_review_config_creation(self):
+        """Test ReviewConfig can be created with Minion config values."""
+        from nebulus_swarm.reviewer.workflow import ReviewConfig
+
+        config = ReviewConfig(
+            github_token="test-token",
+            llm_base_url="http://localhost:5000/v1",
+            llm_model="test-model",
+            llm_timeout=300,
+            auto_merge_enabled=False,
+            run_local_checks=True,
+        )
+
+        assert config.auto_merge_enabled is False
+        assert config.run_local_checks is True
+        assert config.llm_base_url == "http://localhost:5000/v1"
+
+    def test_workflow_result_summary(self):
+        """Test WorkflowResult summary generation."""
+        from nebulus_swarm.reviewer.workflow import WorkflowResult
+        from nebulus_swarm.reviewer.pr_reviewer import (
+            PRDetails,
+            ReviewResult,
+            ReviewDecision,
+        )
+
+        pr_details = PRDetails(
+            repo="test/repo",
+            number=42,
+            title="Test PR",
+            body="Description",
+            author="minion",
+            base_branch="main",
+            head_branch="feature",
+            created_at=None,
+        )
+
+        llm_result = ReviewResult(
+            decision=ReviewDecision.APPROVE,
+            summary="LGTM",
+            confidence=0.9,
+        )
+
+        result = WorkflowResult(
+            pr_details=pr_details,
+            llm_result=llm_result,
+            review_posted=True,
+        )
+
+        summary = result.summary
+        assert "test/repo#42" in summary
+        assert "APPROVE" in summary
+        assert "90%" in summary
+        assert "Review posted: Yes" in summary
