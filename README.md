@@ -1,47 +1,150 @@
-# Nebulus Atom (formerly Nebulus Atom)
+# Nebulus Atom
 
-> **The Fundamental Unit of Autonomy ⚛️**
+> A professional, autonomous AI engineer CLI powered by local LLMs.
 
-**Nebulus Atom** is a lightweight, containerized autonomous agent designed to be portably deployed into any environment. It serves as the "Autonomy" tier in the greater Nebulus ecosystem:
-*   **Nebulus Prime**: Heavy Compute / Training.
-*   **Nebulus Edge**: High-speed Inference.
-*   **Nebulus Atom**: Autonomous Execution & Utility.
+Nebulus Atom is a lightweight CLI agent that interacts with a local LLM server (Nebulus, Ollama, TabbyAPI, vLLM) to assist with software engineering tasks. It includes **Nebulus Swarm**, a multi-agent orchestration system that autonomously processes GitHub issues at scale.
+
+## Quick Start
+
+```bash
+# Clone and install
+git clone git@github.com:jlwestsr/nebulus-atom.git
+cd nebulus-atom
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+
+# Configure your LLM server
+cp .env.example .env
+# Edit .env with your server URL and model name
+
+# Run
+python3 -m nebulus_atom.main start
+```
+
+See the [Installation Guide](https://github.com/jlwestsr/nebulus-atom/wiki/Installation) for detailed setup instructions.
 
 ## Features
 
-## Context Manager Feature
-The Context Manager allows users to "pin" files to the agent s active context. This ensures the agent is always aware of the content of these files without needing to read them repeatedly.
+### Core Agent
 
-### Commands
-- `pin_file <path>`: Pin a file to the active context.
-- `unpin_file <path>`: Unpin a file.
-- `list_context`: List all currently pinned files.
+- **Context Manager** - Pin files to active context for persistent awareness
+- **Smart Undo** - Auto-checkpoints before risky operations with rollback
+- **Skill Library** - Persistent, reusable capabilities across sessions
+- **Semantic Code Search (RAG)** - ChromaDB-powered code search by meaning
+- **Autonomous Execution** - Multi-turn execution without confirmation prompts
+- **Agentic TDD** - Test-driven development cycle automation
+- **Advanced Cognition** - "System 2" deeper reasoning for complex tasks
+- **MCP Integration** - Model Context Protocol for external tool servers
+- **Interactive Clarification** - Asks questions when requirements are ambiguous
+- **Codebase Cartographer** - AST-based code structure analysis
+- **Sandbox Execution** - Safe command execution with restricted file access
+- **Flight Recorder Dashboard** - Streamlit telemetry dashboard
 
-### Token Limits
-The system automatically manages context size. If pinned files exceed the token limit (approx 32,000 characters), content will be truncated to ensure the agent functions correctly.
+### Nebulus Swarm
 
-## Interactive Clarification
-The agent can now pause execution to ask for user input using the `ask_user` tool. This enables a Human-in-the-Loop workflow where the agent can resolve ambiguities dynamically.
+- **Overlord** - Slack-driven control plane with natural language commands
+- **Minions** - Containerized agents that clone repos, work issues, and create PRs
+- **Model Router** - Routes simple tasks to 8B models, complex tasks to 30B
+- **Swarm Dashboard** - Streamlit monitoring with live status, history, queue, and metrics
+- **PR Reviewer** - Automated code review of minion-created pull requests
+- **Clarifying Questions** - Minions ask humans via Slack when requirements are unclear
+- **Cron Scheduling** - Automated queue sweeps on configurable schedules
 
-## Smart Undo
-The agent protects your files by automatically creating checkpoints before risky operations (like `write_file`).
-- **Auto-Checkpoint**: Triggered before file overwrites.
-- **Manual Tools**:
-    - \`create_checkpoint(label)\`: Snapshot the project.
-    - \`rollback_checkpoint(id)\`: Restore project to a previous state.
-    - \`list_checkpoints()\`: View available backups.
+## Architecture
 
-## Persistent Skill Library
-Skills created via `create_skill` can be shared across projects.
-- **Publishing**: Use \`publish_skill(name)\` to move a local skill to your global library (`~/.nebulus_atom/skills`).
-- **Global Skills**: Global skills are automatically loaded in every project and prefixed with `global.` (e.g., \`global.my_function\`).
+```
+nebulus-atom/
+├── nebulus_atom/           # Core CLI agent (MVC)
+│   ├── models/             # Data structures
+│   ├── views/              # UI (Rich TUI)
+│   ├── controllers/        # Orchestration
+│   ├── services/           # LLM, RAG, Skills, MCP
+│   └── main.py             # Entry point
+├── nebulus_swarm/           # Multi-agent swarm
+│   ├── overlord/            # Control plane
+│   ├── minion/              # Worker agents
+│   ├── dashboard/           # Streamlit monitoring
+│   └── reviewer/            # PR review
+└── tests/                   # 376 tests
+```
 
-## Visual Task Graph
-The agent now visualizes the plan execution flow as a dependency tree in the terminal.
-- **Dependencies**: Tasks can have dependencies (e.g., Task B depends on Task A).
-- **Visualization**: The plan is displayed as a hierarchical tree, showing which tasks are blocked by others.
+## Commands
 
-## Semantic Code Search (RAG)
-The agent can now semantically search the codebase using embeddings.
-- **Index**: Use `index_codebase` to scan and index all project files.
-- **Search**: Use `search_code(query="...")` to find relevant code snippets based on meaning.
+```bash
+# Start the agent
+python3 -m nebulus_atom.main start
+
+# Start with a prompt
+python3 -m nebulus_atom.main start "fix the login bug"
+
+# Launch the dashboard
+python3 -m nebulus_atom.main dashboard
+
+# View embedded docs
+python3 -m nebulus_atom.main docs list
+```
+
+## Swarm Usage
+
+```bash
+# Build and start the Overlord
+docker build -t nebulus-overlord:latest -f nebulus_swarm/overlord/Dockerfile .
+docker build -t nebulus-minion:latest -f nebulus_swarm/minion/Dockerfile .
+docker compose -f docker-compose.swarm.yml up -d overlord
+```
+
+Then in Slack:
+```
+work on owner/repo#42
+status
+queue
+```
+
+## Tech Stack
+
+| Component | Technology |
+|-----------|-----------|
+| Language | Python 3.12+ |
+| CLI | Typer |
+| UI | Rich |
+| LLM Client | OpenAI SDK |
+| Swarm | Docker, Slack Bolt, aiohttp |
+| Dashboard | Streamlit |
+| Database | SQLite, ChromaDB |
+| Testing | pytest (376 tests) |
+
+## Documentation
+
+Full documentation is available on the [GitHub Wiki](https://github.com/jlwestsr/nebulus-atom/wiki):
+
+- [Installation](https://github.com/jlwestsr/nebulus-atom/wiki/Installation)
+- [Quick Start](https://github.com/jlwestsr/nebulus-atom/wiki/Quick-Start)
+- [Architecture](https://github.com/jlwestsr/nebulus-atom/wiki/Architecture)
+- [CLI Reference](https://github.com/jlwestsr/nebulus-atom/wiki/CLI-Reference)
+- [Configuration](https://github.com/jlwestsr/nebulus-atom/wiki/Configuration)
+- [Nebulus Swarm](https://github.com/jlwestsr/nebulus-atom/wiki/Nebulus-Swarm)
+- [Deployment](https://github.com/jlwestsr/nebulus-atom/wiki/Deployment)
+- [Testing](https://github.com/jlwestsr/nebulus-atom/wiki/Testing)
+- [Contributing](https://github.com/jlwestsr/nebulus-atom/wiki/Contributing)
+
+## Development
+
+```bash
+# Install dev dependencies
+pip install -r requirements-dev.txt
+pre-commit install
+
+# Run tests
+python3 -m pytest tests/ -v
+
+# Git workflow (always use feature branches)
+git checkout -b feat/my-feature
+# ... make changes ...
+git checkout develop
+git merge feat/my-feature --no-ff
+git push nebulus-atom develop
+```
+
+## License
+
+See repository for license details.
