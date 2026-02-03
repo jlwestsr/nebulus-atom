@@ -58,9 +58,9 @@ def test_context_resilience(runner):
 
     print(f"[RESULT] Exit Code: {result.exit_code}")
     # We check for the specific crash signature from logs
-    assert (
-        "Chat completion aborted" not in result.stderr
-    ), "Agent crashed with Context Overflow"
+    assert "Chat completion aborted" not in result.stderr, (
+        "Agent crashed with Context Overflow"
+    )
     assert result.exit_code == 0
 
 
@@ -75,9 +75,9 @@ def test_json_stability(runner):
     result = runner.run_agent(prompt)
 
     assert result.exit_code == 0
-    assert (
-        "Error: No command provided" not in result.stdout
-    ), "Agent hit the Infinite Loop / JSON Hallucination bug"
+    assert "Error: No command provided" not in result.stdout, (
+        "Agent hit the Infinite Loop / JSON Hallucination bug"
+    )
     assert (
         "passed" in result.stdout
         or "total" in result.stdout

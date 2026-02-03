@@ -32,9 +32,9 @@ class TestCognitionService:
 
         for task in simple_tasks:
             result = service.analyze_task(task)
-            assert (
-                result.task_complexity == TaskComplexity.SIMPLE
-            ), f"'{task}' should be SIMPLE"
+            assert result.task_complexity == TaskComplexity.SIMPLE, (
+                f"'{task}' should be SIMPLE"
+            )
 
     def test_moderate_task_classification(self, service):
         """Moderate tasks should be classified as MODERATE."""
@@ -64,9 +64,9 @@ class TestCognitionService:
 
         for task in complex_tasks:
             result = service.analyze_task(task)
-            assert (
-                result.task_complexity == TaskComplexity.COMPLEX
-            ), f"'{task}' should be COMPLEX"
+            assert result.task_complexity == TaskComplexity.COMPLEX, (
+                f"'{task}' should be COMPLEX"
+            )
 
     # === Ambiguity Detection ===
 
