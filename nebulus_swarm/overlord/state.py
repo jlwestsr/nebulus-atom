@@ -243,33 +243,50 @@ class OverlordState:
             cursor.execute("DELETE FROM minions WHERE id = ?", (minion.id,))
 
     def get_work_history(
-        self, repo: Optional[str] = None, limit: int = 50
+        self,
+        repo: Optional[str] = None,
+        status: Optional[str] = None,
+        limit: int = 50,
     ) -> List[dict]:
-        """Get recent work history."""
+        """Get recent work history.
+
+        Args:
+            repo: Filter by repository name.
+            status: Filter by status (e.g., 'completed', 'failed', 'timeout').
+            limit: Maximum number of records to return.
+
+        Returns:
+            List of work history records as dicts.
+        """
         with self._get_connection() as conn:
             cursor = conn.cursor()
 
-            if repo:
-                cursor.execute(
-                    """
-                    SELECT * FROM work_history
-                    WHERE repo = ?
-                    ORDER BY completed_at DESC
-                    LIMIT ?
-                """,
-                    (repo, limit),
-                )
-            else:
-                cursor.execute(
-                    """
-                    SELECT * FROM work_history
-                    ORDER BY completed_at DESC
-                    LIMIT ?
-                """,
-                    (limit,),
-                )
+            query = "SELECT * FROM work_history WHERE 1=1"
+            params: list = []
 
+            if repo:
+                query += " AND repo = ?"
+                params.append(repo)
+            if status:
+                query += " AND status = ?"
+                params.append(status)
+
+            query += " ORDER BY completed_at DESC LIMIT ?"
+            params.append(limit)
+
+            cursor.execute(query, params)
             return [dict(row) for row in cursor.fetchall()]
+
+    def get_distinct_repos(self) -> List[str]:
+        """Get list of distinct repositories from work history.
+
+        Returns:
+            Sorted list of unique repo names.
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT DISTINCT repo FROM work_history ORDER BY repo")
+            return [row["repo"] for row in cursor.fetchall()]
 
     def _row_to_minion(self, row: sqlite3.Row) -> Minion:
         """Convert a database row to a Minion object."""
