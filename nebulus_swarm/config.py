@@ -1,8 +1,9 @@
 """Configuration for Nebulus Swarm."""
 
 import os
+import json
 from dataclasses import dataclass, field
-from typing import List
+from typing import Dict, List, Optional
 
 from dotenv import load_dotenv
 
@@ -126,6 +127,64 @@ class OverlordLLMConfig:
 
 
 @dataclass
+class ModelProfile:
+    """A model available for minion routing."""
+
+    name: str
+    tier: str  # "light" or "heavy"
+    base_url: str = ""
+    timeout: int = 600
+    streaming: bool = False
+
+    def to_llm_config(self) -> "LLMConfig":
+        """Convert to an LLMConfig for DockerManager."""
+        return LLMConfig(
+            base_url=self.base_url,
+            model=self.name,
+            timeout=self.timeout,
+            streaming=self.streaming,
+        )
+
+
+@dataclass
+class RoutingConfig:
+    """Multi-LLM routing configuration."""
+
+    enabled: bool = field(
+        default_factory=lambda: os.getenv("ROUTING_ENABLED", "false").lower() == "true"
+    )
+    complexity_threshold: int = field(
+        default_factory=lambda: int(os.getenv("ROUTING_COMPLEXITY_THRESHOLD", "5"))
+    )
+    default_tier: str = field(
+        default_factory=lambda: os.getenv("ROUTING_DEFAULT_TIER", "heavy")
+    )
+    models: Dict[str, ModelProfile] = field(default_factory=dict)
+
+    @classmethod
+    def from_env(cls) -> "RoutingConfig":
+        """Build routing config from environment variables.
+
+        Model profiles are defined via JSON env var:
+        ROUTING_MODELS='{"light": {"name": "llama-3.1-8b", ...}, "heavy": {...}}'
+        """
+        config = cls()
+        models_json = os.getenv("ROUTING_MODELS", "")
+        if models_json:
+            try:
+                raw = json.loads(models_json)
+                for tier, profile_data in raw.items():
+                    config.models[tier] = ModelProfile(tier=tier, **profile_data)
+            except (json.JSONDecodeError, TypeError):
+                pass
+        return config
+
+    def get_model(self, tier: str) -> Optional[ModelProfile]:
+        """Get the model profile for a tier."""
+        return self.models.get(tier)
+
+
+@dataclass
 class SwarmConfig:
     """Main configuration for Nebulus Swarm."""
 
@@ -136,6 +195,7 @@ class SwarmConfig:
     cron: CronConfig = field(default_factory=CronConfig)
     reviewer: ReviewerConfig = field(default_factory=ReviewerConfig)
     overlord_llm: OverlordLLMConfig = field(default_factory=OverlordLLMConfig)
+    routing: RoutingConfig = field(default_factory=RoutingConfig)
 
     # Overlord settings
     state_db_path: str = field(
