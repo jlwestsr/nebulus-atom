@@ -39,9 +39,12 @@ class TestContextService(unittest.TestCase):
         # Total overhead ~110-120 chars. Set limit to 200 to allow ~80 chars of content
         service.MAX_CONTEXT_CHARS = 200
 
-        with patch("os.path.exists", return_value=True), patch(
-            "nebulus_atom.services.file_service.FileService.read_file"
-        ) as mock_read:
+        with (
+            patch("os.path.exists", return_value=True),
+            patch(
+                "nebulus_atom.services.file_service.FileService.read_file"
+            ) as mock_read,
+        ):
             # File content is 300 chars, limit allows only ~80
             mock_read.return_value = "A" * 300
 

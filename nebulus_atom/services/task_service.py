@@ -112,7 +112,7 @@ class TaskService:
                 else ""
             )
             summary.append(
-                f"{i+1}. [{icon}] {task['description']} (ID: {task['id']}){deps}"
+                f"{i + 1}. [{icon}] {task['description']} (ID: {task['id']}){deps}"
             )
         return "\n".join(summary)
 

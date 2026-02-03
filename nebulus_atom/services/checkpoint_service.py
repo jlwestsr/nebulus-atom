@@ -123,7 +123,7 @@ class CheckpointService:
         try:
             with tarfile.open(backup["path"], "r:gz") as tar:
                 tar.extractall(path=".")  # Overwrite files in current dir
-            return f'Rollback successful: Restored {backup["filename"]}'
+            return f"Rollback successful: Restored {backup['filename']}"
         except Exception as e:
             return f"Error restoring checkpoint: {str(e)}"
 
@@ -133,7 +133,7 @@ class CheckpointService:
 
         lines = ["Available Checkpoints:"]
         for i, cp in enumerate(self.checkpoints):
-            lines.append(f'{i}. ID: {cp["id"]} | Label: {cp["label"]}')
+            lines.append(f"{i}. ID: {cp['id']} | Label: {cp['label']}")
         return "\n".join(lines)
 
 

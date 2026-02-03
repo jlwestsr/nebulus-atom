@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.10", "3.11"]
+        python-version: ["3.12"]
 
     steps:
     - uses: actions/checkout@v4
@@ -28,15 +28,17 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-        if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+        pip install -r requirements.txt
+        pip install -r requirements-dev.txt
 
-    - name: Lint with flake8
+    - name: Lint with ruff
       run: |
-        flake8 src tests --count --select=E9,F63,F7,F82 --show-source --statistics
-        flake8 src tests --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        ruff check nebulus_atom/ nebulus_swarm/ tests/
+
+    - name: Check formatting with ruff
+      run: |
+        ruff format --check nebulus_atom/ nebulus_swarm/ tests/
 
     - name: Test with pytest
       run: |
-        export PYTHONPATH=src
-        pytest tests/
+        pytest tests/ -v --tb=short --cov=nebulus_atom --cov=nebulus_swarm --cov-report=term-missing

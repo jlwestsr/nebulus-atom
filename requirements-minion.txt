@@ -7,13 +7,9 @@ openai>=1.0.0
 
 # HTTP client for Overlord communication
 aiohttp>=3.9.0
-httpx>=0.25.0
 
 # GitHub API
 PyGithub>=2.1.0
 
 # Rich for logging (optional, can remove for smaller image)
 rich>=13.0.0
-
-# Async utilities
-asyncio-throttle>=1.0.0
