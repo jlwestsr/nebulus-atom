@@ -96,6 +96,36 @@ class ReviewerConfig:
 
 
 @dataclass
+class OverlordLLMConfig:
+    """LLM configuration for Overlord command parsing."""
+
+    enabled: bool = field(
+        default_factory=lambda: os.getenv("OVERLORD_LLM_ENABLED", "true").lower()
+        == "true"
+    )
+    base_url: str = field(
+        default_factory=lambda: os.getenv(
+            "OVERLORD_LLM_BASE_URL", "http://localhost:5000/v1"
+        )
+    )
+    model: str = field(
+        default_factory=lambda: os.getenv("OVERLORD_LLM_MODEL", "llama-3.1-8b")
+    )
+    timeout: float = field(
+        default_factory=lambda: float(os.getenv("OVERLORD_LLM_TIMEOUT", "5.0"))
+    )
+    confidence_threshold: float = field(
+        default_factory=lambda: float(os.getenv("OVERLORD_LLM_CONFIDENCE", "0.7"))
+    )
+    context_max_entries: int = field(
+        default_factory=lambda: int(os.getenv("OVERLORD_LLM_CONTEXT_MAX", "10"))
+    )
+    context_ttl_minutes: int = field(
+        default_factory=lambda: int(os.getenv("OVERLORD_LLM_CONTEXT_TTL", "30"))
+    )
+
+
+@dataclass
 class SwarmConfig:
     """Main configuration for Nebulus Swarm."""
 
@@ -105,6 +135,7 @@ class SwarmConfig:
     llm: LLMConfig = field(default_factory=LLMConfig)
     cron: CronConfig = field(default_factory=CronConfig)
     reviewer: ReviewerConfig = field(default_factory=ReviewerConfig)
+    overlord_llm: OverlordLLMConfig = field(default_factory=OverlordLLMConfig)
 
     # Overlord settings
     state_db_path: str = field(

@@ -1,12 +1,16 @@
 """Slack Bot integration for Overlord using Slack Bolt."""
 
+import asyncio
 import logging
-from typing import Callable, Optional
+from typing import Awaitable, Callable, Optional, Union
 
 from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
 from slack_bolt.async_app import AsyncApp
 
 logger = logging.getLogger(__name__)
+
+# Type alias for message handlers (sync or async)
+MessageHandler = Callable[[str, str, str], Union[str, Awaitable[str]]]
 
 
 class SlackBot:
@@ -17,7 +21,7 @@ class SlackBot:
         bot_token: str,
         app_token: str,
         channel_id: str,
-        message_handler: Optional[Callable[[str, str], str]] = None,
+        message_handler: Optional[MessageHandler] = None,
     ):
         """Initialize Slack bot.
 
@@ -25,8 +29,8 @@ class SlackBot:
             bot_token: Slack bot OAuth token (xoxb-...).
             app_token: Slack app-level token for Socket Mode (xapp-...).
             channel_id: Channel ID to monitor and post to.
-            message_handler: Callback for processing messages.
-                            Takes (user_id, message_text) and returns response.
+            message_handler: Callback for processing messages (sync or async).
+                            Takes (user_id, message_text, channel_id) and returns response.
         """
         self.bot_token = bot_token
         self.app_token = app_token
@@ -69,7 +73,12 @@ class SlackBot:
             # Forward to message handler if configured
             if self.message_handler:
                 try:
-                    response = self.message_handler(user, text)
+                    channel = event.get("channel", "")
+                    # Support both sync and async handlers
+                    if asyncio.iscoroutinefunction(self.message_handler):
+                        response = await self.message_handler(user, text, channel)
+                    else:
+                        response = self.message_handler(user, text, channel)
                     if response:
                         await say(response)
                 except Exception as e:
@@ -95,7 +104,12 @@ class SlackBot:
 
             if self.message_handler:
                 try:
-                    response = self.message_handler(user, text)
+                    channel = event.get("channel", "")
+                    # Support both sync and async handlers
+                    if asyncio.iscoroutinefunction(self.message_handler):
+                        response = await self.message_handler(user, text, channel)
+                    else:
+                        response = self.message_handler(user, text, channel)
                     if response:
                         await say(response)
                 except Exception as e:
