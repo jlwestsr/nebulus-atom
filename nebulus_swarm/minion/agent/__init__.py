@@ -12,6 +12,7 @@ from nebulus_swarm.minion.agent.prompt_builder import (
     build_initial_message,
     build_system_prompt,
 )
+from nebulus_swarm.minion.agent.response_parser import ResponseParser
 from nebulus_swarm.minion.agent.tool_executor import ToolExecutor
 from nebulus_swarm.minion.agent.tools import (
     MINION_TOOLS,
@@ -28,6 +29,7 @@ __all__ = [
     "AgentResult",
     "ToolResult",
     "ToolExecutor",
+    "ResponseParser",
     "MINION_TOOLS",
     "get_tool_names",
     "get_tool_by_name",

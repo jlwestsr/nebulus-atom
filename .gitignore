@@ -145,3 +145,4 @@ docs/_build/
 # Don't ignore Dockerfiles, but ignore local overrides
 docker-compose.override.yml
 docker-compose.local.yml
+.env.minion-test
