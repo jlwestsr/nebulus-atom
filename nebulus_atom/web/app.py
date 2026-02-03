@@ -187,7 +187,7 @@ st.header("Agent Chat")
 for msg in st.session_state.messages:
     if msg["role"] == "user":
         st.markdown(
-            f"""<div class="chat-message user-msg"><b>User:</b> {msg['content']}</div>""",
+            f"""<div class="chat-message user-msg"><b>User:</b> {msg["content"]}</div>""",
             unsafe_allow_html=True,
         )
     else:
@@ -195,12 +195,12 @@ for msg in st.session_state.messages:
         tools = msg.get("tools", [])
         tool_html = ""
         for tool in tools:
-            tool_html += f"""<div class="tool-output">🔧 {tool['name']}: {tool['output'][:200]}...</div>"""
+            tool_html += f"""<div class="tool-output">🔧 {tool["name"]}: {tool["output"][:200]}...</div>"""
 
         st.markdown(
             f"""
         <div class="chat-message agent-msg">
-            <b>Agent:</b> {msg['content']}
+            <b>Agent:</b> {msg["content"]}
             {tool_html}
         </div>
         """,

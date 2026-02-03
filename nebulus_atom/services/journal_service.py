@@ -30,7 +30,7 @@ class JournalService:
             f"**Session ID**: {session_id}",
             "",
             "## 🎯 Goal",
-            f"{plan_data.get("goal", "No explicit goal set.") if plan_data else "No active plan."}",
+            f"{plan_data.get('goal', 'No explicit goal set.') if plan_data else 'No active plan.'}",
             "",
             "## ✅ Completed Tasks",
         ]
@@ -41,7 +41,7 @@ class JournalService:
             ]
             if completed_tasks:
                 for t in completed_tasks:
-                    journal_content.append(f"- [x] {t["description"]}")
+                    journal_content.append(f"- [x] {t['description']}")
             else:
                 journal_content.append("_No tasks completed yet._")
         else:

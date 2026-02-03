@@ -20,11 +20,10 @@ async def test_tool_executor_scan_image():
     mock_telemetry = MagicMock()
     mock_telemetry.log_tool_call = MagicMock()
 
-    with patch.object(
-        ToolExecutor, "image_manager"
-    ) as mock_image_manager, patch.object(
-        ToolExecutor, "telemetry_manager"
-    ) as mock_telemetry_manager:
+    with (
+        patch.object(ToolExecutor, "image_manager") as mock_image_manager,
+        patch.object(ToolExecutor, "telemetry_manager") as mock_telemetry_manager,
+    ):
         mock_image_manager.get_service.return_value = mock_service
         mock_telemetry_manager.get_service.return_value = mock_telemetry
 

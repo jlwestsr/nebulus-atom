@@ -273,8 +273,9 @@ class TestMinionQuestionLoop:
         """_do_work returns True when agent completes successfully."""
         minion = self._make_minion()
 
-        with patch("nebulus_swarm.minion.main.MinionAgent") as MockAgent, patch(
-            "nebulus_swarm.minion.main.ToolExecutor"
+        with (
+            patch("nebulus_swarm.minion.main.MinionAgent") as MockAgent,
+            patch("nebulus_swarm.minion.main.ToolExecutor"),
         ):
             mock_agent = MockAgent.return_value
             mock_agent.run.return_value = AgentResult(
@@ -312,8 +313,9 @@ class TestMinionQuestionLoop:
                 turns_used=5,
             )
 
-        with patch("nebulus_swarm.minion.main.MinionAgent") as MockAgent, patch(
-            "nebulus_swarm.minion.main.ToolExecutor"
+        with (
+            patch("nebulus_swarm.minion.main.MinionAgent") as MockAgent,
+            patch("nebulus_swarm.minion.main.ToolExecutor"),
         ):
             mock_agent = MockAgent.return_value
             mock_agent.run.side_effect = mock_run
@@ -354,8 +356,9 @@ class TestMinionQuestionLoop:
                 turns_used=5,
             )
 
-        with patch("nebulus_swarm.minion.main.MinionAgent") as MockAgent, patch(
-            "nebulus_swarm.minion.main.ToolExecutor"
+        with (
+            patch("nebulus_swarm.minion.main.MinionAgent") as MockAgent,
+            patch("nebulus_swarm.minion.main.ToolExecutor"),
         ):
             mock_agent = MockAgent.return_value
             mock_agent.run.side_effect = mock_run
@@ -394,8 +397,9 @@ class TestMinionQuestionLoop:
                 turns_used=5,
             )
 
-        with patch("nebulus_swarm.minion.main.MinionAgent") as MockAgent, patch(
-            "nebulus_swarm.minion.main.ToolExecutor"
+        with (
+            patch("nebulus_swarm.minion.main.MinionAgent") as MockAgent,
+            patch("nebulus_swarm.minion.main.ToolExecutor"),
         ):
             mock_agent = MockAgent.return_value
             mock_agent.run.side_effect = mock_run
@@ -417,8 +421,9 @@ class TestMinionQuestionLoop:
         """_do_work returns False when agent is blocked without a question."""
         minion = self._make_minion()
 
-        with patch("nebulus_swarm.minion.main.MinionAgent") as MockAgent, patch(
-            "nebulus_swarm.minion.main.ToolExecutor"
+        with (
+            patch("nebulus_swarm.minion.main.MinionAgent") as MockAgent,
+            patch("nebulus_swarm.minion.main.ToolExecutor"),
         ):
             mock_agent = MockAgent.return_value
             mock_agent.run.return_value = AgentResult(
@@ -438,8 +443,9 @@ class TestMinionQuestionLoop:
         """_do_work returns False on ERROR status."""
         minion = self._make_minion()
 
-        with patch("nebulus_swarm.minion.main.MinionAgent") as MockAgent, patch(
-            "nebulus_swarm.minion.main.ToolExecutor"
+        with (
+            patch("nebulus_swarm.minion.main.MinionAgent") as MockAgent,
+            patch("nebulus_swarm.minion.main.ToolExecutor"),
         ):
             mock_agent = MockAgent.return_value
             mock_agent.run.return_value = AgentResult(
@@ -477,8 +483,9 @@ class TestMinionQuestionLoop:
                 turns_used=5,
             )
 
-        with patch("nebulus_swarm.minion.main.MinionAgent") as MockAgent, patch(
-            "nebulus_swarm.minion.main.ToolExecutor"
+        with (
+            patch("nebulus_swarm.minion.main.MinionAgent") as MockAgent,
+            patch("nebulus_swarm.minion.main.ToolExecutor"),
         ):
             mock_agent = MockAgent.return_value
             mock_agent.run.side_effect = mock_run

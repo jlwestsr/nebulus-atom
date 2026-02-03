@@ -130,7 +130,7 @@ class ASTService:
                         matches.append(
                             {
                                 "type": "method",
-                                "name": f"{cls["name"]}.{method}",
+                                "name": f"{cls['name']}.{method}",
                                 "file": path,
                                 "line": cls["lineno"],
                             }

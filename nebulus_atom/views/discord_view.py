@@ -49,7 +49,7 @@ class DiscordView(BaseView):
     async def print_plan(self, plan_data: Dict[str, Any]):
         # 1. Send detailed list as Embed
         embed = discord.Embed(
-            title=f"Plan: {plan_data.get("goal", "Unknown")}",
+            title=f"Plan: {plan_data.get('goal', 'Unknown')}",
             color=discord.Color.blue(),
         )
         description = ""
@@ -63,7 +63,7 @@ class DiscordView(BaseView):
                 icon = "▶️"
             elif status == "failed":
                 icon = "❌"
-            description += f"{icon} **{status.upper()}**: {task.get("description")}\n"
+            description += f"{icon} **{status.upper()}**: {task.get('description')}\n"
         embed.description = description
         await self.channel.send(embed=embed)
 
