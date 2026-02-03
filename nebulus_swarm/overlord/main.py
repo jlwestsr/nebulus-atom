@@ -134,6 +134,9 @@ class Overlord:
         # Pending questions from Minions
         self._pending_questions: Dict[str, PendingQuestion] = {}
 
+        # Cached queue scan results (for dashboard)
+        self._last_queue_scan: list[dict] = []
+
         # Queue processing state
         self._paused = False
 
@@ -459,6 +462,18 @@ class Overlord:
             }
         )
 
+    async def _queue_handler(self, request: web.Request) -> web.Response:
+        """Handle queue status requests for the dashboard.
+
+        GET /queue - Returns cached queue scan results.
+        """
+        return web.json_response(
+            {
+                "issues": self._last_queue_scan,
+                "paused": self._paused,
+            }
+        )
+
     async def _setup_health_server(self) -> None:
         """Set up health check HTTP server."""
         self._health_app = web.Application()
@@ -468,6 +483,7 @@ class Overlord:
         self._health_app.router.add_get(
             "/minion/answer/{minion_id}", self._answer_handler
         )
+        self._health_app.router.add_get("/queue", self._queue_handler)
 
         self._health_runner = web.AppRunner(self._health_app)
         await self._health_runner.setup()
@@ -504,6 +520,17 @@ class Overlord:
                     "max_concurrent": self.config.minions.max_concurrent,
                     "timeout_minutes": self.config.minions.timeout_minutes,
                 },
+                "pending_questions": [
+                    {
+                        "minion_id": pq.minion_id,
+                        "question_id": pq.question_id,
+                        "issue_number": pq.issue_number,
+                        "question_text": pq.question_text,
+                        "asked_at": pq.asked_at.isoformat(),
+                        "answered": pq.answered,
+                    }
+                    for pq in self._pending_questions.values()
+                ],
             }
         )
 
@@ -847,6 +874,17 @@ class Overlord:
 
         try:
             issues = self.github_queue.scan_queue()
+
+            # Cache scan results for dashboard
+            self._last_queue_scan = [
+                {
+                    "repo": issue.repo,
+                    "number": issue.number,
+                    "title": issue.title,
+                    "priority": issue.priority,
+                }
+                for issue in issues
+            ]
 
             if not issues:
                 logger.info("Queue sweep complete - no pending issues")
