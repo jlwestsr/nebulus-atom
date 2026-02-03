@@ -95,16 +95,34 @@ class MinionAgent:
         self._completed = False
         self._result: Optional[AgentResult] = None
 
+    def inject_message(self, text: str) -> None:
+        """Inject a user message into conversation history for resuming.
+
+        Use this to provide answers to questions when resuming after a
+        BLOCKED state. Resets the completed flag so run() can continue.
+
+        Args:
+            text: Message text to inject.
+        """
+        self._messages.append({"role": "user", "content": text})
+        self._completed = False
+        self._result = None
+        logger.info(f"Injected message into agent history: {text[:100]}...")
+
     def run(self) -> AgentResult:
         """Run the agent loop until completion or limit.
+
+        Can be called multiple times to resume after inject_message().
 
         Returns:
             AgentResult with status and details.
         """
-        logger.info("Starting agent loop")
-
-        # Initialize with system prompt
-        self._messages = [{"role": "system", "content": self.system_prompt}]
+        # Initialize with system prompt only on first run
+        if not self._messages:
+            logger.info("Starting agent loop")
+            self._messages = [{"role": "system", "content": self.system_prompt}]
+        else:
+            logger.info("Resuming agent loop")
 
         while not self._completed and self._turn_count < self.turn_limit:
             self._turn_count += 1

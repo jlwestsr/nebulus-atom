@@ -43,7 +43,8 @@ You are working on issue #{issue_number} in repository {repo}.
 - Make minimal, focused changes
 - Prefer editing existing files over creating new ones
 - Run tests to verify your changes work
-- If you cannot complete the task, call `task_blocked` with a clear explanation
+- If requirements are unclear or you face a decision with multiple valid approaches, call `task_blocked` with a question in the `question` field. You may receive a human response and continue working. Limit questions to what is truly necessary.
+- If you cannot complete the task at all, call `task_blocked` with a clear explanation
 
 ## Available Tools
 
