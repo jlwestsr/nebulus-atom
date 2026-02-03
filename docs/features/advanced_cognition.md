@@ -32,9 +32,9 @@ Implements deeper reasoning capabilities inspired by Daniel Kahneman's "System 2
 - [x] **Confidence Scoring**: Track certainty levels (0-100%)
 
 ### Phase 3: Adaptive Behavior
-- [ ] **Complexity-Based Routing**: Simple tasks → fast path, Complex → deep reasoning
-- [ ] **Clarification Triggers**: Auto-detect ambiguous requests
-- [ ] **Learning from Mistakes**: Track failure patterns
+- [x] **Complexity-Based Routing**: Simple tasks → fast path, Complex → deep reasoning
+- [x] **Clarification Triggers**: Auto-detect ambiguous requests
+- [ ] **Learning from Mistakes**: Track failure patterns (future)
 
 ## 4. Technical Implementation
 
@@ -75,7 +75,7 @@ class CognitionResult:
 ## 5. Verification Plan
 
 ### Automated Tests
-- [ ] `tests/test_cognition_service.py`:
+- [x] `tests/test_cognition_service.py`:
   - Test complexity classification accuracy
   - Test reasoning chain generation
   - Test confidence scoring
@@ -114,4 +114,4 @@ Confidence: 45% (needs clarification before proceeding)
 - [x] **Phase 2**: Implement self-critique
 - [x] **Phase 3**: Integrate with turn processor
 - [x] **Test**: All tests pass (`pytest`) - 124 tests passing
-- [ ] **Doc**: Update README and AI_INSIGHTS
+- [x] **Doc**: Update README and wiki

@@ -333,9 +333,9 @@ class TurnProcessor:
             if tc.function.name:
                 tool_calls_map[tc.index]["function"]["name"] += tc.function.name
             if tc.function.arguments:
-                tool_calls_map[tc.index]["function"][
-                    "arguments"
-                ] += tc.function.arguments
+                tool_calls_map[tc.index]["function"]["arguments"] += (
+                    tc.function.arguments
+                )
         return tool_calls_map
 
     def _normalize_extracted_calls(
