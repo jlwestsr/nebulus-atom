@@ -7,7 +7,10 @@ import shutil
 import sys
 from typing import List, Dict, Callable, Any
 from nebulus_atom.config import Config
+from nebulus_atom.utils.logger import setup_logger
 from nebulus_atom.utils.sandbox import sandbox
+
+logger = setup_logger(__name__)
 
 
 class SkillService:
@@ -70,9 +73,11 @@ class SkillService:
                                 )
                                 self._register_skill(reg_name, attr_value)
                 except Exception as e:
-                    print(f"Failed to load skill module {name} from {path}: {e}")
+                    logger.error(
+                        "Failed to load skill module %s from %s: %s", name, path, e
+                    )
         except Exception as e:
-            print(f"Error scanning path {path}: {e}")
+            logger.error("Error scanning path %s: %s", path, e)
 
     def publish_skill(self, name: str) -> str:
         """Moves a local skill to the global library."""
