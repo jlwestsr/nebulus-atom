@@ -18,7 +18,8 @@ from nebulus_swarm.logging import (
     set_correlation_id,
 )
 from nebulus_swarm.models.minion import Minion, MinionStatus
-from nebulus_swarm.overlord.command_parser import CommandParser, CommandType
+from nebulus_swarm.overlord.command_parser import CommandType
+from nebulus_swarm.overlord.llm_parser import LLMCommandParser
 from nebulus_swarm.overlord.docker_manager import DockerManager
 from nebulus_swarm.overlord.github_queue import GitHubQueue
 from nebulus_swarm.overlord.slack_bot import SlackBot
@@ -65,7 +66,10 @@ class Overlord:
             stub_mode=stub_mode,
         )
 
-        self.parser = CommandParser(default_repo=config.github.default_repo)
+        self.parser = LLMCommandParser(
+            config=config.overlord_llm,
+            default_repo=config.github.default_repo,
+        )
 
         self.slack = SlackBot(
             bot_token=config.slack.bot_token,
@@ -113,17 +117,26 @@ class Overlord:
         # Queue processing state
         self._paused = False
 
-    def _handle_message(self, user_id: str, text: str) -> str:
+    async def _handle_message(self, user_id: str, text: str, channel_id: str) -> str:
         """Handle incoming Slack message.
 
         Args:
             user_id: Slack user ID.
             text: Message text.
+            channel_id: Slack channel ID for context.
 
         Returns:
             Response message to send back.
         """
-        command = self.parser.parse(text)
+        # Parse with LLM (async)
+        result = await self.parser.parse(text, channel_id, user_id)
+
+        # Handle clarification requests
+        if result.needs_clarification:
+            logger.info(f"Requesting clarification from {user_id}")
+            return f"🤔 {result.clarification_message}"
+
+        command = result.command
         logger.info(f"Parsed command from {user_id}: {command.type.value}")
 
         handlers = {
@@ -880,6 +893,12 @@ class Overlord:
                 self._reviewer.close()
             except Exception as e:
                 logger.warning(f"Error closing reviewer: {e}")
+
+        # Close LLM parser
+        try:
+            await self.parser.close()
+        except Exception as e:
+            logger.warning(f"Error closing LLM parser: {e}")
 
         # Final Slack notification
         try:
