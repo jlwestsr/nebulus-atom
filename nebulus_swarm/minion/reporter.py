@@ -194,6 +194,7 @@ class Reporter:
         pr_number: Optional[int] = None,
         pr_url: Optional[str] = None,
         branch: Optional[str] = None,
+        review_summary: Optional[str] = None,
     ) -> bool:
         """Report successful completion.
 
@@ -202,6 +203,7 @@ class Reporter:
             pr_number: Created PR number.
             pr_url: Created PR URL.
             branch: Branch name.
+            review_summary: Summary of automated PR review.
 
         Returns:
             True if sent successfully.
@@ -213,6 +215,8 @@ class Reporter:
             data["pr_url"] = pr_url
         if branch:
             data["branch"] = branch
+        if review_summary:
+            data["review_summary"] = review_summary
 
         payload = ReportPayload(
             minion_id=self.minion_id,

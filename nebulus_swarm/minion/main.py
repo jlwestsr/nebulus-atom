@@ -22,6 +22,7 @@ from nebulus_swarm.minion.agent.prompt_builder import IssueContext, build_system
 from nebulus_swarm.minion.github_client import GitHubClient, IssueDetails
 from nebulus_swarm.minion.git_ops import GitOps
 from nebulus_swarm.minion.reporter import Reporter
+from nebulus_swarm.reviewer.workflow import ReviewConfig, ReviewWorkflow, WorkflowResult
 
 logger = logging.getLogger(__name__)
 
@@ -254,12 +255,31 @@ class Minion:
                 # Error already reported
                 return 1
 
-            # Step 8: Report completion
+            if self._shutdown_requested:
+                return 130
+
+            # Step 8: Review pull request
+            await self.reporter.progress("Running automated review")
+            review_result = await self._review_pr(pr.number)
+
+            # Build completion message with review summary if available
+            completion_message = f"Created PR #{pr.number}"
+            review_summary = None
+            if review_result and not review_result.error:
+                review_summary = review_result.summary
+                completion_message = (
+                    f"Created PR #{pr.number} | Review: "
+                    f"{review_result.llm_result.decision.value} "
+                    f"({review_result.llm_result.confidence:.0%} confidence)"
+                )
+
+            # Step 9: Report completion
             await self.reporter.complete(
-                message=f"Created PR #{pr.number}",
+                message=completion_message,
                 pr_number=pr.number,
                 pr_url=pr.html_url,
                 branch=branch_name,
+                review_summary=review_summary,
             )
 
             logger.info(f"Minion completed successfully: {pr.html_url}")
@@ -449,6 +469,58 @@ Closes #{self.config.issue_number}
                 error_type="github_error",
                 details=str(e),
             )
+            return None
+
+    async def _review_pr(self, pr_number: int) -> Optional[WorkflowResult]:
+        """Run PR review after creation.
+
+        Reviews the PR using the automated review workflow and posts
+        results as a comment. Review failures do not block PR creation.
+
+        Args:
+            pr_number: The PR number to review.
+
+        Returns:
+            WorkflowResult if review succeeded, None on failure.
+        """
+        logger.info(f"Running automated review for PR #{pr_number}")
+
+        try:
+            config = ReviewConfig(
+                github_token=self.config.github_token,
+                llm_base_url=self.config.nebulus_base_url,
+                llm_model=self.config.nebulus_model,
+                llm_timeout=self.config.nebulus_timeout,
+                auto_merge_enabled=False,  # Never auto-merge
+                run_local_checks=True,
+            )
+
+            workflow = ReviewWorkflow(config)
+
+            # Run review (synchronous method, run in thread to not block)
+            repo_path = str(self.git.repo_path) if self.git else None
+            result = await asyncio.to_thread(
+                workflow.review_pr,
+                self.config.repo,
+                pr_number,
+                post_review=True,
+                auto_merge=False,
+                repo_path=repo_path,
+            )
+
+            if result.error:
+                logger.warning(f"PR review completed with error: {result.error}")
+            else:
+                logger.info(f"PR review complete: {result.summary}")
+
+            # Clean up
+            workflow.close()
+
+            return result
+
+        except Exception as e:
+            # Review failures should not block PR creation
+            logger.warning(f"PR review failed (non-blocking): {e}")
             return None
 
     def _get_changes_summary(self) -> str:
