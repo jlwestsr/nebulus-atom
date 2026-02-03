@@ -47,18 +47,45 @@ You are working on issue #{issue_number} in repository {repo}.
 
 ## Available Tools
 
-You have access to these tools:
-- `read_file` - Read file contents
-- `write_file` - Create or overwrite files
-- `edit_file` - Make targeted edits to files
-- `list_directory` - List files and folders
-- `search_files` - Search for patterns in code
-- `glob_files` - Find files by pattern
-- `run_command` - Execute shell commands (tests, builds, etc.)
-- `list_skills` - See available skills
-- `use_skill` - Load skill instructions
-- `task_complete` - Signal successful completion
-- `task_blocked` - Signal you cannot proceed
+You have access to these tools. To call a tool, output a JSON object with "name" and "arguments" fields:
+
+{{"name": "tool_name", "arguments": {{"param1": "value1"}}}}
+
+### Tools:
+
+1. `read_file` - Read file contents
+   - Arguments: `path` (string) - relative path to file
+   - Example: {{"name": "read_file", "arguments": {{"path": "src/main.py"}}}}
+
+2. `write_file` - Create or overwrite files
+   - Arguments: `path` (string), `content` (string)
+   - Example: {{"name": "write_file", "arguments": {{"path": "README.md", "content": "# Hello"}}}}
+
+3. `edit_file` - Make targeted edits to files
+   - Arguments: `path` (string), `old_text` (string), `new_text` (string)
+   - Example: {{"name": "edit_file", "arguments": {{"path": "src/main.py", "old_text": "foo", "new_text": "bar"}}}}
+
+4. `list_directory` - List files and folders
+   - Arguments: `path` (string, default ".")
+   - Example: {{"name": "list_directory", "arguments": {{"path": "."}}}}
+
+5. `glob_files` - Find files by pattern
+   - Arguments: `pattern` (string)
+   - Example: {{"name": "glob_files", "arguments": {{"pattern": "**/*.py"}}}}
+
+6. `run_command` - Execute shell commands (tests, builds, etc.)
+   - Arguments: `command` (string)
+   - Example: {{"name": "run_command", "arguments": {{"command": "python -m pytest"}}}}
+
+7. `task_complete` - Signal successful completion (REQUIRED when done)
+   - Arguments: `summary` (string), `files_changed` (array of strings, optional)
+   - Example: {{"name": "task_complete", "arguments": {{"summary": "Added CONTRIBUTORS.md file", "files_changed": ["CONTRIBUTORS.md"]}}}}
+
+8. `task_blocked` - Signal you cannot proceed
+   - Arguments: `reason` (string), `blocker_type` (string), `question` (string, optional)
+   - Example: {{"name": "task_blocked", "arguments": {{"reason": "Missing info", "blocker_type": "missing_info"}}}}
+
+**IMPORTANT:** Output exactly one JSON tool call per message. Do not wrap the JSON in markdown code blocks.
 
 ## Workspace
 

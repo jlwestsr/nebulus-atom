@@ -7,6 +7,7 @@ from enum import Enum
 from typing import Any, Callable, Dict, List, Optional
 
 from nebulus_swarm.minion.agent.llm_client import LLMClient, LLMConfig, LLMResponse
+from nebulus_swarm.minion.agent.response_parser import ResponseParser
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +83,9 @@ class MinionAgent:
         self.turn_limit = turn_limit
         self.error_threshold = error_threshold
 
+        # Response parser for JSON fallback (when LLM doesn't support tool calling)
+        self._parser = ResponseParser()
+
         # Conversation history
         self._messages: List[Dict[str, Any]] = []
         self._turn_count = 0
@@ -151,14 +155,28 @@ class MinionAgent:
         Returns:
             AgentResult if agent is done, None to continue.
         """
-        # Add assistant message to history
-        assistant_message: Dict[str, Any] = {"role": "assistant"}
-
         if response.content:
-            assistant_message["content"] = response.content
             logger.debug(f"Assistant: {response.content[:200]}...")
 
-        if response.tool_calls:
+        # Get tool calls - either from API or extracted from content
+        tool_calls = response.tool_calls
+
+        # If no tool calls from API, try to extract from content (JSON fallback)
+        if not tool_calls and response.content:
+            logger.debug(
+                f"No API tool calls, trying JSON extraction from: {response.content[:300]}..."
+            )
+            extracted = self._parser.extract_tool_calls(response.content)
+            if extracted:
+                tool_calls = self._parser.normalize_all(extracted)
+                logger.info(f"Extracted {len(tool_calls)} tool calls from content")
+
+        # Build assistant message with whatever tool calls we found
+        assistant_message: Dict[str, Any] = {"role": "assistant"}
+        if response.content:
+            assistant_message["content"] = response.content
+
+        if tool_calls:
             assistant_message["tool_calls"] = [
                 {
                     "id": tc["id"],
@@ -168,24 +186,24 @@ class MinionAgent:
                         "arguments": tc["arguments"],
                     },
                 }
-                for tc in response.tool_calls
+                for tc in tool_calls
             ]
 
         self._messages.append(assistant_message)
 
-        # If no tool calls, continue conversation
-        if not response.has_tool_calls:
-            # Add a prompt to encourage tool use or completion
+        # If no tool calls, prompt to continue
+        if not tool_calls:
+            logger.debug("No tool calls found, prompting to continue")
             self._messages.append(
                 {
                     "role": "user",
-                    "content": "Please continue with the task. Use tools to make progress, or call task_complete when done.",
+                    "content": "Please continue with the task. Use tools to make progress, or call task_complete when done. Output your tool call as a JSON object with 'name' and 'arguments' fields.",
                 }
             )
             return None
 
         # Execute tool calls
-        for tool_call in response.tool_calls:
+        for tool_call in tool_calls:
             result = self._execute_tool_call(tool_call)
 
             # Check for completion tools

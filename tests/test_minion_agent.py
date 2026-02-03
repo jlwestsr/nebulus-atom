@@ -546,3 +546,75 @@ triggers:
 
             assert len(matches) == 1
             assert matches[0].name == "bugfix"
+
+
+class TestResponseParser:
+    """Tests for response parser (JSON fallback for local LLMs)."""
+
+    def test_extract_single_tool_call(self):
+        """Test extracting a single tool call from text."""
+        from nebulus_swarm.minion.agent.response_parser import ResponseParser
+
+        parser = ResponseParser()
+        text = """I'll create the file now.
+{"name": "write_file", "arguments": {"path": "test.txt", "content": "hello"}}
+"""
+        calls = parser.extract_tool_calls(text)
+        assert len(calls) == 1
+        assert calls[0]["name"] == "write_file"
+
+    def test_extract_multiple_tool_calls(self):
+        """Test extracting multiple tool calls."""
+        from nebulus_swarm.minion.agent.response_parser import ResponseParser
+
+        parser = ResponseParser()
+        text = """Let me do two things.
+{"name": "read_file", "arguments": {"path": "a.txt"}}
+Then:
+{"name": "write_file", "arguments": {"path": "b.txt", "content": "data"}}
+"""
+        calls = parser.extract_tool_calls(text)
+        assert len(calls) == 2
+        assert calls[0]["name"] == "read_file"
+        assert calls[1]["name"] == "write_file"
+
+    def test_extract_array_of_calls(self):
+        """Test extracting an array of tool calls."""
+        from nebulus_swarm.minion.agent.response_parser import ResponseParser
+
+        parser = ResponseParser()
+        text = """[{"name": "list_directory", "arguments": {"path": "."}}]"""
+        calls = parser.extract_tool_calls(text)
+        assert len(calls) == 1
+        assert calls[0]["name"] == "list_directory"
+
+    def test_no_tool_calls(self):
+        """Test text with no tool calls."""
+        from nebulus_swarm.minion.agent.response_parser import ResponseParser
+
+        parser = ResponseParser()
+        text = "Just a regular response with no JSON."
+        calls = parser.extract_tool_calls(text)
+        assert len(calls) == 0
+
+    def test_normalize_tool_call(self):
+        """Test normalizing extracted tool calls."""
+        from nebulus_swarm.minion.agent.response_parser import ResponseParser
+
+        parser = ResponseParser()
+        extracted = {"name": "read_file", "arguments": {"path": "test.txt"}}
+        normalized = parser.normalize_tool_call(extracted, 0)
+
+        assert normalized["name"] == "read_file"
+        assert "id" in normalized
+        assert "arguments" in normalized
+
+    def test_extract_with_nested_json(self):
+        """Test extracting tool call with nested JSON arguments."""
+        from nebulus_swarm.minion.agent.response_parser import ResponseParser
+
+        parser = ResponseParser()
+        text = '{"name": "write_file", "arguments": {"path": "config.json", "content": "{\\"key\\": \\"value\\"}"}}'
+        calls = parser.extract_tool_calls(text)
+        assert len(calls) == 1
+        assert calls[0]["name"] == "write_file"
