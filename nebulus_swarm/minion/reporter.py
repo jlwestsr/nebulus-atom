@@ -19,6 +19,7 @@ class EventType(Enum):
     PROGRESS = "progress"
     COMPLETE = "complete"
     ERROR = "error"
+    QUESTION = "question"
 
 
 @dataclass
@@ -257,3 +258,76 @@ class Reporter:
             data=data,
         )
         return await self._send_report(payload)
+
+    async def question(
+        self,
+        question_text: str,
+        blocker_type: str,
+        question_id: str,
+    ) -> bool:
+        """Send a question to the Overlord for human input.
+
+        Args:
+            question_text: The question to ask.
+            blocker_type: Type of blocker (e.g., 'unclear_requirements').
+            question_id: Unique identifier for this question.
+
+        Returns:
+            True if sent successfully.
+        """
+        self._current_status = "waiting for answer"
+        payload = ReportPayload(
+            minion_id=self.minion_id,
+            event=EventType.QUESTION,
+            issue=self.issue_number,
+            message=question_text,
+            data={
+                "blocker_type": blocker_type,
+                "question_id": question_id,
+            },
+        )
+        return await self._send_report(payload)
+
+    async def poll_answer(
+        self,
+        question_id: str,
+        timeout: int = 600,
+        interval: int = 15,
+    ) -> Optional[str]:
+        """Poll the Overlord for an answer to a pending question.
+
+        Args:
+            question_id: ID of the question to poll for.
+            timeout: Max seconds to wait for an answer.
+            interval: Seconds between poll attempts.
+
+        Returns:
+            Answer text if received, None if timed out.
+        """
+        # Derive answer endpoint from callback URL
+        # callback_url is like http://overlord:8080/minion/report
+        # answer URL is   like http://overlord:8080/minion/answer/{minion_id}
+        base_url = self.callback_url.rsplit("/", 1)[0]
+        answer_url = f"{base_url}/answer/{self.minion_id}"
+
+        elapsed = 0
+        while elapsed < timeout:
+            try:
+                session = await self._get_session()
+                async with session.get(
+                    answer_url,
+                    params={"question_id": question_id},
+                ) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        if data.get("answered"):
+                            logger.info(f"Received answer for {question_id}")
+                            return data["answer"]
+            except Exception as e:
+                logger.debug(f"Poll attempt failed: {e}")
+
+            await asyncio.sleep(interval)
+            elapsed += interval
+
+        logger.warning(f"No answer received for {question_id} after {timeout}s")
+        return None

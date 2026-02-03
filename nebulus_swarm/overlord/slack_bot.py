@@ -12,6 +12,9 @@ logger = logging.getLogger(__name__)
 # Type alias for message handlers (sync or async)
 MessageHandler = Callable[[str, str, str], Union[str, Awaitable[str]]]
 
+# Type alias for thread reply handlers
+ThreadReplyHandler = Callable[[str, str], None]  # (thread_ts, reply_text)
+
 
 class SlackBot:
     """Slack bot for Overlord communication."""
@@ -22,6 +25,7 @@ class SlackBot:
         app_token: str,
         channel_id: str,
         message_handler: Optional[MessageHandler] = None,
+        thread_reply_handler: Optional[ThreadReplyHandler] = None,
     ):
         """Initialize Slack bot.
 
@@ -31,11 +35,14 @@ class SlackBot:
             channel_id: Channel ID to monitor and post to.
             message_handler: Callback for processing messages (sync or async).
                             Takes (user_id, message_text, channel_id) and returns response.
+            thread_reply_handler: Callback for thread replies.
+                                 Takes (thread_ts, reply_text).
         """
         self.bot_token = bot_token
         self.app_token = app_token
         self.channel_id = channel_id
         self.message_handler = message_handler
+        self.thread_reply_handler = thread_reply_handler
 
         # Initialize Slack Bolt app
         self.app = AsyncApp(token=bot_token)
@@ -62,6 +69,14 @@ class SlackBot:
 
             if not text:
                 return
+
+            # Check if this is a thread reply (has thread_ts different from ts)
+            thread_ts = event.get("thread_ts")
+            if thread_ts and thread_ts != event.get("ts"):
+                logger.debug(f"Thread reply in {thread_ts}: {text}")
+                if self.thread_reply_handler:
+                    self.thread_reply_handler(thread_ts, text)
+                return  # Thread replies don't go to the command handler
 
             logger.info(f"Received message from {user}: {text}")
 
@@ -143,6 +158,45 @@ class SlackBot:
             )
         except Exception as e:
             logger.error(f"Failed to post message: {e}")
+
+    async def post_question(
+        self,
+        minion_id: str,
+        issue_number: int,
+        question_text: str,
+        timeout_minutes: int = 10,
+    ) -> Optional[str]:
+        """Post a Minion question to the channel.
+
+        Posts a formatted question message that humans can reply to in a thread.
+
+        Args:
+            minion_id: Minion identifier.
+            issue_number: GitHub issue number.
+            question_text: The question to ask.
+            timeout_minutes: Minutes before auto-continuing.
+
+        Returns:
+            Thread timestamp (thread_ts) for matching replies, or None on failure.
+        """
+        message = (
+            f"🤔 Minion `{minion_id}` on #{issue_number} has a question:\n\n"
+            f"> {question_text}\n\n"
+            f"Reply in this thread to answer. "
+            f"Auto-continuing in {timeout_minutes} minutes."
+        )
+
+        try:
+            response = await self.app.client.chat_postMessage(
+                channel=self.channel_id,
+                text=message,
+            )
+            thread_ts = response.get("ts")
+            logger.info(f"Posted question for {minion_id} (thread_ts={thread_ts})")
+            return thread_ts
+        except Exception as e:
+            logger.error(f"Failed to post question: {e}")
+            return None
 
     async def post_minion_update(
         self,

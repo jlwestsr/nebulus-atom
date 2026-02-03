@@ -3,8 +3,9 @@
 import asyncio
 import os
 import signal
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Dict, Optional
 
 import aiohttp
 from aiohttp import web
@@ -38,6 +39,21 @@ DEFAULT_CRON_SCHEDULE = "0 2 * * *"
 # Shutdown configuration
 SHUTDOWN_TIMEOUT = 30  # Max seconds to wait for graceful shutdown
 MINION_DRAIN_TIMEOUT = 60  # Max seconds to wait for minions to drain
+
+
+@dataclass
+class PendingQuestion:
+    """A question from a Minion awaiting a human answer."""
+
+    minion_id: str
+    question_id: str
+    issue_number: int
+    repo: str
+    question_text: str
+    thread_ts: str  # Slack thread timestamp for matching replies
+    asked_at: datetime = field(default_factory=datetime.now)
+    answer: Optional[str] = None
+    answered: bool = False
 
 
 class Overlord:
@@ -76,6 +92,7 @@ class Overlord:
             app_token=config.slack.app_token,
             channel_id=config.slack.channel_id,
             message_handler=self._handle_message,
+            thread_reply_handler=self._handle_thread_reply,
         )
 
         # GitHub queue scanner (only if we have watched repos)
@@ -113,6 +130,9 @@ class Overlord:
         # Cron configuration
         self._cron_enabled = config.cron.enabled
         self._cron_schedule = config.cron.schedule or DEFAULT_CRON_SCHEDULE
+
+        # Pending questions from Minions
+        self._pending_questions: Dict[str, PendingQuestion] = {}
 
         # Queue processing state
         self._paused = False
@@ -402,12 +422,52 @@ class Overlord:
             "Type `help` to see available commands."
         )
 
+    def _handle_thread_reply(self, thread_ts: str, reply_text: str) -> None:
+        """Handle a reply in a Slack thread.
+
+        Matches the thread_ts to a pending question and stores the answer.
+
+        Args:
+            thread_ts: Thread timestamp of the reply.
+            reply_text: The reply text.
+        """
+        for pending in self._pending_questions.values():
+            if pending.thread_ts == thread_ts and not pending.answered:
+                pending.answer = reply_text
+                pending.answered = True
+                logger.info(
+                    f"Received answer for question {pending.question_id} "
+                    f"from minion {pending.minion_id}: {reply_text[:100]}"
+                )
+                break
+
+    async def _answer_handler(self, request: web.Request) -> web.Response:
+        """Handle Minion polling for question answers.
+
+        GET /minion/answer/{minion_id}?question_id=<id>
+        """
+        minion_id = request.match_info["minion_id"]
+        pending = self._pending_questions.get(minion_id)
+
+        if not pending or not pending.answered:
+            return web.json_response({"answered": False})
+
+        return web.json_response(
+            {
+                "answered": True,
+                "answer": pending.answer,
+            }
+        )
+
     async def _setup_health_server(self) -> None:
         """Set up health check HTTP server."""
         self._health_app = web.Application()
         self._health_app.router.add_get("/health", self._health_handler)
         self._health_app.router.add_get("/status", self._status_handler)
         self._health_app.router.add_post("/minion/report", self._minion_report_handler)
+        self._health_app.router.add_get(
+            "/minion/answer/{minion_id}", self._answer_handler
+        )
 
         self._health_runner = web.AppRunner(self._health_app)
         await self._health_runner.setup()
@@ -532,6 +592,34 @@ class Overlord:
 
                 # Clean up container
                 self.docker.kill_minion(minion_id)
+
+            elif event == "question":
+                question_id = report_data.get("question_id", "unknown")
+                blocker_type = report_data.get("blocker_type", "unknown")
+
+                logger.info(
+                    f"Minion {minion_id} asks: {message} "
+                    f"(type={blocker_type}, id={question_id})"
+                )
+
+                # Post to Slack as a message (thread replies will be matched)
+                thread_ts = await self.slack.post_question(
+                    minion_id=minion_id,
+                    issue_number=issue or 0,
+                    question_text=message,
+                    timeout_minutes=10,
+                )
+
+                # Store pending question for answer matching
+                if thread_ts:
+                    self._pending_questions[minion_id] = PendingQuestion(
+                        minion_id=minion_id,
+                        question_id=question_id,
+                        issue_number=issue or 0,
+                        repo=minion.repo,
+                        question_text=message,
+                        thread_ts=thread_ts,
+                    )
 
             elif event == "error":
                 error_type = report_data.get("error_type", "unknown")

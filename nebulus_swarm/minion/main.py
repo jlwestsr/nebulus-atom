@@ -29,6 +29,8 @@ logger = logging.getLogger(__name__)
 # Constants
 WORKSPACE = Path("/workspace")
 MAX_ISSUE_COMPLEXITY = 20  # Max estimated steps before bailing
+MAX_QUESTIONS = 3  # Max clarifying questions per Minion run
+QUESTION_TIMEOUT = 600  # 10 minutes to wait for human answer
 
 
 @dataclass
@@ -347,52 +349,105 @@ class Minion:
         self.reporter.update_status("working")
         logger.info("Running MinionAgent...")
 
-        # Run the agent (blocking)
-        result: AgentResult = agent.run()
+        # Question loop: agent runs, may ask questions, gets answers, resumes
+        questions_asked = 0
 
-        logger.info(f"Agent finished: {result.status.value} - {result.summary}")
-        logger.info(f"Turns used: {result.turns_used}")
+        while True:
+            result: AgentResult = agent.run()
 
-        # Handle result based on status
-        if result.status == AgentStatus.COMPLETED:
-            self.reporter.update_status("work completed")
-            if result.files_changed:
-                logger.info(f"Files changed: {result.files_changed}")
-            return True
+            logger.info(f"Agent finished: {result.status.value} - {result.summary}")
+            logger.info(f"Turns used: {result.turns_used}")
 
-        elif result.status == AgentStatus.BLOCKED:
-            await self.reporter.error(
-                result.summary,
-                error_type="blocked",
-                details=f"Blocker type: {result.blocker_type}",
-            )
-            # Post question to issue if provided
-            if result.question:
-                try:
-                    self.github.post_comment(
-                        self.config.repo,
-                        self.config.issue_number,
-                        f"**Minion Question:**\n\n{result.question}",
+            if result.status == AgentStatus.COMPLETED:
+                self.reporter.update_status("work completed")
+                if result.files_changed:
+                    logger.info(f"Files changed: {result.files_changed}")
+                return True
+
+            elif result.status == AgentStatus.BLOCKED and result.question:
+                questions_asked += 1
+
+                if questions_asked > MAX_QUESTIONS:
+                    logger.info(
+                        f"Max questions ({MAX_QUESTIONS}) reached, "
+                        "continuing with best judgment"
                     )
-                except Exception as e:
-                    logger.warning(f"Failed to post question: {e}")
-            return False
+                    agent.inject_message(
+                        "No more questions available. "
+                        "Use your best judgment to proceed."
+                    )
+                    continue
 
-        elif result.status == AgentStatus.TURN_LIMIT:
-            await self.reporter.error(
-                result.summary,
-                error_type="turn_limit",
-                details=f"Used {result.turns_used} turns",
-            )
-            return False
+                # Send question to Overlord via Reporter
+                question_id = f"q-{self.config.minion_id}-{questions_asked}"
+                logger.info(
+                    f"Agent asked question {questions_asked}/{MAX_QUESTIONS}: "
+                    f"{result.question}"
+                )
+                self.reporter.update_status("waiting for answer")
 
-        else:  # ERROR
-            await self.reporter.error(
-                result.summary,
-                error_type="agent_error",
-                details=result.error or "Unknown error",
-            )
-            return False
+                sent = await self.reporter.question(
+                    result.question,
+                    result.blocker_type or "unknown",
+                    question_id,
+                )
+
+                if not sent:
+                    logger.warning(
+                        "Failed to send question to Overlord, "
+                        "continuing with best judgment"
+                    )
+                    agent.inject_message(
+                        "Could not reach the team for an answer. "
+                        "Use your best judgment to proceed."
+                    )
+                    continue
+
+                # Poll for answer with timeout
+                answer = await self.reporter.poll_answer(
+                    question_id, timeout=QUESTION_TIMEOUT
+                )
+
+                if answer:
+                    logger.info(f"Received answer for {question_id}")
+                    agent.inject_message(f"Human response: {answer}")
+                else:
+                    logger.info(
+                        f"No answer received for {question_id}, "
+                        "continuing with best judgment"
+                    )
+                    agent.inject_message(
+                        "No response received within 10 minutes. "
+                        "Use your best judgment to proceed."
+                    )
+
+                self.reporter.update_status("working")
+                # Loop continues - agent.run() resumes with injected context
+
+            elif result.status == AgentStatus.BLOCKED:
+                # Blocked without a question - terminal failure
+                await self.reporter.error(
+                    result.summary,
+                    error_type="blocked",
+                    details=f"Blocker type: {result.blocker_type}",
+                )
+                return False
+
+            elif result.status == AgentStatus.TURN_LIMIT:
+                await self.reporter.error(
+                    result.summary,
+                    error_type="turn_limit",
+                    details=f"Used {result.turns_used} turns",
+                )
+                return False
+
+            else:  # ERROR
+                await self.reporter.error(
+                    result.summary,
+                    error_type="agent_error",
+                    details=result.error or "Unknown error",
+                )
+                return False
 
     def _generate_commit_message(self) -> str:
         """Generate a commit message for the work.
