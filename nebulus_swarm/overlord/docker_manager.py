@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 import docker
 from docker.errors import DockerException, ImageNotFound, NotFound
 
-from nebulus_swarm.config import LLMConfig, MinionConfig
+from nebulus_swarm.config import LLMConfig, ModelProfile, MinionConfig
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +58,11 @@ class DockerManager:
         return self._client
 
     def _build_environment(
-        self, minion_id: str, repo: str, issue_number: int
+        self,
+        minion_id: str,
+        repo: str,
+        issue_number: int,
+        model_override: Optional[ModelProfile] = None,
     ) -> Dict[str, str]:
         """Build environment variables for a Minion container.
 
@@ -66,20 +70,33 @@ class DockerManager:
             minion_id: Unique minion identifier.
             repo: GitHub repository (owner/name).
             issue_number: Issue number to work on.
+            model_override: Optional model profile to use instead of default.
 
         Returns:
             Dictionary of environment variables.
         """
+        # Use override if provided, otherwise use default llm_config
+        if model_override:
+            base_url = model_override.base_url or self.llm_config.base_url
+            model = model_override.name
+            timeout = str(model_override.timeout)
+            streaming = str(model_override.streaming).lower()
+        else:
+            base_url = self.llm_config.base_url
+            model = self.llm_config.model
+            timeout = str(self.llm_config.timeout)
+            streaming = str(self.llm_config.streaming).lower()
+
         return {
             "MINION_ID": minion_id,
             "GITHUB_REPO": repo,
             "GITHUB_ISSUE": str(issue_number),
             "GITHUB_TOKEN": self.github_token,
             "OVERLORD_CALLBACK_URL": self.overlord_callback_url,
-            "NEBULUS_BASE_URL": self.llm_config.base_url,
-            "NEBULUS_MODEL": self.llm_config.model,
-            "NEBULUS_TIMEOUT": str(self.llm_config.timeout),
-            "NEBULUS_STREAMING": str(self.llm_config.streaming).lower(),
+            "NEBULUS_BASE_URL": base_url,
+            "NEBULUS_MODEL": model,
+            "NEBULUS_TIMEOUT": timeout,
+            "NEBULUS_STREAMING": streaming,
             "MINION_TIMEOUT": str(self.minion_config.timeout_minutes * 60),
         }
 
@@ -88,6 +105,7 @@ class DockerManager:
         repo: str,
         issue_number: int,
         minion_id: Optional[str] = None,
+        model_override: Optional[ModelProfile] = None,
     ) -> str:
         """Spawn a new Minion container.
 
@@ -95,6 +113,7 @@ class DockerManager:
             repo: GitHub repository (owner/name).
             issue_number: Issue number to work on.
             minion_id: Optional custom minion ID.
+            model_override: Optional model profile to use instead of default.
 
         Returns:
             The minion ID.
@@ -109,7 +128,7 @@ class DockerManager:
         logger.info(f"Spawning minion {minion_id} for {repo}#{issue_number}")
 
         # Build environment variables
-        env = self._build_environment(minion_id, repo, issue_number)
+        env = self._build_environment(minion_id, repo, issue_number, model_override)
 
         if self.stub_mode:
             # Stub mode for testing

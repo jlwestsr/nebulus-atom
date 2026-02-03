@@ -27,6 +27,7 @@ class QueuedIssue:
     labels: List[str]
     created_at: datetime
     priority: int = 0  # Higher = more urgent
+    body: str = ""
 
     def __str__(self) -> str:
         return f"{self.repo}#{self.number}: {self.title}"
@@ -127,6 +128,7 @@ class GitHubQueue:
                         labels=label_names,
                         created_at=issue.created_at,
                         priority=priority,
+                        body=issue.body or "",
                     )
                 )
 
@@ -136,6 +138,28 @@ class GitHubQueue:
         except GithubException as e:
             logger.error(f"Failed to scan {repo_name}: {e}")
             raise
+
+    def get_issue_details(self, repo_name: str, issue_number: int) -> Optional[dict]:
+        """Fetch basic issue details for routing decisions.
+
+        Args:
+            repo_name: Repository in owner/name format.
+            issue_number: Issue number.
+
+        Returns:
+            Dict with title, body, and labels, or None on error.
+        """
+        try:
+            repo = self._client.get_repo(repo_name)
+            issue = repo.get_issue(issue_number)
+            return {
+                "title": issue.title,
+                "body": issue.body or "",
+                "labels": [label.name for label in issue.labels],
+            }
+        except GithubException as e:
+            logger.error(f"Failed to fetch {repo_name}#{issue_number}: {e}")
+            return None
 
     def get_next_issue(self) -> Optional[QueuedIssue]:
         """Get the next highest-priority issue to work on.

@@ -23,6 +23,7 @@ from nebulus_swarm.overlord.command_parser import CommandType
 from nebulus_swarm.overlord.llm_parser import LLMCommandParser
 from nebulus_swarm.overlord.docker_manager import DockerManager
 from nebulus_swarm.overlord.github_queue import GitHubQueue
+from nebulus_swarm.overlord.model_router import ModelRouter
 from nebulus_swarm.overlord.slack_bot import SlackBot
 from nebulus_swarm.overlord.state import OverlordState
 from nebulus_swarm.reviewer.workflow import ReviewConfig, ReviewWorkflow
@@ -134,6 +135,9 @@ class Overlord:
         # Pending questions from Minions
         self._pending_questions: Dict[str, PendingQuestion] = {}
 
+        # Model router (for multi-LLM routing)
+        self.router = ModelRouter(config.routing)
+
         # Cached queue scan results (for dashboard)
         self._last_queue_scan: list[dict] = []
 
@@ -230,8 +234,21 @@ class Overlord:
             return f"⚠️ Already working on {command.repo}#{command.issue_number} (minion `{existing.id}`)"
 
         try:
+            # Route model selection if enabled
+            model_override = None
+            if self.config.routing.enabled and self.github_queue:
+                details = self.github_queue.get_issue_details(
+                    command.repo, command.issue_number
+                )
+                if details:
+                    model_override = self.router.select_model(
+                        details["title"], details["body"], details["labels"]
+                    )
+
             # Spawn minion
-            minion_id = self.docker.spawn_minion(command.repo, command.issue_number)
+            minion_id = self.docker.spawn_minion(
+                command.repo, command.issue_number, model_override=model_override
+            )
 
             # Create minion record
             minion = Minion(
@@ -248,7 +265,8 @@ class Overlord:
             if self.github_queue:
                 self.github_queue.mark_in_progress(command.repo, command.issue_number)
 
-            return f"🚀 Spawning minion `{minion_id}` to work on {command.repo}#{command.issue_number}"
+            model_info = f" (model: `{model_override.name}`)" if model_override else ""
+            return f"🚀 Spawning minion `{minion_id}` to work on {command.repo}#{command.issue_number}{model_info}"
 
         except Exception as e:
             logger.exception(f"Failed to spawn minion: {e}")
@@ -913,7 +931,14 @@ class Overlord:
                     continue
 
                 try:
-                    minion_id = self.docker.spawn_minion(issue.repo, issue.number)
+                    # Route model selection
+                    model_override = self.router.select_model(
+                        issue.title, issue.body, issue.labels
+                    )
+
+                    minion_id = self.docker.spawn_minion(
+                        issue.repo, issue.number, model_override=model_override
+                    )
 
                     minion = Minion(
                         id=minion_id,
@@ -929,8 +954,11 @@ class Overlord:
                     self.github_queue.mark_in_progress(issue.repo, issue.number)
 
                     # Notify Slack
+                    model_info = (
+                        f" (model: `{model_override.name}`)" if model_override else ""
+                    )
                     await self.slack.post_message(
-                        f"🤖 Cron: Spawning minion `{minion_id}` for {issue}"
+                        f"🤖 Cron: Spawning minion `{minion_id}` for {issue}{model_info}"
                     )
 
                     spawned += 1
