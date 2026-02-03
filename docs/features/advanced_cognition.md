@@ -31,21 +31,25 @@ Implements deeper reasoning capabilities inspired by Daniel Kahneman's "System 2
 - [x] **Error Anticipation**: Predict potential failure modes
 - [x] **Confidence Scoring**: Track certainty levels (0-100%)
 
-### Phase 3: Adaptive Behavior
+### Phase 3: Adaptive Behavior ✅
 - [x] **Complexity-Based Routing**: Simple tasks → fast path, Complex → deep reasoning
 - [x] **Clarification Triggers**: Auto-detect ambiguous requests
-- [ ] **Learning from Mistakes**: Track failure patterns (future)
+- [x] **Learning from Mistakes**: Track failure patterns, adjust confidence scoring
 
 ## 4. Technical Implementation
 
 ### New Files
 - `nebulus_atom/services/cognition_service.py`: Core reasoning engine
 - `nebulus_atom/models/cognition.py`: Data models for thoughts/reasoning
-- `tests/test_cognition_service.py`: Unit tests
+- `nebulus_atom/services/failure_memory_service.py`: Failure tracking, pattern recognition, confidence penalties
+- `nebulus_atom/models/failure_memory.py`: Data models for failure records, patterns, and context
+- `tests/test_cognition_service.py`: Cognition unit tests
+- `tests/test_failure_memory_service.py`: Failure memory unit tests (35 tests, 97% coverage)
 
 ### Modified Files
-- `nebulus_atom/controllers/turn_processor.py`: Integrate cognition before tool execution
+- `nebulus_atom/controllers/turn_processor.py`: Integrate cognition and failure context before tool execution
 - `nebulus_atom/controllers/agent_controller.py`: Add cognition hooks
+- `nebulus_atom/services/tool_executor.py`: Record failures on error, append failure summary to recovery hints
 
 ### Data Models
 ```python
@@ -75,11 +79,17 @@ class CognitionResult:
 ## 5. Verification Plan
 
 ### Automated Tests
-- [x] `tests/test_cognition_service.py`:
+- [x] `tests/test_cognition_service.py` (25 tests):
   - Test complexity classification accuracy
   - Test reasoning chain generation
   - Test confidence scoring
   - Test clarification detection
+- [x] `tests/test_failure_memory_service.py` (35 tests):
+  - Test error classification (8 error types)
+  - Test argument sanitization
+  - Test confidence penalty math and caps
+  - Test SQLite record/query/resolve operations
+  - Test cognition integration (confidence reduction, risk injection, backward compat)
 
 ### Manual Verification
 - [ ] Simple task: "List files" → Direct execution, no deep reasoning
@@ -113,5 +123,5 @@ Confidence: 45% (needs clarification before proceeding)
 - [x] **Phase 1**: Implement CognitionService
 - [x] **Phase 2**: Implement self-critique
 - [x] **Phase 3**: Integrate with turn processor
-- [x] **Test**: All tests pass (`pytest`) - 124 tests passing
+- [x] **Test**: All tests pass (`pytest`) — 474 tests passing
 - [x] **Doc**: Update README and wiki

@@ -16,6 +16,7 @@ from nebulus_atom.models.cognition import (
     ThoughtRecord,
     SelfCritiqueResult,
 )
+from nebulus_atom.models.failure_memory import FailureContext
 from nebulus_atom.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -128,7 +129,10 @@ class CognitionService:
         self._thought_history: List[ThoughtRecord] = []
 
     def analyze_task(
-        self, user_input: str, context: Optional[str] = None
+        self,
+        user_input: str,
+        context: Optional[str] = None,
+        failure_context: Optional[FailureContext] = None,
     ) -> CognitionResult:
         """
         Analyze a task to determine complexity and approach.
@@ -136,6 +140,7 @@ class CognitionService:
         Args:
             user_input: The user's request/task description.
             context: Optional additional context (pinned files, history).
+            failure_context: Optional failure memory context for confidence adjustment.
 
         Returns:
             CognitionResult with analysis and recommendations.
@@ -162,6 +167,11 @@ class CognitionService:
         # Identify potential risks
         risks = self._identify_risks(input_lower, complexity)
 
+        # Inject failure warnings into risks
+        if failure_context and failure_context.warning_messages:
+            for warning in failure_context.warning_messages:
+                risks.append(warning)
+
         # Generate clarification questions if needed
         clarification_needed = (
             ambiguity_score > 0.5 or complexity == TaskComplexity.COMPLEX
@@ -173,8 +183,9 @@ class CognitionService:
             )
 
         # Calculate overall confidence
+        failure_penalty = failure_context.total_penalty if failure_context else 0.0
         confidence = self._calculate_confidence(
-            complexity, ambiguity_score, len(clarifications)
+            complexity, ambiguity_score, len(clarifications), failure_penalty
         )
 
         # Generate recommended approach
@@ -416,6 +427,7 @@ class CognitionService:
         complexity: TaskComplexity,
         ambiguity_score: float,
         num_clarifications: int,
+        failure_penalty: float = 0.0,
     ) -> float:
         """Calculate overall confidence in understanding the task."""
         # Base confidence from complexity
@@ -430,6 +442,9 @@ class CognitionService:
 
         # Reduce for needed clarifications
         confidence -= num_clarifications * 0.05
+
+        # Reduce for failure history
+        confidence -= failure_penalty
 
         return max(0.1, min(1.0, confidence))
 

@@ -17,6 +17,7 @@ from nebulus_atom.services.docker_service import DockerServiceManager
 from nebulus_atom.services.error_recovery_service import ErrorRecoveryServiceManager
 from nebulus_atom.services.telemetry_service import TelemetryServiceManager
 from nebulus_atom.services.cognition_service import CognitionServiceManager
+from nebulus_atom.services.failure_memory_service import FailureMemoryServiceManager
 from nebulus_atom.models.task import TaskStatus
 from nebulus_atom.utils.logger import setup_logger
 
@@ -41,6 +42,7 @@ class ToolExecutor:
     recovery_manager = ErrorRecoveryServiceManager()
     telemetry_manager = TelemetryServiceManager()
     cognition_manager = CognitionServiceManager()
+    failure_memory_manager = FailureMemoryServiceManager()
 
     @staticmethod
     def initialize():
@@ -245,7 +247,25 @@ class ToolExecutor:
                 )
                 telemetry_service.log_error(session_id, tool_name, str(e))
 
-                return recovery_service.analyze_error(tool_name, str(e), args)
+                # Record failure in failure memory
+                try:
+                    failure_service = ToolExecutor.failure_memory_manager.get_service(
+                        session_id
+                    )
+                    failure_service.record_failure(session_id, tool_name, str(e), args)
+
+                    # Append failure history summary to recovery hint
+                    context = failure_service.build_failure_context([tool_name])
+                    summary = failure_service.get_failure_summary_for_llm(context)
+                    recovery_msg = recovery_service.analyze_error(
+                        tool_name, str(e), args
+                    )
+                    if summary:
+                        recovery_msg += f"\n\n{summary}"
+                    return recovery_msg
+                except Exception:
+                    logger.debug("Failure memory recording failed, continuing")
+                    return recovery_service.analyze_error(tool_name, str(e), args)
             except Exception as e2:
                 logger.error(f"CRITICAL: Recovery Service Failed: {e2}", exc_info=True)
                 # Fallback to standard error message

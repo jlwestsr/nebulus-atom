@@ -142,7 +142,22 @@ class TurnProcessor:
 
         try:
             cognition_service = ToolExecutor.cognition_manager.get_service(session_id)
-            result = cognition_service.analyze_task(last_user_msg)
+
+            # Build failure context from failure memory
+            failure_context = None
+            try:
+                failure_service = ToolExecutor.failure_memory_manager.get_service(
+                    session_id
+                )
+                failure_context = failure_service.build_failure_context()
+                if not failure_context.patterns:
+                    failure_context = None
+            except Exception:
+                logger.debug("Failed to build failure context, continuing without it")
+
+            result = cognition_service.analyze_task(
+                last_user_msg, failure_context=failure_context
+            )
 
             # Record the analysis as a thought
             cognition_service.record_thought(
