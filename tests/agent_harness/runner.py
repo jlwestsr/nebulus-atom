@@ -39,8 +39,6 @@ class AgentRunner:
             session_id,
         ]
 
-        print(f"DEBUG: Harness running command: {' '.join(cmd)}")
-
         try:
             # Run process and capture output
             # We use text=True to get strings instead of bytes

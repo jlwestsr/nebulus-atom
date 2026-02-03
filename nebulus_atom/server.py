@@ -1,6 +1,5 @@
 import asyncio
-import sys
-import subprocess
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -8,10 +7,7 @@ from pydantic import BaseModel
 from nebulus_atom.controllers.agent_controller import AgentController
 from nebulus_atom.views.headless_view import HeadlessView
 
-# DEBUG: Print installed packages
-print("--- INSTALLED PACKAGES ---")
-subprocess.run([sys.executable, "-m", "pip", "freeze"])
-print("--------------------------")
+logger = logging.getLogger(__name__)
 
 # Global State
 agent_view = HeadlessView()
@@ -46,9 +42,7 @@ async def chat(request: ChatRequest):
     """
     Send a user message to the agent.
     """
-    print(f"DEBUG: Input received: {request.message}")
     await agent_view.submit_input(request.message)
-    print("DEBUG: Input submitted to view")
     return {"status": "sent"}
 
 
@@ -59,15 +53,9 @@ async def get_events():
     Returns all currently queued events immediately.
     """
     events = []
-    # Drain the queue non-blocking
-    q_size = agent_view.event_queue.qsize()
-    if q_size > 0:
-        print(f"DEBUG: Draining {q_size} events")
-
     while not agent_view.event_queue.empty():
         try:
             event = agent_view.event_queue.get_nowait()
-            print(f"DEBUG: Returning event: {event['type']}")
             events.append(event)
             agent_view.event_queue.task_done()
         except asyncio.QueueEmpty:
@@ -82,10 +70,9 @@ async def websocket_endpoint(websocket: WebSocket):
     """
     await websocket.accept()
     try:
-        # Loop to consume events from HeadlessView and send to WS
         async for event in agent_view.get_events():
             await websocket.send_json(event)
     except WebSocketDisconnect:
-        print("Client disconnected")
+        logger.info("Client disconnected")
     except Exception as e:
-        print(f"WS Error: {e}")
+        logger.error("WS Error: %s", e)

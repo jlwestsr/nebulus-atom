@@ -25,18 +25,12 @@ def check_password():
         user_input = st.session_state["username"].strip()
         pass_input = st.session_state["password"]
 
-        print(
-            f"DEBUG: Comparing Input User '{user_input}' vs Expected '{EXPECTED_USER}'"
-        )
-
         if user_input == EXPECTED_USER and pass_input == EXPECTED_PASS:
-            print("DEBUG: Password Correct!")
             st.session_state["password_correct"] = True
             # Clear any previous error
             if "auth_error" in st.session_state:
                 del st.session_state["auth_error"]
         else:
-            print("DEBUG: Password Incorrect!")
             st.session_state["password_correct"] = False
             st.session_state["auth_error"] = "😕 User not known or password incorrect"
 
