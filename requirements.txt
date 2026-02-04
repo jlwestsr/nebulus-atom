@@ -12,3 +12,4 @@ aiohttp>=3.9.0
 PyGithub>=2.1.0
 croniter>=2.0.0
 streamlit>=1.30.0
+textual>=0.40.0
