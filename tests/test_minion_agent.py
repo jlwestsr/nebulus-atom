@@ -3,6 +3,9 @@
 import tempfile
 from pathlib import Path
 
+import pytest
+
+pytest.importorskip("openai")
 
 from nebulus_swarm.minion.agent import (
     AgentResult,

@@ -1,4 +1,8 @@
 import pytest
+
+pytest.importorskip("openai")
+pytest.importorskip("chromadb")
+
 from unittest.mock import MagicMock, AsyncMock
 from nebulus_atom.controllers.agent_controller import AgentController
 from nebulus_atom.models.task import Task, TaskStatus, Plan

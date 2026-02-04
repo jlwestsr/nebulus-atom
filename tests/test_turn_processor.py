@@ -2,6 +2,9 @@
 
 import json
 import pytest
+
+pytest.importorskip("openai")
+
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 from nebulus_atom.controllers.turn_processor import (

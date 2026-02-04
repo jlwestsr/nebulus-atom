@@ -5,6 +5,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+pytest.importorskip("openai")
+
 from nebulus_swarm.minion.agent.minion_agent import (
     AgentResult,
     AgentStatus,

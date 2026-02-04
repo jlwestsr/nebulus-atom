@@ -6,6 +6,8 @@ from unittest.mock import patch
 
 import pytest
 
+pytest.importorskip("openai")
+
 from nebulus_swarm.config import OverlordLLMConfig
 from nebulus_swarm.overlord.command_parser import Command, CommandType
 from nebulus_swarm.overlord.llm_parser import (

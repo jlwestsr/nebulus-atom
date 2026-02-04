@@ -1,4 +1,8 @@
 import pytest
+
+pytest.importorskip("openai")
+pytest.importorskip("chromadb")
+
 from unittest.mock import AsyncMock, patch
 from nebulus_atom.controllers.agent_controller import AgentController
 from nebulus_atom.services.tool_executor import ToolExecutor

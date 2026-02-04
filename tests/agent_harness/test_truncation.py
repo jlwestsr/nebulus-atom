@@ -1,3 +1,7 @@
+import pytest
+
+pytest.importorskip("chromadb")
+
 from nebulus_atom.services.tool_executor import ToolExecutor
 
 

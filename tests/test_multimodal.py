@@ -1,4 +1,7 @@
 import pytest
+
+pytest.importorskip("chromadb")
+
 from unittest.mock import MagicMock, patch
 from nebulus_atom.services.image_service import ImageService
 from nebulus_atom.services.tool_executor import ToolExecutor
