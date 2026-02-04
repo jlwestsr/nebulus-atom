@@ -24,8 +24,9 @@ class Config:
 
     @classmethod
     def ensure_config_dir(cls):
-        """Ensure the user config directory exists."""
+        """Ensure the user config directory and subdirectories exist."""
         os.makedirs(cls.USER_CONFIG_DIR, exist_ok=True)
+        os.makedirs(cls.GLOBAL_SKILLS_PATH, exist_ok=True)
 
     # Logging Configuration
     LOG_DIR = os.path.join(os.getcwd(), "logs")

@@ -92,6 +92,33 @@ Example:
             ToolExecutor.mcp_service,
         )
 
+    async def _check_llm_health(self) -> bool:
+        """Verify the LLM server is reachable before entering the chat loop.
+
+        Returns:
+            True if the server is healthy, False otherwise.
+        """
+        try:
+            response = await self._openai.client.models.list()
+            available = [m.id for m in response.data]
+            if Config.NEBULUS_MODEL not in available:
+                logger.warning(
+                    f"Model '{Config.NEBULUS_MODEL}' not found. Available: {available}"
+                )
+                await self.view.print_error(
+                    f"Model '{Config.NEBULUS_MODEL}' not found on server. "
+                    f"Available models: {', '.join(available)}"
+                )
+                return False
+            logger.info(f"LLM server healthy, model '{Config.NEBULUS_MODEL}' available")
+            return True
+        except Exception as e:
+            logger.error(f"LLM server unreachable: {e}")
+            await self.view.print_error(
+                f"Cannot reach LLM server at {Config.NEBULUS_BASE_URL}: {e}"
+            )
+            return False
+
     async def start(
         self, initial_prompt: Optional[str] = None, session_id: str = "default"
     ) -> None:
@@ -102,6 +129,9 @@ Example:
             initial_prompt: Optional initial user prompt.
             session_id: Session identifier.
         """
+        if not await self._check_llm_health():
+            return
+
         await self.view.print_welcome()
 
         if initial_prompt:
