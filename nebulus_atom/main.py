@@ -89,6 +89,52 @@ def docs(
         )
 
 
+@app.command("review-pr")
+def review_pr(
+    pr_number: int = typer.Argument(..., help="Pull request number to review"),
+    repo: Optional[str] = typer.Option(
+        None, help="Repository in owner/name format (auto-detected from git remote)"
+    ),
+    no_checks: bool = typer.Option(
+        False, "--no-checks", help="Skip local checks (pytest, ruff, security)"
+    ),
+):
+    """
+    Review a pull request using LLM analysis and local checks.
+    """
+    from rich.panel import Panel
+
+    from nebulus_atom.commands.review_pr import (
+        format_review_output,
+        run_review,
+    )
+
+    console = Console()
+    console.print(f"[bold cyan]Reviewing PR #{pr_number}...[/bold cyan]")
+
+    result = run_review(
+        pr_number=pr_number,
+        repo=repo,
+        run_checks=not no_checks,
+    )
+
+    output = format_review_output(result)
+
+    decision = result.llm_result.decision
+    if decision == "APPROVE" or (
+        hasattr(decision, "value") and decision.value == "APPROVE"
+    ):
+        style = "green"
+    elif decision == "REQUEST_CHANGES" or (
+        hasattr(decision, "value") and decision.value == "REQUEST_CHANGES"
+    ):
+        style = "red"
+    else:
+        style = "yellow"
+
+    console.print(Panel(output, title="PR Review", border_style=style))
+
+
 @app.command()
 def dashboard():
     """
