@@ -1,14 +1,14 @@
 import pytest
 from unittest.mock import MagicMock, AsyncMock, patch
-from mini_nebulus.services.mcp_service import MCPService
+from nebulus_atom.services.mcp_service import MCPService
 
 
 @pytest.mark.asyncio
 async def test_connect_server_env_merge():
     service = MCPService()
 
-    with patch("mini_nebulus.services.mcp_service.StdioServerParameters") as MockParams:
-        with patch("mini_nebulus.services.mcp_service.stdio_client") as mock_client:
+    with patch("nebulus_atom.services.mcp_service.StdioServerParameters") as MockParams:
+        with patch("nebulus_atom.services.mcp_service.stdio_client") as mock_client:
             # Mock context manager
             mock_client.return_value.__aenter__.return_value = (
                 MagicMock(),
@@ -17,7 +17,7 @@ async def test_connect_server_env_merge():
             mock_client.return_value.__aexit__.return_value = None
 
             with patch(
-                "mini_nebulus.services.mcp_service.ClientSession"
+                "nebulus_atom.services.mcp_service.ClientSession"
             ) as MockSession:
                 session = AsyncMock()
                 MockSession.return_value.__aenter__.return_value = session
