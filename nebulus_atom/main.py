@@ -162,5 +162,22 @@ def dashboard():
         pass
 
 
+@app.command()
+def proposals(
+    action: str = typer.Argument(
+        ..., help="Action: 'list', 'approve <id>', 'reject <id>'"
+    ),
+    proposal_id: Optional[str] = typer.Argument(
+        None, help="Proposal ID (for approve/reject)"
+    ),
+):
+    """
+    Manage enhancement proposals.
+    """
+
+    console = Console()
+    console.print(f"[yellow]proposals {action} — not yet wired to store[/yellow]")
+
+
 if __name__ == "__main__":
     app()
