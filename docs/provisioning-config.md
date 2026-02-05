@@ -42,8 +42,90 @@ Settings are loaded in this order (highest precedence first):
 | Setting | Env Var | Default | Description |
 |---------|---------|---------|-------------|
 | MCP URL | `ATOM_MCP_URL` | `None` (disabled) | MCP server endpoint for additional tools |
+| MCP Timeout | `ATOM_MCP_TIMEOUT` | `30` | MCP request timeout in seconds |
 
 When `ATOM_MCP_URL` is set, Atom connects to the MCP server and registers additional tools (LTM, document parsing, domain knowledge). When not set, Atom works standalone.
+
+## MCP Integration Details
+
+MCP (Model Context Protocol) integration is **optional** and only relevant when Atom is deployed on Nebulus appliances. It provides:
+
+- **Long-Term Memory (LTM)** — Persistent memory across sessions
+- **Document Parsing** — Extract text from PDFs, Office docs, etc.
+- **Domain Knowledge** — Access to indexed organizational knowledge
+
+### Enabling MCP
+
+Set the MCP server URL via environment variable:
+
+```bash
+export ATOM_MCP_URL=http://nebulus-core:8000/mcp
+```
+
+Or in your config file:
+
+```yaml
+# ~/.atom/config.yml (YAML config for MCP not yet supported - use env var)
+```
+
+### How MCP Works
+
+1. **On startup**, Atom checks if `ATOM_MCP_URL` is set
+2. If set, it connects to the MCP server and discovers available tools
+3. Tools are registered with an `mcp_` prefix (e.g., `mcp_ltm_search`) to avoid conflicts
+4. If the MCP server is unavailable, Atom continues working with its built-in tools
+
+### Graceful Degradation
+
+MCP integration is designed for graceful degradation:
+
+| Scenario | Behavior |
+|----------|----------|
+| `ATOM_MCP_URL` not set | Atom works standalone (default) |
+| MCP server unavailable at startup | Warning logged, Atom continues without MCP tools |
+| MCP server goes down mid-session | Tool calls return None, Atom continues working |
+| MCP server returns errors | Errors logged, fallback to built-in behavior |
+
+### Nebulus Appliance Configuration
+
+For Tier 1/2/3 appliances with nebulus-core:
+
+```bash
+# Edge (Tier 1) — nebulus-core on same machine
+ATOM_MCP_URL=http://localhost:8000/mcp
+
+# Prime (Tier 2) — nebulus-core in Docker
+ATOM_MCP_URL=http://nebulus-core:8000/mcp
+
+# Tier 3 — nebulus-core on separate host
+ATOM_MCP_URL=http://core.internal:8000/mcp
+```
+
+### Verifying MCP Connection
+
+```bash
+# Check if MCP is configured
+python -c "
+from nebulus_swarm.integrations.mcp_client import get_mcp_client
+client = get_mcp_client()
+print(f'MCP available: {client.available}')
+print(f'MCP tools: {[t.name for t in client.tools]}')
+"
+
+# Test MCP server directly
+curl -X POST http://localhost:8000/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"tools/list","id":1}'
+```
+
+### Troubleshooting MCP
+
+| Issue | Cause | Solution |
+|-------|-------|----------|
+| MCP tools not appearing | `ATOM_MCP_URL` not set | Set environment variable |
+| Connection refused | nebulus-core not running | Start nebulus-core service |
+| Timeout errors | Network issues or slow server | Increase `ATOM_MCP_TIMEOUT` |
+| Empty tool list | MCP server has no tools registered | Check nebulus-core configuration |
 
 ## Recommended Values by Platform
 
