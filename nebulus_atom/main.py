@@ -165,18 +165,49 @@ def dashboard():
 @app.command()
 def proposals(
     action: str = typer.Argument(
-        ..., help="Action: 'list', 'approve <id>', 'reject <id>'"
+        ..., help="Action: 'list', 'show', 'approve', or 'reject'"
     ),
     proposal_id: Optional[str] = typer.Argument(
-        None, help="Proposal ID (for approve/reject)"
+        None, help="Proposal ID (for show/approve/reject)"
     ),
 ):
     """
     Manage enhancement proposals.
     """
+    from nebulus_atom.commands.proposals import (
+        approve_proposal,
+        list_proposals,
+        reject_proposal,
+        show_proposal,
+    )
 
     console = Console()
-    console.print(f"[yellow]proposals {action} — not yet wired to store[/yellow]")
+
+    if action == "list":
+        result = list_proposals()
+        console.print(result)
+    elif action == "show":
+        if not proposal_id:
+            console.print("[red]Error: 'show' requires a proposal ID[/red]")
+            return
+        result = show_proposal(proposal_id)
+        console.print(result)
+    elif action == "approve":
+        if not proposal_id:
+            console.print("[red]Error: 'approve' requires a proposal ID[/red]")
+            return
+        result = approve_proposal(proposal_id)
+        console.print(f"[green]{result}[/green]")
+    elif action == "reject":
+        if not proposal_id:
+            console.print("[red]Error: 'reject' requires a proposal ID[/red]")
+            return
+        result = reject_proposal(proposal_id)
+        console.print(f"[yellow]{result}[/yellow]")
+    else:
+        console.print(
+            f"[red]Error: Unknown action '{action}'. Use: list, show, approve, or reject[/red]"
+        )
 
 
 if __name__ == "__main__":
