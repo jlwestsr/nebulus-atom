@@ -1,10 +1,21 @@
 """Tests for the supervisor evaluation layer."""
 
+import pytest
+
+# Guard against missing optional dependencies
+pytest.importorskip("openai")
+pytest.importorskip("github")
+
+
 from nebulus_swarm.overlord.evaluator import (
     CheckScore,
     EvaluationResult,
+    Evaluator,
     RevisionRequest,
+    MAX_REVISIONS,
 )
+from nebulus_swarm.reviewer.checks import CheckResult, ChecksReport, CheckStatus
+from nebulus_swarm.reviewer.pr_reviewer import ReviewDecision, ReviewResult
 
 
 class TestCheckScore:
@@ -96,3 +107,85 @@ class TestRevisionRequest:
         )
         assert req.repo == "owner/repo"
         assert req.revision_number == 1
+
+
+class TestEvaluator:
+    def _make_evaluator(self):
+        return Evaluator(
+            llm_base_url="http://localhost:5000/v1",
+            llm_model="test-model",
+            github_token="ghp_test",
+        )
+
+    def test_all_pass(self):
+        ev = self._make_evaluator()
+        checks = ChecksReport(
+            results=[
+                CheckResult(
+                    name="pytest", status=CheckStatus.PASSED, message="10 passed"
+                ),
+                CheckResult(name="ruff", status=CheckStatus.PASSED, message="clean"),
+            ]
+        )
+        review = ReviewResult(
+            decision=ReviewDecision.APPROVE,
+            summary="Looks good",
+            confidence=0.9,
+        )
+        result = ev._score(checks, review, repo="o/r", pr_number=1)
+        assert result.overall == CheckScore.PASS
+
+    def test_test_failure_means_needs_revision(self):
+        ev = self._make_evaluator()
+        checks = ChecksReport(
+            results=[
+                CheckResult(
+                    name="pytest", status=CheckStatus.FAILED, message="2 failed"
+                ),
+                CheckResult(name="ruff", status=CheckStatus.PASSED, message="clean"),
+            ]
+        )
+        review = ReviewResult(
+            decision=ReviewDecision.APPROVE,
+            summary="Looks good",
+            confidence=0.9,
+        )
+        result = ev._score(checks, review, repo="o/r", pr_number=1)
+        assert result.test_score == CheckScore.NEEDS_REVISION
+        assert "2 failed" in result.test_feedback
+
+    def test_request_changes_means_needs_revision(self):
+        ev = self._make_evaluator()
+        checks = ChecksReport(
+            results=[
+                CheckResult(name="pytest", status=CheckStatus.PASSED, message="ok"),
+            ]
+        )
+        review = ReviewResult(
+            decision=ReviewDecision.REQUEST_CHANGES,
+            summary="Has bugs",
+            confidence=0.8,
+            issues=["Off by one error"],
+        )
+        result = ev._score(checks, review, repo="o/r", pr_number=1)
+        assert result.review_score == CheckScore.NEEDS_REVISION
+
+    def test_low_confidence_review_means_pass(self):
+        ev = self._make_evaluator()
+        checks = ChecksReport(results=[])
+        review = ReviewResult(
+            decision=ReviewDecision.COMMENT,
+            summary="Minor suggestions",
+            confidence=0.6,
+        )
+        result = ev._score(checks, review, repo="o/r", pr_number=1)
+        assert result.review_score == CheckScore.PASS
+
+    def test_can_revise_under_max(self):
+        ev = self._make_evaluator()
+        assert ev.can_revise(revision_number=0) is True
+        assert ev.can_revise(revision_number=1) is True
+
+    def test_cannot_revise_at_max(self):
+        ev = self._make_evaluator()
+        assert ev.can_revise(revision_number=MAX_REVISIONS) is False
