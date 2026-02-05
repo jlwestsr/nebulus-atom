@@ -5,7 +5,7 @@ import logging
 import os
 import signal
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
@@ -22,6 +22,7 @@ from nebulus_swarm.minion.agent.prompt_builder import IssueContext, build_system
 from nebulus_swarm.minion.github_client import GitHubClient, IssueDetails
 from nebulus_swarm.minion.git_ops import GitOps
 from nebulus_swarm.minion.reporter import Reporter
+from nebulus_swarm.overlord.scope import ScopeConfig
 from nebulus_swarm.reviewer.workflow import ReviewConfig, ReviewWorkflow, WorkflowResult
 
 logger = logging.getLogger(__name__)
@@ -47,6 +48,7 @@ class MinionConfig:
     nebulus_timeout: int
     nebulus_streaming: bool
     minion_timeout: int
+    scope: ScopeConfig = field(default_factory=ScopeConfig.unrestricted)
 
     @classmethod
     def from_env(cls) -> "MinionConfig":
@@ -67,6 +69,7 @@ class MinionConfig:
             nebulus_streaming=os.environ.get("NEBULUS_STREAMING", "false").lower()
             == "true",
             minion_timeout=int(os.environ.get("MINION_TIMEOUT", "1800")),
+            scope=ScopeConfig.from_json(os.environ.get("MINION_SCOPE", "")),
         )
 
     def validate(self) -> list[str]:

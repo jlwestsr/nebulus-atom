@@ -1,6 +1,9 @@
 # tests/test_scope_executor.py
 """Tests for scope enforcement in ToolExecutor."""
 
+import os
+from unittest.mock import patch
+
 import pytest
 
 pytest.importorskip("openai")
@@ -59,3 +62,34 @@ class TestScopedToolExecutor:
         executor = ToolExecutor(workspace=tmp_path)
         result = executor.execute("write_file", {"path": "anywhere.py", "content": "x"})
         assert result.success
+
+
+class TestMinionScopeLoading:
+    def test_minion_config_loads_scope_from_env(self):
+        from nebulus_swarm.minion.main import MinionConfig
+
+        env = {
+            "MINION_ID": "m-1",
+            "GITHUB_REPO": "owner/repo",
+            "GITHUB_ISSUE": "42",
+            "GITHUB_TOKEN": "ghp_test",
+            "MINION_SCOPE": '["src/**", "tests/**"]',
+        }
+        with patch.dict(os.environ, env, clear=True):
+            config = MinionConfig.from_env()
+        assert config.scope is not None
+        assert config.scope.is_write_allowed("src/foo.py")
+        assert not config.scope.is_write_allowed("README.md")
+
+    def test_minion_config_no_scope_means_unrestricted(self):
+        from nebulus_swarm.minion.main import MinionConfig
+
+        env = {
+            "MINION_ID": "m-1",
+            "GITHUB_REPO": "owner/repo",
+            "GITHUB_ISSUE": "42",
+            "GITHUB_TOKEN": "ghp_test",
+        }
+        with patch.dict(os.environ, env, clear=True):
+            config = MinionConfig.from_env()
+        assert config.scope.is_write_allowed("any/file.py")

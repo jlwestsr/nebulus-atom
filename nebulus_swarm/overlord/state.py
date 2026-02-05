@@ -4,9 +4,12 @@ import os
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime
-from typing import Generator, List, Optional
+from typing import TYPE_CHECKING, Generator, List, Optional
 
 from nebulus_swarm.models.minion import Minion, MinionStatus
+
+if TYPE_CHECKING:
+    from nebulus_swarm.overlord.evaluator import EvaluationResult
 
 
 class OverlordState:
@@ -90,6 +93,24 @@ class OverlordState:
                 """
                 CREATE INDEX IF NOT EXISTS idx_history_repo
                 ON work_history(repo)
+            """
+            )
+
+            # Evaluations table - evaluation results for PRs
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS evaluations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    pr_number INTEGER NOT NULL,
+                    repo TEXT NOT NULL,
+                    test_score TEXT NOT NULL,
+                    lint_score TEXT NOT NULL,
+                    review_score TEXT NOT NULL,
+                    overall TEXT NOT NULL,
+                    revision_number INTEGER DEFAULT 0,
+                    feedback TEXT,
+                    evaluated_at TEXT NOT NULL
+                )
             """
             )
 
@@ -287,6 +308,49 @@ class OverlordState:
             cursor = conn.cursor()
             cursor.execute("SELECT DISTINCT repo FROM work_history ORDER BY repo")
             return [row["repo"] for row in cursor.fetchall()]
+
+    def save_evaluation(self, result: "EvaluationResult") -> None:
+        """Save an evaluation result to the database.
+
+        Args:
+            result: EvaluationResult to persist.
+        """
+
+        with self._get_connection() as conn:
+            conn.execute(
+                """INSERT INTO evaluations
+                   (pr_number, repo, test_score, lint_score, review_score,
+                    overall, revision_number, feedback, evaluated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    result.pr_number,
+                    result.repo,
+                    result.test_score.value,
+                    result.lint_score.value,
+                    result.review_score.value,
+                    result.overall.value,
+                    result.revision_number,
+                    result.combined_feedback,
+                    result.timestamp.isoformat(),
+                ),
+            )
+
+    def get_evaluations(self, repo: str, pr_number: int) -> List[dict]:
+        """Get evaluation history for a PR.
+
+        Args:
+            repo: Repository in owner/name format.
+            pr_number: Pull request number.
+
+        Returns:
+            List of evaluation records as dicts.
+        """
+        with self._get_connection() as conn:
+            rows = conn.execute(
+                "SELECT * FROM evaluations WHERE repo = ? AND pr_number = ? ORDER BY evaluated_at",
+                (repo, pr_number),
+            ).fetchall()
+            return [dict(r) for r in rows]
 
     def _row_to_minion(self, row: sqlite3.Row) -> Minion:
         """Convert a database row to a Minion object."""

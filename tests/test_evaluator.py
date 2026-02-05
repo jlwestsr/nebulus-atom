@@ -189,3 +189,23 @@ class TestEvaluator:
     def test_cannot_revise_at_max(self):
         ev = self._make_evaluator()
         assert ev.can_revise(revision_number=MAX_REVISIONS) is False
+
+
+class TestEvaluationStorage:
+    def test_store_and_retrieve_evaluation(self, tmp_path):
+        from nebulus_swarm.overlord.state import OverlordState
+
+        state = OverlordState(db_path=str(tmp_path / "test.db"))
+        result = EvaluationResult(
+            pr_number=42,
+            repo="owner/repo",
+            test_score=CheckScore.PASS,
+            lint_score=CheckScore.PASS,
+            review_score=CheckScore.NEEDS_REVISION,
+            revision_number=1,
+            review_feedback="Needs error handling",
+        )
+        state.save_evaluation(result)
+        history = state.get_evaluations(repo="owner/repo", pr_number=42)
+        assert len(history) == 1
+        assert history[0]["review_score"] == "needs_revision"
