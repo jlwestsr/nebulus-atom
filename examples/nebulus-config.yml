@@ -1,0 +1,88 @@
+# Nebulus Atom Configuration
+# Copy this file to ~/.atom/config.yml or .atom.yml in your project root
+#
+# Configuration precedence (highest first):
+# 1. Environment variables (ATOM_*)
+# 2. Project config (.atom.yml)
+# 3. User config (~/.atom/config.yml)
+# 4. Built-in defaults
+
+# =============================================================================
+# LLM Backend Configuration
+# =============================================================================
+# Atom connects to any OpenAI-compatible API endpoint.
+# Common backends: TabbyAPI, vLLM, MLX Serving, Ollama, OpenAI, Anthropic
+
+llm:
+  # API endpoint URL
+  # - Tier 1 (Mac Mini/Edge): http://localhost:8080/v1 (MLX)
+  # - Tier 2 (Linux/Prime): http://localhost:5000/v1 (TabbyAPI)
+  # - Cloud: https://api.openai.com/v1 or https://api.anthropic.com/v1
+  base_url: "http://localhost:5000/v1"
+
+  # Model identifier
+  # Must match a model available on your backend
+  # Examples:
+  # - TabbyAPI: Meta-Llama-3.1-8B-Instruct-exl2-8_0
+  # - MLX: mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+  # - OpenAI: gpt-4o, gpt-4o-mini
+  # - Anthropic: claude-sonnet-4-20250514
+  model: "Meta-Llama-3.1-8B-Instruct-exl2-8_0"
+
+  # API key (required for cloud providers, usually "not-needed" for local)
+  api_key: "not-needed"
+
+  # Request timeout in seconds
+  # Increase for slower hardware or larger models
+  timeout: 300.0
+
+  # Enable streaming responses
+  # Provides faster perceived response time
+  streaming: true
+
+# =============================================================================
+# Vector Store Configuration (RAG)
+# =============================================================================
+# ChromaDB is used for semantic code search and retrieval-augmented generation
+
+vector_store:
+  # Storage path for ChromaDB
+  # Use absolute path for system-wide, relative for project-specific
+  path: ".nebulus_atom/db"
+
+  # Default collection name
+  # Each project can have its own collection
+  collection: "codebase"
+
+  # Sentence transformer model for embeddings
+  # all-MiniLM-L6-v2 is fast and good quality
+  # For better quality (slower): all-mpnet-base-v2
+  embedding_model: "all-MiniLM-L6-v2"
+
+# =============================================================================
+# Platform-Specific Examples
+# =============================================================================
+# Uncomment and modify the section that matches your deployment
+
+# --- Tier 1: Mac Mini (Edge) with MLX ---
+# llm:
+#   base_url: "http://localhost:8080/v1"
+#   model: "mlx-community/Meta-Llama-3.1-8B-Instruct-4bit"
+#   timeout: 300.0
+# vector_store:
+#   path: "/var/lib/atom/vectors"
+
+# --- Tier 2: Linux SFF (Prime) with TabbyAPI ---
+# llm:
+#   base_url: "http://localhost:5000/v1"
+#   model: "Meta-Llama-3.1-8B-Instruct-exl2-8_0"
+#   timeout: 300.0
+# vector_store:
+#   path: "/var/lib/atom/vectors"
+
+# --- Cloud (OpenAI) ---
+# llm:
+#   base_url: "https://api.openai.com/v1"
+#   model: "gpt-4o-mini"
+#   api_key: "${OPENAI_API_KEY}"  # Set via environment variable
+#   timeout: 60.0
