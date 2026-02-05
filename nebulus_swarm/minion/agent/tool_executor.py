@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 from nebulus_swarm.minion.agent.minion_agent import ToolResult
+from nebulus_swarm.overlord.scope import ScopeConfig
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,7 @@ class ToolExecutor:
         workspace: Path,
         skill_loader: Optional[Callable[[], List[Dict[str, Any]]]] = None,
         skill_getter: Optional[Callable[[str], Optional[str]]] = None,
+        scope: Optional[ScopeConfig] = None,
     ):
         """Initialize tool executor.
 
@@ -37,8 +39,10 @@ class ToolExecutor:
             workspace: Root workspace path (cloned repo).
             skill_loader: Optional function to list available skills.
             skill_getter: Optional function to get skill instructions by name.
+            scope: Optional scope configuration for write restrictions.
         """
         self.workspace = workspace.resolve()
+        self.scope = scope or ScopeConfig.unrestricted()
         self._skill_loader = skill_loader
         self._skill_getter = skill_getter
 
@@ -115,6 +119,12 @@ class ToolExecutor:
 
         return resolved
 
+    def _check_write_scope(self, path: str) -> Optional[str]:
+        """Check if a write to path is allowed by scope. Returns error or None."""
+        if self.scope.is_write_allowed(path):
+            return None
+        return self.scope.violation_message(path)
+
     def _read_file(self, args: Dict[str, Any]) -> ToolResult:
         """Read file contents."""
         path = args.get("path", "")
@@ -183,6 +193,17 @@ class ToolExecutor:
         content = args.get("content", "")
 
         try:
+            # Check scope
+            scope_error = self._check_write_scope(path)
+            if scope_error:
+                return ToolResult(
+                    tool_call_id="",
+                    name="write_file",
+                    success=False,
+                    output="",
+                    error=scope_error,
+                )
+
             resolved = self._resolve_path(path)
 
             # Create parent directories if needed
@@ -213,6 +234,17 @@ class ToolExecutor:
         new_text = args.get("new_text", "")
 
         try:
+            # Check scope
+            scope_error = self._check_write_scope(path)
+            if scope_error:
+                return ToolResult(
+                    tool_call_id="",
+                    name="edit_file",
+                    success=False,
+                    output="",
+                    error=scope_error,
+                )
+
             resolved = self._resolve_path(path)
 
             if not resolved.exists():
