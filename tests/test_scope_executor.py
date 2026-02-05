@@ -1,12 +1,13 @@
 # tests/test_scope_executor.py
 """Tests for scope enforcement in ToolExecutor."""
 
-import os
-from unittest.mock import patch
-
 import pytest
 
+# Guard against missing optional dependencies
 pytest.importorskip("openai")
+
+import os
+from unittest.mock import patch
 
 from nebulus_swarm.minion.agent.tool_executor import ToolExecutor
 from nebulus_swarm.overlord.scope import ScopeConfig, ScopeMode
