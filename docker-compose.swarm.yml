@@ -1,0 +1,77 @@
+# Nebulus Swarm Docker Compose Configuration
+# Use this for local development and testing
+#
+# Usage:
+#   docker-compose -f docker-compose.swarm.yml up -d overlord
+#
+# Required environment variables (create .env.swarm file):
+#   SLACK_BOT_TOKEN=xoxb-...
+#   SLACK_APP_TOKEN=xapp-...
+#   SLACK_CHANNEL_ID=C...
+#   GITHUB_TOKEN=ghp_...
+#   GITHUB_WATCHED_REPOS=owner/repo
+#
+# Build Minion image first:
+#   docker build -t nebulus-minion:latest -f nebulus_swarm/minion/Dockerfile .
+
+version: "3.8"
+
+services:
+  overlord:
+    build:
+      context: .
+      dockerfile: nebulus_swarm/overlord/Dockerfile
+    image: nebulus-overlord:latest
+    container_name: overlord
+    restart: unless-stopped
+    env_file:
+      - .env.swarm
+    environment:
+      # Overlord settings
+      - OVERLORD_STATE_DB=/var/lib/overlord/state.db
+      - OVERLORD_HEALTH_PORT=8080
+      # LLM backend (Mac Mini)
+      - NEBULUS_BASE_URL=${NEBULUS_BASE_URL:-http://192.168.4.30:8080/v1}
+      - NEBULUS_MODEL=${NEBULUS_MODEL:-qwen3-coder-30b}
+      - NEBULUS_TIMEOUT=${NEBULUS_TIMEOUT:-600}
+      - NEBULUS_STREAMING=${NEBULUS_STREAMING:-false}
+      # Minion settings
+      - MAX_CONCURRENT_MINIONS=${MAX_CONCURRENT_MINIONS:-3}
+    volumes:
+      # Persist state database
+      - overlord-state:/var/lib/overlord
+      # Access Docker socket to spawn Minions
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - nebulus-swarm
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Example minion service (for reference - spawned dynamically by Overlord)
+  # minion:
+  #   image: nebulus-minion:latest
+  #   environment:
+  #     - MINION_ID=minion-test
+  #     - GITHUB_REPO=owner/repo
+  #     - GITHUB_ISSUE=1
+  #     - GITHUB_TOKEN=${GITHUB_TOKEN}
+  #     - OVERLORD_CALLBACK_URL=http://overlord:8080/minion/report
+  #     - NEBULUS_BASE_URL=http://192.168.4.30:8080/v1
+  #     - NEBULUS_MODEL=qwen3-coder-30b
+  #   networks:
+  #     - nebulus-swarm
+
+volumes:
+  overlord-state:
+    driver: local
+
+networks:
+  nebulus-swarm:
+    driver: bridge
+    name: nebulus-swarm

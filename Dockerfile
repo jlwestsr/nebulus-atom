@@ -1,21 +1,53 @@
-# Use an official Python runtime as a parent image
-FROM python:3.10-slim
+# Build Stage
+FROM python:3.12-slim AS builder
 
-# Set the working directory in the container
 WORKDIR /app
 
-# Copy the requirements file into the container at /app
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install python dependencies
 COPY requirements.txt .
+RUN pip wheel --no-cache-dir --no-deps --wheel-dir /app/wheels -r requirements.txt
 
-# Install any needed packages specified in requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+# Final Stage
+FROM python:3.12-slim
 
-# Copy the rest of the application code
+WORKDIR /app
+
+# Create a non-root user
+RUN groupadd -r nebulus && useradd -r -g nebulus nebulus
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy wheels from builder
+COPY --from=builder /app/wheels /wheels
+COPY --from=builder /app/requirements.txt .
+
+# Install dependencies
+RUN pip install --no-cache-dir /wheels/*
+
+# Copy application code
 COPY . .
+
+# Set ownership to non-root user
+RUN chown -R nebulus:nebulus /app
+
+# Ensure home directory exists and is writable
+RUN mkdir -p /home/nebulus && chown -R nebulus:nebulus /home/nebulus
+
+# Switch to non-root user
+USER nebulus
 
 # Define environment variable
 ENV PYTHONUNBUFFERED=1
+ENV PATH="/home/nebulus/.local/bin:${PATH}"
 
-# Run the application (Default command, can be overridden)
-# CMD ["python", "src/main.py"]
+# Default command
 CMD ["/bin/bash"]

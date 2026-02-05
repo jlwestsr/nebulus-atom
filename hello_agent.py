@@ -1,1 +1,0 @@
-print("Nebulus is Autonomous")

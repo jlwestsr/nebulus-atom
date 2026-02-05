@@ -1,86 +1,150 @@
-# Mini-Nebulus
+# Nebulus Atom
 
-A professional, lightweight AI agent CLI built with Python, designed for autonomy and extensibility.
+> A professional, autonomous AI engineer CLI powered by local LLMs.
+
+Nebulus Atom is a lightweight CLI agent that interacts with a local LLM server (Nebulus, Ollama, TabbyAPI, vLLM) to assist with software engineering tasks. It includes **Nebulus Swarm**, a multi-agent orchestration system that autonomously processes GitHub issues at scale.
+
+## Quick Start
+
+```bash
+# Clone and install
+git clone git@github.com:jlwestsr/nebulus-atom.git
+cd nebulus-atom
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+
+# Configure your LLM server
+cp .env.example .env
+# Edit .env with your server URL and model name
+
+# Run
+python3 -m nebulus_atom.main start
+```
+
+See the [Installation Guide](https://github.com/jlwestsr/nebulus-atom/wiki/Installation) for detailed setup instructions.
+
+## Features
+
+### Core Agent
+
+- **Context Manager** - Pin files to active context for persistent awareness
+- **Smart Undo** - Auto-checkpoints before risky operations with rollback
+- **Skill Library** - Persistent, reusable capabilities across sessions
+- **Semantic Code Search (RAG)** - ChromaDB-powered code search by meaning
+- **Autonomous Execution** - Multi-turn execution without confirmation prompts
+- **Agentic TDD** - Test-driven development cycle automation
+- **Advanced Cognition** - "System 2" deeper reasoning for complex tasks
+- **MCP Integration** - Model Context Protocol for external tool servers
+- **Interactive Clarification** - Asks questions when requirements are ambiguous
+- **Codebase Cartographer** - AST-based code structure analysis
+- **Sandbox Execution** - Safe command execution with restricted file access
+- **Flight Recorder Dashboard** - Streamlit telemetry dashboard
+
+### Nebulus Swarm
+
+- **Overlord** - Slack-driven control plane with natural language commands
+- **Minions** - Containerized agents that clone repos, work issues, and create PRs
+- **Model Router** - Routes simple tasks to 8B models, complex tasks to 30B
+- **Swarm Dashboard** - Streamlit monitoring with live status, history, queue, and metrics
+- **PR Reviewer** - Automated code review of minion-created pull requests
+- **Clarifying Questions** - Minions ask humans via Slack when requirements are unclear
+- **Cron Scheduling** - Automated queue sweeps on configurable schedules
 
 ## Architecture
 
-Built on the **Nebulus Gantry** standards using a strict **MVC** architecture with a decoupled Gateway interface.
+```
+nebulus-atom/
+├── nebulus_atom/           # Core CLI agent (MVC)
+│   ├── models/             # Data structures
+│   ├── views/              # UI (Rich TUI)
+│   ├── controllers/        # Orchestration
+│   ├── services/           # LLM, RAG, Skills, MCP
+│   └── main.py             # Entry point
+├── nebulus_swarm/           # Multi-agent swarm
+│   ├── overlord/            # Control plane
+│   ├── minion/              # Worker agents
+│   ├── dashboard/           # Streamlit monitoring
+│   └── reviewer/            # PR review
+└── tests/                   # 376 tests
+```
 
-- **Models**: `mini_nebulus/models/` (History, Tasks, Plans)
-- **Views**: `mini_nebulus/views/` (CLI, Discord, Base)
-- **Controllers**: `mini_nebulus/controllers/` (Agent Logic)
-- **Services**: `mini_nebulus/services/` (Skills, Tools, Files)
-- **Gateways**: `mini_nebulus/gateways/` (Discord Bot)
+## Commands
 
-## Prerequisites
-
-- Python 3.12+
-- `venv` or `uv`
-- Local Nebulus/Ollama server running
-
-## Setup
-
-1. Create and activate a virtual environment:
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate
-   ```
-2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-3. Configure `.env`:
-   ```env
-   NEBULUS_BASE_URL=http://nebulus:11434/v1
-   NEBULUS_API_KEY=any
-   NEBULUS_MODEL=qwen2.5-coder:latest
-   DISCORD_TOKEN=your_token_here  # Optional: For Discord Gateway
-   ```
-
-## Features (Implemented)
-
-*   **Autonomous Mission Mode**: Break complex goals into Plans and Tasks (`create_plan`, `add_task`).
-*   **Dynamic Skills**: The agent can write its own tools (`create_skill`) and hot-load them at runtime from `mini_nebulus/skills/`.
-*   **Rich Terminal UI**: Polished CLI experience with spinners, panels, and syntax highlighting.
-*   **Gateway Architecture**: Decoupled design supporting both CLI and Discord interfaces.
-*   **Safe File Ops**: Dedicated `read_file`, `write_file`, and `list_dir` tools.
-
-## Usage
-
-### CLI Agent
-Start the agent in interactive mode:
 ```bash
-python3 -m mini_nebulus.main start
+# Start the agent
+python3 -m nebulus_atom.main start
+
+# Start with a prompt
+python3 -m nebulus_atom.main start "fix the login bug"
+
+# Launch the dashboard
+python3 -m nebulus_atom.main dashboard
+
+# View embedded docs
+python3 -m nebulus_atom.main docs list
 ```
 
-Or with an initial prompt:
+## Swarm Usage
+
 ```bash
-python3 -m mini_nebulus.main start "Create a plan to audit the codebase"
+# Build and start the Overlord
+docker build -t nebulus-overlord:latest -f nebulus_swarm/overlord/Dockerfile .
+docker build -t nebulus-minion:latest -f nebulus_swarm/minion/Dockerfile .
+docker compose -f docker-compose.swarm.yml up -d overlord
 ```
 
-### Discord Bot
-To run the agent as a Discord bot:
-```python
-# Create run_discord.py
-import os
-from mini_nebulus.controllers.agent_controller import AgentController
-from mini_nebulus.gateways.discord_gateway import DiscordGateway
-
-if __name__ == "__main__":
-    bot = DiscordGateway(AgentController())
-    bot.run(os.getenv("DISCORD_TOKEN"))
+Then in Slack:
 ```
+work on owner/repo#42
+status
+queue
+```
+
+## Tech Stack
+
+| Component | Technology |
+|-----------|-----------|
+| Language | Python 3.12+ |
+| CLI | Typer |
+| UI | Rich |
+| LLM Client | OpenAI SDK |
+| Swarm | Docker, Slack Bolt, aiohttp |
+| Dashboard | Streamlit |
+| Database | SQLite, ChromaDB |
+| Testing | pytest (376 tests) |
+
+## Documentation
+
+Full documentation is available on the [GitHub Wiki](https://github.com/jlwestsr/nebulus-atom/wiki):
+
+- [Installation](https://github.com/jlwestsr/nebulus-atom/wiki/Installation)
+- [Quick Start](https://github.com/jlwestsr/nebulus-atom/wiki/Quick-Start)
+- [Architecture](https://github.com/jlwestsr/nebulus-atom/wiki/Architecture)
+- [CLI Reference](https://github.com/jlwestsr/nebulus-atom/wiki/CLI-Reference)
+- [Configuration](https://github.com/jlwestsr/nebulus-atom/wiki/Configuration)
+- [Nebulus Swarm](https://github.com/jlwestsr/nebulus-atom/wiki/Nebulus-Swarm)
+- [Deployment](https://github.com/jlwestsr/nebulus-atom/wiki/Deployment)
+- [Testing](https://github.com/jlwestsr/nebulus-atom/wiki/Testing)
+- [Contributing](https://github.com/jlwestsr/nebulus-atom/wiki/Contributing)
 
 ## Development
 
-- **Linting**: `pre-commit run --all-files` (Uses `ruff`)
-- **Format**: `ruff format`
+```bash
+# Install dev dependencies
+pip install -r requirements-dev.txt
+pre-commit install
 
-## Feature Roadmap
-The following features are planned for future development. See `docs/features/` for detailed specifications.
+# Run tests
+python3 -m pytest tests/ -v
 
-- **[Context Manager](docs/features/context_manager.md)**: File pinning for persistent context.
-- **[Smart Undo](docs/features/smart_undo.md)**: Transactional filesystem with rollback.
-- **[Interactive Clarification](docs/features/interactive_clarification.md)**: Human-in-the-loop support.
-- **[Skill Library](docs/features/skill_library.md)**: Persistent and global skill sharing.
-- **[Visual Task Graph](docs/features/visual_task_graph.md)**: Visualization of complex task dependencies.
+# Git workflow (always use feature branches)
+git checkout -b feat/my-feature
+# ... make changes ...
+git checkout develop
+git merge feat/my-feature --no-ff
+git push nebulus-atom develop
+```
+
+## License
+
+See repository for license details.

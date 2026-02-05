@@ -1,0 +1,7 @@
+# Nebulus Skills Index
+# Lists all available skills for Minion agents
+
+skills:
+  - write-tests.yaml
+  - fix-bug.yaml
+  - add-feature.yaml

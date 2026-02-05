@@ -1,29 +1,151 @@
-# Node.js
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-package-lock.json
-
+# =============================================================================
 # Python
-venv/
+# =============================================================================
 __pycache__/
 *.py[cod]
 *$py.class
-.pytest_cache/
-.mypy_cache/
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
-# Environment / Secrets
+# =============================================================================
+# Virtual Environments
+# =============================================================================
+venv/
+ENV/
+env/
+.venv/
+
+# =============================================================================
+# IDEs and Editors
+# =============================================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+
+# =============================================================================
+# OS Generated
+# =============================================================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# =============================================================================
+# Environment / Secrets - CRITICAL FOR SECURITY
+# =============================================================================
 .env
 .env.local
 .env.*.local
+.env.production
+.env.staging
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+secrets/
+secrets.yaml
+secrets.yml
+secrets.json
+credentials.json
+service-account*.json
+*_credentials*
+*_secret*
+api_key*
+apikey*
+auth_token*
 
-# Local / IDE
-.vscode/
-.idea/
-.DS_Store
+# =============================================================================
+# Testing
+# =============================================================================
+.pytest_cache/
+.tox/
+.coverage
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# =============================================================================
+# Project Specific - Nebulus Atom
+# =============================================================================
+# Entire .nebulus_atom directory (user/session data)
+.nebulus_atom/
+
+# Legacy files (no longer used)
+.mini_nebulus/
+.mini_nebulus_history
+.nebulus_atom_history
+
+# Other AI tool directories
 .gemini/
+.scratchpad/
+.aider/
+.claude/
+.serena/
 
-# Project Specific
+# Logs and temp files
 logs/
+*.log
 tmp/
+temp/
+
+# Database files
+**/*.sqlite3
+**/*.db
+*.sqlite
+*.sqlite3
+
+# Backup and checkpoint files
+*.tar.gz
+*.bak
+*.backup
+
+# =============================================================================
+# Documentation Build
+# =============================================================================
+site/
+docs/_build/
+
+# =============================================================================
+# Jupyter Notebooks
+# =============================================================================
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# =============================================================================
+# Docker
+# =============================================================================
+# Don't ignore Dockerfiles, but ignore local overrides
+docker-compose.override.yml
+docker-compose.local.yml
+.env.minion-test
+
+# GitHub Wiki (separate git repo)
+wiki/

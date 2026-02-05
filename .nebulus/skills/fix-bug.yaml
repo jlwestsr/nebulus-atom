@@ -1,0 +1,58 @@
+name: fix-bug
+description: Diagnose and fix bugs in the codebase
+version: 1.0.0
+tags:
+  - debugging
+  - bugfix
+  - maintenance
+
+triggers:
+  keywords:
+    - bug
+    - fix
+    - broken
+    - error
+    - crash
+    - issue
+    - not working
+    - fails
+  labels:
+    - bug
+    - bugfix
+    - defect
+
+instructions: |
+  When fixing a bug:
+
+  1. **Understand the bug**
+     - Read the issue description carefully
+     - Identify expected vs actual behavior
+     - Note any error messages or stack traces
+
+  2. **Reproduce the issue**
+     - Find or write a test that demonstrates the bug
+     - Run it to confirm the failure
+     - This test will verify your fix works
+
+  3. **Locate the source**
+     - Search for relevant code using keywords from the error
+     - Trace the code path that leads to the bug
+     - Read surrounding code for context
+
+  4. **Fix the bug**
+     - Make the minimal change needed
+     - Don't refactor unrelated code
+     - Add comments only if the fix is non-obvious
+
+  5. **Verify the fix**
+     - Run your reproduction test - it should pass now
+     - Run the full test suite to check for regressions
+     - Test edge cases related to your change
+
+  6. **Document if needed**
+     - If the bug was due to a subtle issue, add a code comment
+     - Update any affected documentation
+
+examples:
+  - input: "Fix: login fails when username contains spaces"
+    approach: "Find login code, add test with space in username, fix validation/encoding issue"

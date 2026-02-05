@@ -1,9 +1,34 @@
-version: '3.8'
-
 services:
-  app:
+  agent:
     build: .
+    image: nebulus-atom:latest
+    container_name: nebulus-atom-agent
     volumes:
-      - .:/app
-    # command: python src/main.py
-    command: tail -f /dev/null # Keep the container running for development
+      - ./nebulus_atom/data:/app/nebulus_atom/data
+      - ./nebulus_atom/skills:/app/nebulus_atom/skills
+      - ./.scratchpad:/app/.scratchpad
+    env_file:
+      - .env
+    environment:
+      - NEBULUS_BASE_URL=http://host.docker.internal:5000/v1
+      - NEBULUS_MODEL=Meta-Llama-3.1-8B-Instruct-exl2-8_0
+    stdin_open: true # docker run -i
+    tty: true # docker run -t
+    command: python -m nebulus_atom.main start --tui
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  dashboard:
+    build: .
+    image: nebulus-atom:latest
+    container_name: nebulus-atom-dashboard
+    volumes:
+      - ./nebulus_atom/data:/app/nebulus_atom/data
+    env_file:
+      - .env
+    environment:
+      - STREAMLIT_SERVER_PORT=8501
+      - STREAMLIT_SERVER_ADDRESS=0.0.0.0
+    ports:
+      - "8501:8501"
+    command: python -m nebulus_atom.main dashboard

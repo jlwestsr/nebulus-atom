@@ -9,7 +9,7 @@ We follow a strict **Gitflow-lite** workflow.
 - **`develop`**: Integration branch for the next release. **All work merges here.**
 
 ### Temporary Branches (Local Only)
-**CRITICAL**: These branches exist **ONLY** on your local machine. You generally do **NOT** push them to origin unless working on a long-lived collaborative feature.
+**CRITICAL**: These branches exist **ONLY** on your local machine. You generally do **NOT** push them to nebulus-atom unless working on a long-lived collaborative feature.
 
 - **`feat/name`**: New features (models, services, UI).
 - **`fix/description`**: Bug fixes.
@@ -21,7 +21,7 @@ We follow a strict **Gitflow-lite** workflow.
 1.  **Start**: Checkout `develop` and pull latest.
     ```bash
     git checkout develop
-    git pull origin develop
+    git pull nebulus-atom develop
     ```
 2.  **Branch**: Create a specific local branch.
     ```bash
@@ -39,7 +39,7 @@ We follow a strict **Gitflow-lite** workflow.
     ```
 6.  **Push**: Push **ONLY** `develop`.
     ```bash
-    git push origin develop
+    git push nebulus-atom develop
     ```
 7.  **Cleanup**: Delete the local branch.
     ```bash

@@ -1,0 +1,16 @@
+# Dockerfile.web - The Face 🌐
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Install dependencies
+RUN pip install streamlit requests websockets
+
+# Copy Web App
+COPY nebulus_atom/web ./nebulus_atom/web
+
+# Expose Streamlit Port
+EXPOSE 8501
+
+# Run the app
+CMD ["streamlit", "run", "nebulus_atom/web/app.py", "--server.address=0.0.0.0"]

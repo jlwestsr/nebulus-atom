@@ -1,7 +1,13 @@
-# AI Directives for Mini-Nebulus
+# AI Directives for Nebulus Atom
 
+# Autonomy Mandates
+1. **Autonomous Implementation**: Once a task is IN_PROGRESS, execute it immediately.
+2. **No Permission needed**: Do NOT ask for permission to write individual files or run standard shell commands if they are part of the active plan.
+3. **JSON Tool Output**: ALWAYS output tool calls in JSON. NEVER just print code blocks without using a tool to save them.
+
+# Development Standards
 1. **Commit Messages**: Use Conventional Commits.
-2. **Branching**: All work happens on `develop`. `main` is for stable releases.
+2. **Branching**: All work happens on `develop` (via local feature branches). `main` is for stable releases.
 3. **Coding Style**: Python 3.12+ with Type Hinting.
 4. **Testing**: `pytest` for unit tests.
 5. **Linting**: `ruff` is enforced via pre-commit.
@@ -11,10 +17,10 @@
 We adhere to the **MVC (Model-View-Controller)** pattern for this Python CLI application.
 
 ## Directory Structure
-- **mini_nebulus/models/**: Data structures (Pydantic/Dataclasses).
-- **mini_nebulus/views/**: UI logic using `rich`.
-- **mini_nebulus/controllers/**: Orchestration logic.
-- **mini_nebulus/services/**: Integrations (OpenAI, Subprocess).
+- **nebulus_atom/models/**: Data structures (Pydantic/Dataclasses).
+- **nebulus_atom/views/**: UI logic using `rich`.
+- **nebulus_atom/controllers/**: Orchestration logic.
+- **nebulus_atom/services/**: Integrations (OpenAI, Subprocess).
 
 ## Coding Standards
 - **Type Hints**: Mandatory for all function signatures.
@@ -35,3 +41,10 @@ We adhere to the **MVC (Model-View-Controller)** pattern for this Python CLI app
 - **Local-Only Policy**: Do not push feature branches to remote. Merge them into `develop` locally, then push `develop`.
 - **Commit Messages**: Strictly follow [Conventional Commits](https://www.conventionalcommits.org/).
 - **Verification**: Ensure `pre-commit run --all-files` passes.
+
+# Strict Execution Protocol
+1. **Stop Talking, Start Coding**: If you describe a technical step, you MUST execute it in the same turn using a tool.
+2. **Assume Approval**: Once a plan is confirmed, you have full approval to implement all tasks. Do not ask "Should I proceed?" or "Is this okay?". Just do it.
+
+## Communication Standards
+- **Prompt Delivery**: When suggesting a prompt for the user to run, ALWAYS wrap it in a code block under a "Proposed Prompt" header. This facilitates easy copy/pasting.
