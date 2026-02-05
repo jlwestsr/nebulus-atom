@@ -635,6 +635,23 @@ class Overlord:
                 if pr_number and self._reviewer and self.config.reviewer.auto_review:
                     asyncio.create_task(self._run_review_async(minion.repo, pr_number))
 
+                # TODO: Evaluate completion and handle revision requests
+                # This is the integration point for Evaluator.evaluate()
+                # After running checks + review, call:
+                #   result, revision_request = evaluator.evaluate(
+                #       checks=checks_report,
+                #       review=review_result,
+                #       repo=minion.repo,
+                #       pr_number=pr_number,
+                #       revision_number=minion.revision_number,
+                #       issue_number=minion.issue_number,
+                #       branch=minion.branch,
+                #   )
+                # Then:
+                #   - Save result: self.state.save_evaluation(result)
+                #   - If revision_request: dispatch revision task to Minion
+                #   - Notify Slack of evaluation outcome
+
                 # Clean up container
                 self.docker.kill_minion(minion_id)
 

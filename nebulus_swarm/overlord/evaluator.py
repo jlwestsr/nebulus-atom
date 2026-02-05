@@ -4,6 +4,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
+from typing import Optional
 
 from nebulus_swarm.reviewer.checks import ChecksReport, CheckStatus
 from nebulus_swarm.reviewer.pr_reviewer import ReviewDecision, ReviewResult
@@ -91,6 +92,50 @@ class Evaluator:
     def can_revise(self, revision_number: int) -> bool:
         """Check if another revision is allowed."""
         return revision_number < MAX_REVISIONS
+
+    def evaluate(
+        self,
+        checks: ChecksReport,
+        review: ReviewResult,
+        repo: str,
+        pr_number: int,
+        revision_number: int = 0,
+        issue_number: int = 0,
+        branch: str = "",
+    ) -> tuple[EvaluationResult, Optional[RevisionRequest]]:
+        """Evaluate a Minion's work and determine if revision is needed.
+
+        Args:
+            checks: ChecksReport from automated checks.
+            review: ReviewResult from LLM review.
+            repo: Repository name (owner/repo).
+            pr_number: Pull request number.
+            revision_number: Current revision number (0 for first attempt).
+            issue_number: GitHub issue number.
+            branch: Branch name.
+
+        Returns:
+            Tuple of (EvaluationResult, Optional[RevisionRequest]).
+            RevisionRequest is created if work needs revision and can_revise is True.
+        """
+        # Get the evaluation result
+        result = self._score(checks, review, repo, pr_number, revision_number)
+
+        # Determine if revision is needed and allowed
+        revision_request = None
+        if result.overall == CheckScore.NEEDS_REVISION and self.can_revise(
+            revision_number
+        ):
+            revision_request = RevisionRequest(
+                repo=repo,
+                pr_number=pr_number,
+                issue_number=issue_number,
+                branch=branch,
+                feedback=result.combined_feedback,
+                revision_number=revision_number + 1,
+            )
+
+        return result, revision_request
 
     def _score(
         self,
