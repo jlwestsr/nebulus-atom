@@ -210,5 +210,59 @@ def proposals(
         )
 
 
+@app.command("audit")
+def audit(
+    action: str = typer.Argument(..., help="Action: 'verify' or 'export'"),
+    task_id: Optional[str] = typer.Option(
+        None, "--task", "-t", help="Filter by task ID"
+    ),
+    output: Optional[str] = typer.Option(
+        None, "--output", "-o", help="Output file for export"
+    ),
+):
+    """
+    Manage the audit trail for compliance.
+    """
+    from pathlib import Path
+    from nebulus_swarm.overlord.audit_trail import (
+        AuditTrail,
+        load_or_create_signing_key,
+    )
+
+    console = Console()
+
+    # Default paths
+    atom_dir = Path.home() / ".atom"
+    db_path = atom_dir / "audit_trail.db"
+    key_path = atom_dir / "signing_key"
+
+    signing_key = load_or_create_signing_key(key_path) if key_path.exists() else None
+    trail = AuditTrail(str(db_path), signing_key)
+
+    if action == "verify":
+        is_valid, issues = trail.verify_integrity()
+        if is_valid:
+            console.print("[green]Audit trail integrity verified.[/green]")
+        else:
+            console.print("[red]Audit trail integrity check FAILED:[/red]")
+            for issue in issues:
+                console.print(f"  - {issue}")
+
+    elif action == "export":
+        import json
+
+        data = trail.export(task_id)
+        json_output = json.dumps(data, indent=2)
+
+        if output:
+            Path(output).write_text(json_output)
+            console.print(f"[green]Exported to {output}[/green]")
+        else:
+            console.print(json_output)
+
+    else:
+        console.print(f"[red]Unknown action: {action}. Use 'verify' or 'export'.[/red]")
+
+
 if __name__ == "__main__":
     app()
