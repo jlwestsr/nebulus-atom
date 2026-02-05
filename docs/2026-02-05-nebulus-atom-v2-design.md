@@ -22,6 +22,7 @@ Atom has two packages today:
 **V2 Phase 2:** COMPLETE (core items) — evaluator, scope enforcement, enhancement proposals. 691 tests.
 **V2 Phase 3:** COMPLETE — Proposals CLI wired, Evaluator.evaluate() method, LLM connection pool, Minion pool integration, backend compatibility matrix, skill evolution workflow. 738 tests passing (47 new).
 **V2 Phase 4:** COMPLETE — Provisioning config documentation, example configs, MCP client integration with graceful degradation. 754 tests passing (16 new).
+**V2 Phase 5:** COMPLETE — Small-model auditor, hybrid audit trail with hash chains, platform health API client, certification packages. 826 tests passing (72 new).
 
 ## V2 Vision
 
@@ -157,25 +158,13 @@ Only relevant when Atom is deployed on Nebulus appliances. Not needed for standa
 
 Informed by Claude–Gemini brainstorming session (2026-02-05). These items should be designed before the architecture hardens but implemented after Phase 2.
 
-14. **Small-model auditor** — Run a lightweight model (<3B params, ~2GB VRAM) as a structural validator alongside the primary model. Its job is to verify that worker output conforms to schema, logic, and safety constraints before reaching the Supervisor. Not a replacement for human review — a pre-filter that catches obvious failures. Candidates: Phi-3.5-mini, Qwen-2.5-1.5B. Fits within the 24GB VRAM ceiling alongside the primary model.
+14. ~~**Small-model auditor**~~ **DONE (2026-02-05)** — Created `nebulus_swarm/overlord/auditor.py` with structural validation. Checks Python syntax (AST), JSON schema, safety patterns (eval, exec, dangerous shell calls). Optional LLM review via `ATOM_AUDITOR_MODEL`. Config: `ATOM_AUDITOR_ENABLED` (default false), `ATOM_AUDITOR_STRICT`. 21 tests.
 
-15. **Hybrid audit trail** — Two-layer logging architecture aligned with existing ownership boundaries:
-    - **Atom (application level):** Logs intent and reasoning — "Semantic Logs." What the Supervisor decided, why, what it dispatched. Signed with an application-level key (Ed25519).
-    - **Platform (Edge/Prime level):** Logs execution results and system state — "Execution Receipts." Includes hash of the corresponding Semantic Log. Signed by hardware: **Secure Enclave** on macOS (Tier 1), **TPM 2.0** on Linux (Tier 2/3).
-    - **Result:** Immutable link between what was intended and what actually happened. Required for HIPAA, legal discovery, and financial audit compliance.
+15. ~~**Hybrid audit trail**~~ **DONE (2026-02-05)** — Created `nebulus_swarm/overlord/audit_trail.py` with hash chain tamper evidence and optional Ed25519 signing. `SemanticLog` captures task lifecycle events. CLI commands `audit verify` and `audit export`. 15 tests.
 
-16. **Platform health API** — Edge and Prime expose a health endpoint reporting thermal state, VRAM usage, inference latency, and system load. Atom's Supervisor queries this API to:
-    - Dynamically adjust worker timeouts (e.g., double timeout at Thermal Level 2)
-    - Throttle dispatch rate or switch to a smaller model when hardware is stressed
-    - Pause non-essential background tasks until the system cools
-    - This keeps hardware awareness in the platform (where it belongs) and out of Atom (standalone product).
+16. ~~**Platform health API**~~ **DONE (2026-02-05)** — Created `nebulus_swarm/integrations/health_client.py`. Queries platform for thermal_level, vram_percent, cpu_percent, inference_latency. Timeout multipliers: 1.5x warm, 2.0x hot, 3.0x critical. Dispatch pause at level 3. Model switch at VRAM >90%. 23 tests.
 
-17. **Certification Packages** — The practical middle ground between "approve everything" (bottleneck) and "autonomous self-improvement" (trust violation). When the Supervisor proposes an enhancement, it bundles:
-    1. The proposed diff
-    2. Test execution results
-    3. Auditor model's evaluation score
-    4. Impact analysis (estimated performance/thermal delta)
-    - The human reviews and approves the **package**, not individual lines. This shifts the role from "code reviewer" to "approver" — higher velocity with the same safety guarantee.
+17. ~~**Certification Packages**~~ **DONE (2026-02-05)** — Created `nebulus_swarm/overlord/certification.py`. `CertificationPackage` bundles proposal + diff + test results + auditor score + evaluator score + impact analysis. `CertificationBuilder` with fluent API. JSON export for compliance audits. 13 tests.
 
 **Future (V3):**
 - Hardware-signed execution receipts (Secure Enclave / TPM signing every inference result)
