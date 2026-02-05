@@ -11,7 +11,14 @@ transformers_logging.set_verbosity_error()
 
 
 class RagService:
-    def __init__(self, db_path=".nebulus_atom/db", collection_name="codebase"):
+    def __init__(self, db_path=None, collection_name=None):
+        from nebulus_atom.settings import get_settings
+
+        vs = get_settings().vector_store
+        db_path = db_path or vs.path
+        collection_name = collection_name or vs.collection
+        self._embedding_model_name = vs.embedding_model
+
         self.client = chromadb.PersistentClient(path=db_path)
         self.collection = self.client.get_or_create_collection(name=collection_name)
         self.history_collection = self.client.get_or_create_collection(
@@ -41,8 +48,7 @@ class RagService:
                         sys.stderr = old_stderr
 
             with suppress_output():
-                # Use a lighter model for speed or the configured one
-                self._model_instance = SentenceTransformer("all-MiniLM-L6-v2")
+                self._model_instance = SentenceTransformer(self._embedding_model_name)
         return self._model_instance
 
     async def index_codebase(self, root_dir: str = "."):

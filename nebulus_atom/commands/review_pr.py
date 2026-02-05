@@ -48,30 +48,31 @@ def detect_repo_from_git() -> Optional[str]:
 
 
 def load_review_config() -> ReviewConfig:
-    """Load review configuration from environment variables.
+    """Load review configuration from unified settings.
 
-    Requires GITHUB_TOKEN. Uses NEBULUS_BASE_URL and NEBULUS_MODEL
-    with sensible defaults.
+    Requires GITHUB_TOKEN. LLM settings come from ~/.atom/config.yml,
+    .atom.yml, or ATOM_*/NEBULUS_* env vars.
 
     Returns:
-        ReviewConfig populated from environment.
+        ReviewConfig populated from settings.
 
     Raises:
         SystemExit: If GITHUB_TOKEN is not set.
     """
+    from nebulus_atom.settings import get_settings
+
     github_token = os.environ.get("GITHUB_TOKEN")
     if not github_token:
         print("Error: GITHUB_TOKEN environment variable is required.")
         print("Set it in your .env file or export it in your shell.")
         sys.exit(1)
 
+    settings = get_settings()
     return ReviewConfig(
         github_token=github_token,
-        llm_base_url=os.environ.get("NEBULUS_BASE_URL", "http://localhost:5000/v1"),
-        llm_model=os.environ.get(
-            "NEBULUS_MODEL", "Meta-Llama-3.1-8B-Instruct-exl2-8_0"
-        ),
-        llm_timeout=int(os.environ.get("NEBULUS_TIMEOUT", "120")),
+        llm_base_url=settings.llm.base_url,
+        llm_model=settings.llm.model,
+        llm_timeout=int(settings.llm.timeout),
         auto_merge_enabled=False,
         run_local_checks=True,
     )

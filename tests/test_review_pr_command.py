@@ -80,31 +80,43 @@ class TestDetectRepoFromGit:
 
 class TestLoadReviewConfig:
     def test_loads_from_env(self):
+        from nebulus_atom.settings import reset_settings
+
         env = {
             "GITHUB_TOKEN": "ghp_test123",
             "NEBULUS_BASE_URL": "http://localhost:8080/v1",
             "NEBULUS_MODEL": "qwen3-30b",
         }
         with patch.dict("os.environ", env, clear=False):
+            reset_settings()
             cfg = load_review_config()
+            reset_settings()
         assert cfg.github_token == "ghp_test123"
         assert cfg.llm_base_url == "http://localhost:8080/v1"
         assert cfg.llm_model == "qwen3-30b"
         assert cfg.auto_merge_enabled is False
 
     def test_raises_without_github_token(self):
+        from nebulus_atom.settings import reset_settings
+
         env = {
             "NEBULUS_BASE_URL": "http://localhost:8080/v1",
             "NEBULUS_MODEL": "qwen3-30b",
         }
         with patch.dict("os.environ", env, clear=True):
+            reset_settings()
             with pytest.raises(SystemExit):
                 load_review_config()
+            reset_settings()
 
     def test_uses_default_llm_settings(self):
+        from nebulus_atom.settings import reset_settings
+
         env = {"GITHUB_TOKEN": "ghp_test123"}
         with patch.dict("os.environ", env, clear=True):
+            reset_settings()
             cfg = load_review_config()
+            reset_settings()
         assert cfg.llm_base_url == "http://localhost:5000/v1"
         assert cfg.llm_model == "Meta-Llama-3.1-8B-Instruct-exl2-8_0"
 

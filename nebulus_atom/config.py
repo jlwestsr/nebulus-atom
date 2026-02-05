@@ -4,19 +4,24 @@ from dotenv import load_dotenv
 # Explicitly load .env from current working directory
 load_dotenv(os.path.join(os.getcwd(), ".env"))
 
+# Load unified settings (after dotenv so env vars are available)
+from nebulus_atom.settings import get_settings as _get_settings  # noqa: E402
+
+_s = _get_settings()
+
 
 class Config:
     # User config directory
     USER_CONFIG_DIR = os.path.expanduser("~/.nebulus_atom")
     HISTORY_FILE = os.path.join(USER_CONFIG_DIR, "history")
 
-    NEBULUS_BASE_URL = os.getenv("NEBULUS_BASE_URL")
-    NEBULUS_API_KEY = os.getenv("NEBULUS_API_KEY")
-    NEBULUS_MODEL = os.getenv("NEBULUS_MODEL", "qwen3:30b-a3b")
-    # Timeout in seconds for LLM requests (default 300s = 5 min for large models)
-    NEBULUS_TIMEOUT = float(os.getenv("NEBULUS_TIMEOUT", "300"))
-    # Enable/disable streaming (some MLX servers don't support SSE streaming)
-    NEBULUS_STREAMING = os.getenv("NEBULUS_STREAMING", "true").lower() == "true"
+    # LLM settings — sourced from ~/.atom/config.yml, .atom.yml, or env vars
+    NEBULUS_BASE_URL = _s.llm.base_url
+    NEBULUS_API_KEY = _s.llm.api_key
+    NEBULUS_MODEL = _s.llm.model
+    NEBULUS_TIMEOUT = _s.llm.timeout
+    NEBULUS_STREAMING = _s.llm.streaming
+
     EXIT_COMMANDS = ["exit", "quit", "/exit", "/quit"]
     SANDBOX_MODE = os.getenv("SANDBOX_MODE", "false").lower() == "true"
     GLOBAL_SKILLS_PATH = os.path.join(USER_CONFIG_DIR, "skills")
