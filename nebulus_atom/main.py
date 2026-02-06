@@ -10,7 +10,10 @@ from rich.console import Console
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
 os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"
 
+from nebulus_atom.commands.overlord_commands import overlord_app
+
 app = typer.Typer(invoke_without_command=True)
+app.add_typer(overlord_app, name="overlord")
 
 
 @app.callback()
