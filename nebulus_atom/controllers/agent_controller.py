@@ -132,19 +132,24 @@ Example:
         if not await self._check_llm_health():
             return
 
-        await self.view.print_welcome()
+        try:
+            await self.view.print_welcome()
 
-        if initial_prompt:
-            self.history_manager.get_session(session_id).add("user", initial_prompt)
-            if hasattr(self.view, "start_app") and not isinstance(self.view, CLIView):
-                asyncio.create_task(self.process_turn(session_id))
+            if initial_prompt:
+                self.history_manager.get_session(session_id).add("user", initial_prompt)
+                if hasattr(self.view, "start_app") and not isinstance(
+                    self.view, CLIView
+                ):
+                    asyncio.create_task(self.process_turn(session_id))
+                else:
+                    await self.process_turn(session_id)
+
+            if hasattr(self.view, "start_app"):
+                await self.view.start_app()
             else:
-                await self.process_turn(session_id)
-
-        if hasattr(self.view, "start_app"):
-            await self.view.start_app()
-        else:
-            await self.chat_loop(session_id)
+                await self.chat_loop(session_id)
+        finally:
+            await ToolExecutor.shutdown()
 
     async def handle_tui_input(
         self, user_input: str, session_id: str = "default"

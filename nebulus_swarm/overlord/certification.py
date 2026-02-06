@@ -17,6 +17,8 @@ logger = logging.getLogger(__name__)
 class TestResult:
     """Summary of test execution results."""
 
+    __test__ = False  # Prevent pytest from collecting this dataclass
+
     total: int
     passed: int
     failed: int
