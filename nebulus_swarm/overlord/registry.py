@@ -65,6 +65,7 @@ class OverlordConfig:
     autonomy_global: str = "cautious"
     autonomy_overrides: dict[str, str] = field(default_factory=dict)
     autonomy_pre_approved: dict[str, list[str]] = field(default_factory=dict)
+    models: dict[str, dict[str, object]] = field(default_factory=dict)
 
 
 def load_config(path: Optional[Path] = None) -> OverlordConfig:
@@ -109,6 +110,7 @@ def load_config(path: Optional[Path] = None) -> OverlordConfig:
     autonomy_global = raw.get("autonomy", {}).get("global", "cautious")
     autonomy_overrides = raw.get("autonomy", {}).get("overrides", {})
     autonomy_pre_approved = raw.get("autonomy", {}).get("pre_approved", {})
+    models = raw.get("models", {})
 
     return OverlordConfig(
         projects=projects,
@@ -118,6 +120,7 @@ def load_config(path: Optional[Path] = None) -> OverlordConfig:
             str(k): [str(action) for action in v]
             for k, v in autonomy_pre_approved.items()
         },
+        models=dict(models) if isinstance(models, dict) else {},
     )
 
 
