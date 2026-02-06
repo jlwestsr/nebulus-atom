@@ -297,6 +297,97 @@ def show_scope(
     _render_scope(scope, verdict, autonomy)
 
 
+@overlord_app.command("autonomy")
+def manage_autonomy(
+    global_level: Optional[str] = typer.Option(
+        None, "--global", help="Set global autonomy level"
+    ),
+    project: Optional[str] = typer.Option(
+        None, "--project", "-p", help="Project to configure"
+    ),
+    level: Optional[str] = typer.Option(
+        None, "--level", "-l", help="Autonomy level for project"
+    ),
+    list_approved: bool = typer.Option(
+        False, "--list-approved", help="Show pre-approved actions"
+    ),
+) -> None:
+    """Manage autonomy settings."""
+    from nebulus_swarm.overlord.autonomy import AutonomyEngine, get_autonomy_summary
+
+    registry = _load_registry_or_exit()
+    if registry is None:
+        return
+
+    engine = AutonomyEngine(registry)
+
+    # List pre-approved actions
+    if list_approved:
+        if not registry.autonomy_pre_approved:
+            console.print("[dim]No pre-approved actions configured.[/dim]")
+            return
+
+        table = Table(title="Pre-Approved Actions")
+        table.add_column("Project", style="bold")
+        table.add_column("Level")
+        table.add_column("Pre-Approved Actions")
+
+        for proj_name in sorted(registry.autonomy_pre_approved.keys()):
+            level = engine.get_level(proj_name)
+            actions = registry.autonomy_pre_approved[proj_name]
+            table.add_row(
+                proj_name,
+                level,
+                "\n".join(f"  • {a}" for a in actions) if actions else "-",
+            )
+
+        console.print(table)
+        return
+
+    # Set global level
+    if global_level:
+        console.print(
+            f"[yellow]Setting global autonomy level requires editing "
+            f"{DEFAULT_CONFIG_PATH}[/yellow]\n"
+            f"Current global level: {registry.autonomy_global}\n"
+            f"Requested level: {global_level}\n\n"
+            f"To apply, edit autonomy.global in the config file."
+        )
+        return
+
+    # Set project-specific level
+    if project and level:
+        console.print(
+            f"[yellow]Setting project autonomy level requires editing "
+            f"{DEFAULT_CONFIG_PATH}[/yellow]\n"
+            f"Current level for {project}: {engine.get_level(project)}\n"
+            f"Requested level: {level}\n\n"
+            f"To apply, add to autonomy.overrides in the config file."
+        )
+        return
+
+    # Show current settings (default behavior)
+    summary = get_autonomy_summary(registry)
+
+    table = Table(title="Autonomy Settings")
+    table.add_column("Project", style="bold")
+    table.add_column("Level")
+    table.add_column("Source")
+
+    # Global row first
+    table.add_row("(global)", summary["__global__"], "config default")
+
+    # Per-project rows
+    for proj_name in sorted(registry.projects.keys()):
+        level = summary[proj_name]
+        source = (
+            "project override" if proj_name in registry.autonomy_overrides else "global"
+        )
+        table.add_row(proj_name, level, source)
+
+    console.print(table)
+
+
 # --- Helpers ---
 
 

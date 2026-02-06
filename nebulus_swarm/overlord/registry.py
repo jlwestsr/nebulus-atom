@@ -64,6 +64,7 @@ class OverlordConfig:
     projects: dict[str, ProjectConfig] = field(default_factory=dict)
     autonomy_global: str = "cautious"
     autonomy_overrides: dict[str, str] = field(default_factory=dict)
+    autonomy_pre_approved: dict[str, list[str]] = field(default_factory=dict)
 
 
 def load_config(path: Optional[Path] = None) -> OverlordConfig:
@@ -107,11 +108,16 @@ def load_config(path: Optional[Path] = None) -> OverlordConfig:
 
     autonomy_global = raw.get("autonomy", {}).get("global", "cautious")
     autonomy_overrides = raw.get("autonomy", {}).get("overrides", {})
+    autonomy_pre_approved = raw.get("autonomy", {}).get("pre_approved", {})
 
     return OverlordConfig(
         projects=projects,
         autonomy_global=str(autonomy_global),
         autonomy_overrides={str(k): str(v) for k, v in autonomy_overrides.items()},
+        autonomy_pre_approved={
+            str(k): [str(action) for action in v]
+            for k, v in autonomy_pre_approved.items()
+        },
     )
 
 
@@ -142,6 +148,13 @@ def validate_config(config: OverlordConfig) -> list[str]:
             )
         if proj_name not in config.projects:
             errors.append(f"Autonomy override references unknown project '{proj_name}'")
+
+    # Validate pre-approved actions reference valid projects
+    for proj_name in config.autonomy_pre_approved:
+        if proj_name not in config.projects:
+            errors.append(
+                f"Pre-approved actions reference unknown project '{proj_name}'"
+            )
 
     # Validate each project
     for name, proj in config.projects.items():
