@@ -28,6 +28,7 @@ from nebulus_swarm.overlord.scanner import scan_ecosystem, scan_project
 from nebulus_swarm.overlord.task_parser import TaskParser
 
 if TYPE_CHECKING:
+    from nebulus_swarm.overlord.proposal_manager import ProposalManager
     from nebulus_swarm.overlord.registry import OverlordConfig
 
 logger = logging.getLogger(__name__)
@@ -39,17 +40,24 @@ _RE_MERGE = re.compile(r"^merge\s+(\S+)\s+(\S+)\s+to\s+(\S+)$", re.IGNORECASE)
 _RE_RELEASE = re.compile(r"^release\s+(\S+)\s+(\S+)$", re.IGNORECASE)
 _RE_AUTONOMY = re.compile(r"^autonomy(?:\s+(\S+))?$", re.IGNORECASE)
 _RE_MEMORY = re.compile(r"^memory\s+(.+)$", re.IGNORECASE)
+_RE_APPROVE = re.compile(r"^approve\s+(\S+)$", re.IGNORECASE)
+_RE_DENY = re.compile(r"^deny\s+(\S+)$", re.IGNORECASE)
 _RE_HELP = re.compile(r"^help$", re.IGNORECASE)
 
 
 class SlackCommandRouter:
     """Routes Slack messages to Overlord Phase 2 module calls."""
 
-    def __init__(self, config: OverlordConfig):
+    def __init__(
+        self,
+        config: OverlordConfig,
+        proposal_manager: Optional[ProposalManager] = None,
+    ):
         """Initialize the command router with the full Phase 2 stack.
 
         Args:
             config: Overlord configuration with project registry.
+            proposal_manager: Optional proposal manager for approval workflows.
         """
         self.config = config
         self.graph = DependencyGraph(config)
@@ -61,6 +69,7 @@ class SlackCommandRouter:
         self.release_coordinator = ReleaseCoordinator(
             config, self.graph, self.dispatch, self.memory
         )
+        self.proposal_manager = proposal_manager
 
     async def handle(self, text: str, user_id: str, channel_id: str) -> str:
         """Parse a command and dispatch to the appropriate handler.
@@ -102,6 +111,14 @@ class SlackCommandRouter:
             m = _RE_MEMORY.match(text)
             if m:
                 return await self._handle_memory(m.group(1))
+
+            m = _RE_APPROVE.match(text)
+            if m:
+                return await self._handle_approve(m.group(1))
+
+            m = _RE_DENY.match(text)
+            if m:
+                return await self._handle_deny(m.group(1))
 
             m = _RE_HELP.match(text)
             if m:
@@ -176,7 +193,16 @@ class SlackCommandRouter:
         ]
 
         if plan.requires_approval:
-            lines.append("Requires approval — use the approval workflow.")
+            if self.proposal_manager:
+                pid = await self.proposal_manager.propose(
+                    task, scope, "Dispatched via Slack", plan=plan
+                )
+                lines.append(
+                    f"Requires approval — proposal `{pid}` created.\n"
+                    "Reply in the proposal thread or use `approve {pid}` / `deny {pid}`."
+                )
+            else:
+                lines.append("Requires approval — use the approval workflow.")
             return "\n".join(lines)
 
         result = await asyncio.to_thread(self.dispatch.execute, plan, True)
@@ -223,7 +249,19 @@ class SlackCommandRouter:
         ]
 
         if plan.requires_approval:
-            lines.append("Requires approval — use the approval workflow.")
+            if self.proposal_manager:
+                pid = await self.proposal_manager.propose(
+                    f"Release {project} {version}",
+                    scope,
+                    "Release requested via Slack",
+                    plan=plan,
+                )
+                lines.append(
+                    f"Requires approval — proposal `{pid}` created.\n"
+                    "Reply in the proposal thread or use `approve {pid}` / `deny {pid}`."
+                )
+            else:
+                lines.append("Requires approval — use the approval workflow.")
             return "\n".join(lines)
 
         result = await asyncio.to_thread(
@@ -296,6 +334,59 @@ class SlackCommandRouter:
             )
         return "\n".join(lines)
 
+    async def _handle_approve(self, proposal_id: str) -> str:
+        """Approve a pending proposal by ID.
+
+        Args:
+            proposal_id: Proposal ID to approve.
+
+        Returns:
+            Result message.
+        """
+        if not self.proposal_manager:
+            return "Proposal system not configured."
+
+        from nebulus_swarm.overlord.proposal_manager import ProposalState
+
+        proposal = self.proposal_manager.store.get(proposal_id)
+        if not proposal:
+            return f"Proposal `{proposal_id}` not found."
+        if not proposal.is_pending:
+            return f"Proposal `{proposal_id}` is {proposal.state.value}, not pending."
+
+        self.proposal_manager.store.update_state(proposal_id, ProposalState.APPROVED)
+        result = await self.proposal_manager.execute_approved(proposal_id)
+        if result and result.status == "success":
+            return f"Proposal `{proposal_id}` approved and executed successfully."
+        elif result:
+            return f"Proposal `{proposal_id}` approved but failed: {result.reason}"
+        return f"Proposal `{proposal_id}` approved (no execution plan cached)."
+
+    async def _handle_deny(self, proposal_id: str) -> str:
+        """Deny a pending proposal by ID.
+
+        Args:
+            proposal_id: Proposal ID to deny.
+
+        Returns:
+            Result message.
+        """
+        if not self.proposal_manager:
+            return "Proposal system not configured."
+
+        from nebulus_swarm.overlord.proposal_manager import ProposalState
+
+        proposal = self.proposal_manager.store.get(proposal_id)
+        if not proposal:
+            return f"Proposal `{proposal_id}` not found."
+        if not proposal.is_pending:
+            return f"Proposal `{proposal_id}` is {proposal.state.value}, not pending."
+
+        self.proposal_manager.store.update_state(
+            proposal_id, ProposalState.DENIED, result_summary="Denied via command"
+        )
+        return f"Proposal `{proposal_id}` denied."
+
     async def _handle_help(self) -> str:
         """List available commands.
 
@@ -310,6 +401,8 @@ class SlackCommandRouter:
             "  `release <project> <version>` — coordinated release\n"
             "  `autonomy [level]` — show/describe autonomy level\n"
             "  `memory <query>` — search cross-project memory\n"
+            "  `approve <id>` — approve a pending proposal\n"
+            "  `deny <id>` — deny a pending proposal\n"
             "  `help` — show this message"
         )
 
