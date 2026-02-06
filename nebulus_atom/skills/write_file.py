@@ -1,2 +1,4 @@
 def write_file(path, content):
-    return open(path, "w").write(content)
+    with open(path, "w") as f:
+        f.write(content)
+    return f"Successfully wrote to {path}"

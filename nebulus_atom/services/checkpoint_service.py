@@ -122,7 +122,7 @@ class CheckpointService:
 
         try:
             with tarfile.open(backup["path"], "r:gz") as tar:
-                tar.extractall(path=".")  # Overwrite files in current dir
+                tar.extractall(path=".", filter="data")
             return f"Rollback successful: Restored {backup['filename']}"
         except Exception as e:
             return f"Error restoring checkpoint: {str(e)}"

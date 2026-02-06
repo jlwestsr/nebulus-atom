@@ -50,6 +50,14 @@ class ToolExecutor:
         ToolExecutor.skill_service.load_skills()
 
     @staticmethod
+    async def shutdown():
+        """Clean up resources held by services."""
+        try:
+            await ToolExecutor.mcp_service.shutdown()
+        except Exception as e:
+            logger.debug(f"MCP shutdown error (non-fatal): {e}")
+
+    @staticmethod
     async def dispatch(tool_name: str, args: dict, session_id: str = "default"):
         logger.info(f"Dispatching tool '{tool_name}' with args: {str(args)[:200]}...")
         telemetry_service = ToolExecutor.telemetry_manager.get_service(session_id)
