@@ -1,8 +1,15 @@
 # Nebulus Atom
 
-> A professional, autonomous AI engineer CLI powered by local LLMs.
+![Python Version](https://img.shields.io/badge/python-3.12+-blue.svg)
+![Version](https://img.shields.io/badge/version-2.1.0-green.svg)
+![Tests](https://img.shields.io/badge/tests-936%20passing-brightgreen.svg)
+![License](https://img.shields.io/badge/license-proprietary-red.svg)
 
-Nebulus Atom is a lightweight CLI agent that interacts with a local LLM server (Nebulus, Ollama, TabbyAPI, vLLM) to assist with software engineering tasks. It includes **Nebulus Swarm**, a multi-agent orchestration system that autonomously processes GitHub issues at scale.
+> **v2.1.0** - A professional, autonomous AI engineer CLI powered by local LLMs for GitHub automation, code generation, and multi-agent orchestration.
+
+Nebulus Atom is a privacy-first, self-hosted AI coding assistant and autonomous software engineering agent. It connects to local LLM servers (Nebulus Prime, Nebulus Edge, Ollama, TabbyAPI, vLLM) to provide intelligent code assistance, automated GitHub issue processing, and multi-agent task orchestration. Perfect for developers who want AI-powered coding tools without cloud dependencies.
+
+**Key capabilities**: Autonomous code generation • GitHub issue automation • Multi-agent swarm orchestration • Local RAG code search • TDD automation • Docker-based minion dispatch • Cross-project dependency analysis • Test-driven development • CI/CD integration
 
 ## Quick Start
 
@@ -40,11 +47,20 @@ See the [Installation Guide](https://github.com/jlwestsr/nebulus-atom/wiki/Insta
 - **Sandbox Execution** - Safe command execution with restricted file access
 - **Flight Recorder Dashboard** - Streamlit telemetry dashboard
 
-### Nebulus Swarm
+### Nebulus Swarm (Multi-Agent Orchestration)
 
-- **Overlord** - Slack-driven control plane with natural language commands
-- **Minions** - Containerized agents that clone repos, work issues, and create PRs
-- **Model Router** - Routes simple tasks to 8B models, complex tasks to 30B
+**Meta-Orchestration (Phase 1-2)**
+- **Project Registry** - Multi-repo discovery with dependency tracking via `overlord.yml`
+- **Health Scanner** - Git state monitoring, test health, and commit tracking across projects
+- **Dependency Graph** - DAG analysis, blast radius calculation, and impact assessment
+- **Action Scope** - Change categorization and autonomy suitability scoring
+- **Cross-Project Memory** - SQLite-backed observation store with search and pruning
+- **Autonomy Engine** - Confidence-based auto-dispatch with test health correlation
+
+**Control Plane (Phase 0)**
+- **Overlord** - Slack-driven control plane with natural language commands via LLM parsing
+- **Minions** - Containerized Docker agents that clone repos, work issues, and create PRs
+- **Model Router** - Complexity-based model selection (8B for simple, 30B+ for complex)
 - **Swarm Dashboard** - Streamlit monitoring with live status, history, queue, and metrics
 - **PR Reviewer** - Automated code review of minion-created pull requests
 - **Clarifying Questions** - Minions ask humans via Slack when requirements are unclear
@@ -61,11 +77,17 @@ nebulus-atom/
 │   ├── services/           # LLM, RAG, Skills, MCP
 │   └── main.py             # Entry point
 ├── nebulus_swarm/           # Multi-agent swarm
-│   ├── overlord/            # Control plane
+│   ├── overlord/            # Meta-orchestrator & control plane
+│   │   ├── registry.py      # Project discovery & dependencies
+│   │   ├── scanner.py       # Git state & health monitoring
+│   │   ├── graph.py         # Dependency graph & blast radius
+│   │   ├── memory.py        # Cross-project observations
+│   │   ├── autonomy.py      # Confidence scoring & dispatch
+│   │   └── main.py          # Slack/Docker/State control
 │   ├── minion/              # Worker agents
 │   ├── dashboard/           # Streamlit monitoring
 │   └── reviewer/            # PR review
-└── tests/                   # 376 tests
+└── tests/                   # 936 tests
 ```
 
 ## Commands
@@ -106,25 +128,41 @@ queue
 |-----------|-----------|
 | Language | Python 3.12+ |
 | CLI | Typer |
-| UI | Rich |
+| UI | Rich (Terminal UI) |
 | LLM Client | OpenAI SDK |
+| Vector DB | ChromaDB (RAG embeddings) |
 | Swarm | Docker, Slack Bolt, aiohttp |
 | Dashboard | Streamlit |
 | Database | SQLite, ChromaDB |
-| Testing | pytest (376 tests) |
+| Testing | pytest (936 tests) |
+| CI/CD | pre-commit hooks, ruff |
 
 ## Documentation
 
 Full documentation is available on the [GitHub Wiki](https://github.com/jlwestsr/nebulus-atom/wiki):
 
+**Getting Started**
 - [Installation](https://github.com/jlwestsr/nebulus-atom/wiki/Installation)
 - [Quick Start](https://github.com/jlwestsr/nebulus-atom/wiki/Quick-Start)
+- [Configuration](https://github.com/jlwestsr/nebulus-atom/wiki/Configuration)
+
+**Core System**
 - [Architecture](https://github.com/jlwestsr/nebulus-atom/wiki/Architecture)
 - [CLI Reference](https://github.com/jlwestsr/nebulus-atom/wiki/CLI-Reference)
-- [Configuration](https://github.com/jlwestsr/nebulus-atom/wiki/Configuration)
-- [Nebulus Swarm](https://github.com/jlwestsr/nebulus-atom/wiki/Nebulus-Swarm)
+- [Features](https://github.com/jlwestsr/nebulus-atom/wiki/Features)
+
+**Nebulus Swarm**
+- [Nebulus Swarm Overview](https://github.com/jlwestsr/nebulus-atom/wiki/Nebulus-Swarm)
+- [Swarm Overlord](https://github.com/jlwestsr/nebulus-atom/wiki/Swarm-Overlord)
+- [Overlord CLI Reference](https://github.com/jlwestsr/nebulus-atom/wiki/Overlord-CLI)
+- [Swarm Minion](https://github.com/jlwestsr/nebulus-atom/wiki/Swarm-Minion)
+- [Swarm Dashboard](https://github.com/jlwestsr/nebulus-atom/wiki/Swarm-Dashboard)
+- [Model Router](https://github.com/jlwestsr/nebulus-atom/wiki/Model-Router)
+
+**Operations**
 - [Deployment](https://github.com/jlwestsr/nebulus-atom/wiki/Deployment)
 - [Testing](https://github.com/jlwestsr/nebulus-atom/wiki/Testing)
+- [Troubleshooting](https://github.com/jlwestsr/nebulus-atom/wiki/Troubleshooting)
 - [Contributing](https://github.com/jlwestsr/nebulus-atom/wiki/Contributing)
 
 ## Development
@@ -144,6 +182,19 @@ git checkout develop
 git merge feat/my-feature --no-ff
 git push nebulus-atom develop
 ```
+
+## Use Cases
+
+- **Autonomous GitHub Issue Processing** - Deploy minions to work on labeled issues automatically
+- **Multi-Repo Management** - Track dependencies, blast radius, and health across project ecosystems
+- **Local AI Development** - Privacy-first coding assistant without cloud dependencies
+- **CI/CD Integration** - Automated testing, code review, and PR generation
+- **Code Search & RAG** - Semantic code search powered by ChromaDB embeddings
+- **TDD Automation** - Test-driven development cycle with autonomous test writing and fixing
+
+## Topics
+
+`ai-coding-assistant` `autonomous-agent` `github-automation` `local-llm` `self-hosted-ai` `multi-agent-system` `docker-orchestration` `slack-bot` `code-generation` `test-automation` `rag` `chromadb` `ollama` `tabbyapi` `mlx` `python-cli` `typer` `streamlit` `dependency-graph` `ci-cd-automation` `issue-automation` `pr-automation` `code-review` `tdd` `swarm-intelligence` `meta-orchestration`
 
 ## License
 
