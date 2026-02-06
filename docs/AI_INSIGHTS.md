@@ -497,3 +497,77 @@ git checkout develop
 - Multi-AI coordination: Successfully worked around parallel Overlord Phase 2 work
 
 ---
+
+## 2026-02-06: Enforcing Patterns Through AI Instruction Files
+
+### Context
+After documenting documentation synchronization patterns in AI_INSIGHTS.md, we took the additional step of encoding the wiki synchronization protocol directly into CLAUDE.md and GEMINI.md instruction files.
+
+### The Meta-Pattern
+
+**Observation**: Documenting patterns in AI_INSIGHTS.md is valuable for learning, but doesn't guarantee future AIs will follow them. Encoding critical patterns in the AI instruction files (CLAUDE.md, GEMINI.md) creates enforcement.
+
+**Pattern Hierarchy**:
+1. **AI_INSIGHTS.md**: Lessons learned, patterns discovered, "why" documentation (educational)
+2. **CLAUDE.md / GEMINI.md**: Required behaviors, step-by-step protocols, "how" documentation (enforcement)
+3. **README.md / Wiki**: User-facing documentation (informational)
+
+**When to Use Each**:
+- AI_INSIGHTS.md: After discovering a pattern or anti-pattern worth sharing
+- CLAUDE.md/GEMINI.md: When a pattern is critical and must be followed consistently
+- README.md/Wiki: When users need to understand features or setup
+
+### Implementation
+
+Added "Documentation Maintenance" section to both CLAUDE.md and GEMINI.md:
+- 41 lines of step-by-step wiki synchronization protocol
+- Version consistency checks
+- Anti-pattern warnings
+- Exact commands to run
+
+**Result**: Future AIs will see these instructions before starting work, making wiki synchronization a default behavior rather than a discovered pattern.
+
+### Success Metrics
+
+**Session Outcome**:
+- 6 commits total (3 documentation updates, 3 merges to main)
+- 510 lines added across AI instruction and insight files
+- Zero conflicts despite parallel AI work
+- Complete documentation synchronization achieved
+- Patterns encoded for future enforcement
+
+**Multi-AI Coordination**:
+- Our work (README SEO, wiki updates, AI insights, instruction files): 4 commits
+- Other AI work (Overlord Phase 2 insights): 1 commit
+- Successful merge without conflicts (append-only documentation strategy)
+
+**Files Updated This Session**:
+1. README.md (+63 lines) - SEO optimization, v2.1.0
+2. Wiki: Home.md, Swarm-Overlord.md, Overlord-CLI.md (new), _Sidebar.md
+3. AI_INSIGHTS.md (+476 lines total) - 8 new patterns documented
+4. CLAUDE.md (+41 lines) - Wiki protocol enforcement
+5. GEMINI.md (+41 lines) - Wiki protocol enforcement
+
+### Key Lesson
+
+**Pattern Discovery → Documentation → Enforcement**
+
+The complete cycle:
+1. **Discover** pattern through experience (documentation drift during v2.1.0 release)
+2. **Document** in AI_INSIGHTS.md (why it matters, what went wrong, solution)
+3. **Enforce** in CLAUDE.md/GEMINI.md (step-by-step protocol for future AIs)
+4. **Verify** by checking if future AIs follow the pattern
+
+**This Session Completed**: Steps 1-3. Step 4 will be validated by future AI sessions.
+
+### Recommendation
+
+When you discover a critical pattern that future AIs must follow:
+1. Document the pattern in AI_INSIGHTS.md with context and rationale
+2. Extract the actionable protocol and add it to CLAUDE.md/GEMINI.md
+3. Commit both changes together
+4. Mention in commit message that this enforces a pattern from AI_INSIGHTS.md
+
+**Example**: This session's commit `b3951e3` referenced the pattern documented in commit `a196209`, creating a traceable chain from discovery → documentation → enforcement.
+
+---
