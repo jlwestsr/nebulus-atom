@@ -18,6 +18,47 @@ This is a custom, lightweight CLI agent built to interact directly with a local 
 - The main entry point is `nebulus_atom/main.py`.
 - Run via: `python3 -m nebulus_atom.main start`.
 
+## Documentation Maintenance
+
+**IMPORTANT**: This project maintains documentation in three locations that MUST stay synchronized:
+
+1. **README.md** (project root) - User-facing quickstart and feature overview
+2. **GitHub Wiki** (separate git repo at `/tmp/nebulus-atom-wiki`) - Comprehensive reference documentation
+3. **docs/AI_INSIGHTS.md** - AI-specific patterns and lessons learned
+
+### Wiki Synchronization Protocol
+
+When you update user-facing features, version numbers, or key metrics:
+
+**Required Actions:**
+1. Update `README.md` first (version, test count, features)
+2. Clone/update wiki repo:
+   ```bash
+   cd /tmp
+   git clone git@github.com:jlwestsr/nebulus-atom.wiki.git nebulus-atom-wiki
+   # OR if already exists: cd /tmp/nebulus-atom-wiki && git pull
+   ```
+3. Update relevant wiki pages:
+   - `Home.md` - Version, test count, architecture overview
+   - Feature-specific pages (e.g., `Swarm-Overlord.md`, `Overlord-CLI.md`)
+   - `_Sidebar.md` - Navigation links if adding new pages
+4. Commit and push wiki changes:
+   ```bash
+   cd /tmp/nebulus-atom-wiki
+   git add -A
+   git commit -m "docs: update wiki for vX.X.X"
+   git push origin master
+   ```
+5. Update `docs/AI_INSIGHTS.md` with any patterns discovered
+
+**Version Consistency Check:**
+- README.md version badge matches release tag
+- Wiki Home.md version matches release tag
+- Test counts match across README and Wiki
+- New features documented in both README and Wiki
+
+**Anti-Pattern**: Updating README without updating Wiki creates documentation drift and confuses users.
+
 ## Key Features
 - **Context Manager**: Pin files to active context for awareness.
 - **Smart Undo**: Auto-checkpoints before risky operations.
