@@ -238,8 +238,8 @@ models:
     notes: TabbyAPI/ExLlamaV2 on NVIDIA GPU
 
   local-edge:
-    host: mac-mini.local               # Mac Mini M4 Pro on desk
-    endpoint: http://mac-mini.local:8080/v1
+    host: nebulus               # Mac Mini M4 Pro on desk
+    endpoint: http://nebulus:8080/v1
     model: qwen3-coder-30b
     tier: local
     concurrent: 2
@@ -692,8 +692,8 @@ models:
     concurrent: 2
     notes: TabbyAPI/ExLlamaV2 on NVIDIA GPU (dev machine)
   local-edge:
-    host: mac-mini.local
-    endpoint: http://mac-mini.local:8080/v1
+    host: nebulus
+    endpoint: http://nebulus:8080/v1
     model: qwen3-coder-30b
     tier: local
     concurrent: 2
