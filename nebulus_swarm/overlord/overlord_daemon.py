@@ -22,6 +22,7 @@ from nebulus_swarm.overlord.dispatch import DispatchEngine
 from nebulus_swarm.overlord.graph import DependencyGraph
 from nebulus_swarm.overlord.memory import OverlordMemory
 from nebulus_swarm.overlord.model_router import ModelRouter
+from nebulus_swarm.overlord.notifications import NotificationManager
 from nebulus_swarm.overlord.proposal_manager import ProposalManager, ProposalStore
 from nebulus_swarm.overlord.registry import ScheduleConfig, ScheduledTask
 from nebulus_swarm.overlord.scanner import scan_ecosystem
@@ -70,6 +71,11 @@ class OverlordDaemon:
             config, proposal_manager=self.proposal_manager
         )
         self.detection_engine = DetectionEngine(config, self.graph, self.autonomy)
+        notif_config = config.notifications
+        self.notifications = NotificationManager(
+            urgent_enabled=notif_config.urgent_enabled,
+            digest_enabled=notif_config.digest_enabled,
+        )
 
         # Slack bot (configured lazily via environment)
         self.slack_bot: Optional[SlackBot] = None
@@ -103,6 +109,7 @@ class OverlordDaemon:
                 thread_reply_handler=self.proposal_manager.handle_reply,
             )
             self.proposal_manager.slack_bot = self.slack_bot
+            self.notifications.slack_bot = self.slack_bot
             tasks.append(asyncio.create_task(self._run_slack()))
             logger.info("Slack bot configured for channel %s", channel_id)
         else:
@@ -229,6 +236,11 @@ class OverlordDaemon:
                             self.detection_engine.format_summary(filtered)
                         )
 
+                self.notifications.accumulate(
+                    "health_check",
+                    f"Scan: {len(results) - len(issues)}/{len(results)} healthy, "
+                    f"{len(detections)} detections",
+                )
                 logger.info(
                     "Scan complete: %d/%d healthy, %d detections",
                     len(results) - len(issues),
@@ -244,6 +256,7 @@ class OverlordDaemon:
                     await self.slack_bot.post_message(
                         f"Test sweep: {names} have no tests detected"
                     )
+                self.notifications.accumulate("test_sweep", "Test sweep completed")
                 logger.info("Test-all sweep complete")
 
             elif task.name == "clean-stale-branches":

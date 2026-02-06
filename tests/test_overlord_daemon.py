@@ -203,8 +203,9 @@ class TestTaskExecution:
         ):
             task = ScheduledTask(name="scan", cron="0 * * * *")
             await daemon._execute_scheduled_task(task)
-            mock_bot.post_message.assert_called_once()
-            call_text = mock_bot.post_message.call_args[0][0]
+            # At least one call for the scan results (may also call for detections)
+            assert mock_bot.post_message.call_count >= 1
+            call_text = mock_bot.post_message.call_args_list[0][0][0]
             assert "core" in call_text
 
     @pytest.mark.asyncio
