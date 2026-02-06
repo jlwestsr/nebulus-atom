@@ -1,0 +1,683 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Documentation for ai_project">
+      
+      
+        <meta name="author" content="User">
+      
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>UI Regression Test Prompts - ai_project</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#ui-regression-test-prompts" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="ai_project" class="md-header__button md-logo" aria-label="ai_project" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            ai_project
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              UI Regression Test Prompts
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="ai_project" class="md-nav__button md-logo" aria-label="ai_project" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    ai_project
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../rules/ai_behavior.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI Behavior
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../CONTEXT.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Context
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Usage
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#core-features-legacy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Core Features (Legacy)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#new-features-v20" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New Features (v2.0)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="New Features (v2.0)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-rich-repl-interface" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Rich REPL Interface
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-session-journal-daily-standup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Session Journal (Daily Standup)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-codebase-cartographer-ast" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Codebase Cartographer (AST)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-shell-macro-generator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Shell Macro Generator
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-agentic-tdd-loop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Agentic TDD Loop
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#6-github-integration-mcp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. GitHub Integration (MCP)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#7-multimodal-input" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Multimodal Input
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#8-embedded-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Embedded Documentation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#9-persistent-tasks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Persistent Tasks
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#integrated-workflow-the-architect" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Integrated Workflow: "The Architect"
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="ui-regression-test-prompts">UI Regression Test Prompts</h1>
+<p>This document contains a standardized set of prompts for manually verifying the <strong>Nebulus Atom</strong> CLI agent's capabilities.</p>
+<h2 id="usage">Usage</h2>
+<p>Run these prompts interactively (e.g., <code>mn</code>) to ensure the agent correctly identifies and executes the appropriate tools.</p>
+<h2 id="core-features-legacy">Core Features (Legacy)</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Feature</th>
+<th style="text-align: left;">Test Prompt</th>
+<th style="text-align: left;">Expected Behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>1. Task Management</strong></td>
+<td style="text-align: left;">"Create a plan to learn about this project. Add a task to read the context file."</td>
+<td style="text-align: left;">Creates a plan (<code>create_plan</code>), then adds a task.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>2. Context Management</strong></td>
+<td style="text-align: left;">"Pin the file 'CONTEXT.md' to the context and then list the current context."</td>
+<td style="text-align: left;">Calls <code>pin_file</code> on <code>CONTEXT.md</code>, then <code>list_context</code>.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>3. File Operations</strong></td>
+<td style="text-align: left;">"List the files in the 'nebulus_atom' directory using a shell command."</td>
+<td style="text-align: left;">Calls <code>run_shell_command</code> with <code>ls</code> (or equivalent).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>4. Skill Execution</strong></td>
+<td style="text-align: left;">"Use the file_info skill to check the size of 'nebulus_atom/main.py'."</td>
+<td style="text-align: left;">Identifies and executes the <code>file_info</code> skill.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>5. RAG / Search</strong></td>
+<td style="text-align: left;">"Search the codebase for 'AgentController' and tell me which file it is in."</td>
+<td style="text-align: left;">Calls <code>search_code</code> to locate the string.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>6. File I/O</strong></td>
+<td style="text-align: left;">"Write a file named 'test_hello.txt' with the content 'Hello World'."</td>
+<td style="text-align: left;">Calls <code>write_file</code> to create the artifact.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="new-features-v20">New Features (v2.0)</h2>
+<h3 id="1-rich-repl-interface">1. Rich REPL Interface</h3>
+<p><strong>Prompt:</strong></p>
+<blockquote>
+<p>"What is your current plan?"
+<strong>Verification:</strong>
+- <strong>Prompt Box</strong>: Ensure the <code>Nebulus Atom ➤</code> prompt remains at the bottom of the screen.
+- <strong>Streaming</strong>: Verify the agent's response streams <em>above</em> the input box.
+- <strong>Status Bar</strong>: Check the bottom toolbar for <code>CWD | (Branch) | Model</code>.
+- <strong>History</strong>: Press <code>Up Arrow</code> to verify you can see the command you just typed.</p>
+</blockquote>
+<h3 id="2-session-journal-daily-standup">2. Session Journal (Daily Standup)</h3>
+<p><strong>Prompt:</strong></p>
+<blockquote>
+<p>"Generate a journal for this session."
+<strong>Verification:</strong>
+- Agent calls <code>generate_journal</code>.
+- Check <code>.nebulus_atom/journals/</code> for a new Markdown file containing your recent interactions.</p>
+</blockquote>
+<h3 id="3-codebase-cartographer-ast">3. Codebase Cartographer (AST)</h3>
+<p><strong>Prompt:</strong></p>
+<blockquote>
+<p>"Map the codebase structure for the 'nebulus_atom' directory."
+<strong>Verification:</strong>
+- Agent calls <code>map_codebase(target_dir="nebulus_atom")</code>.
+- Output should list classes and functions (e.g., <code>AgentController</code>, <code>process_turn</code>).</p>
+</blockquote>
+<h3 id="4-shell-macro-generator">4. Shell Macro Generator</h3>
+<p><strong>Prompt:</strong></p>
+<blockquote>
+<p>"Create a shell macro named 'list_python' that lists all python files in the current directory."
+<strong>Verification:</strong>
+- Agent calls <code>create_macro(name="list_python", commands=["find . -name "*.py""])</code>.
+- Check <code>~/.nebulus_atom/macros/list_python.sh</code> exists and is executable.</p>
+</blockquote>
+<h3 id="5-agentic-tdd-loop">5. Agentic TDD Loop</h3>
+<p><strong>Prompt:</strong></p>
+<blockquote>
+<p>"Start a TDD loop to implement a function 'multiply(a, b)'."
+<strong>Verification:</strong>
+- Agent calls <code>start_tdd(goal="Implement multiply(a, b)")</code>.
+- Observe the agent autonomously:
+    1.  Create <code>tests/test_multiply.py</code> (failing).
+    2.  Run the test (fail).
+    3.  Create/Update <code>multiply.py</code>.
+    4.  Run the test (pass).</p>
+</blockquote>
+<h3 id="6-github-integration-mcp">6. GitHub Integration (MCP)</h3>
+<p><strong>Prompt:</strong></p>
+<blockquote>
+<p>"Connect to the GitHub MCP server and list my open issues."
+<strong>Verification:</strong>
+- Agent calls <code>connect_mcp_server</code>.
+- Agent calls <code>github_list_issues</code> (or similar discovered tool).
+- Output should reflect real GitHub data (requires <code>GITHUB_TOKEN</code>).</p>
+</blockquote>
+<h3 id="7-multimodal-input">7. Multimodal Input</h3>
+<p><strong>Prompt:</strong></p>
+<blockquote>
+<p>"Scan the image 'test_image.png'." (Ensure you have a dummy image first)
+<strong>Verification:</strong>
+- Agent calls <code>scan_image(path="test_image.png")</code>.
+- Returns base64 encoded string.</p>
+</blockquote>
+<h3 id="8-embedded-documentation">8. Embedded Documentation</h3>
+<p><strong>Prompt:</strong></p>
+<blockquote>
+<p>"List the available documentation."
+<strong>Verification:</strong>
+- Agent calls <code>list_docs</code>.
+- Output lists files in <code>docs/</code>.</p>
+</blockquote>
+<h3 id="9-persistent-tasks">9. Persistent Tasks</h3>
+<p><strong>Prompt:</strong></p>
+<blockquote>
+<p>"Create a plan to 'Test Persistence'." -&gt; Exit -&gt; Restart.
+<strong>Verification:</strong>
+- Upon restart, run <code>get_plan</code> (or "Show plan").
+- The output should contain "Test Persistence".</p>
+</blockquote>
+<h2 id="integrated-workflow-the-architect">Integrated Workflow: "The Architect"</h2>
+<p><strong>Prompt:</strong></p>
+<blockquote>
+<p>"I want to understand the 'TaskService'. First, map the codebase to find where it is defined. Second, search the docs for 'Task Management'. Finally, generate a journal of this research."</p>
+</blockquote>
+<p><strong>Expected Sequence:</strong>
+1.  <code>map_codebase</code> (finds <code>nebulus_atom/services/task_service.py</code>).
+2.  <code>read_doc</code> (reads <code>docs/features/task_management.md</code>).
+3.  <code>generate_journal</code> (saves the summary).</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.expand", "navigation.indexes"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

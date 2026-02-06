@@ -1,0 +1,1001 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Documentation for ai_project">
+      
+      
+        <meta name="author" content="User">
+      
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>Concurrent Inference Backend Matrix - ai_project</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#concurrent-inference-backend-matrix" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="ai_project" class="md-header__button md-logo" aria-label="ai_project" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            ai_project
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Concurrent Inference Backend Matrix
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="ai_project" class="md-nav__button md-logo" aria-label="ai_project" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    ai_project
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rules/ai_behavior.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI Behavior
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CONTEXT.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Context
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#quick-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Reference
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#backend-details" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Backend Details
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Backend Details">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tabbyapi-exllamav2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TabbyAPI (ExLlamaV2)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vllm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        vLLM
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mlx-serving" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MLX Serving
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ollama" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ollama
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#openai-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OpenAI API
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#anthropic-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Anthropic API
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#llamacpp-server" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        llama.cpp server
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tgi-text-generation-inference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TGI (Text Generation Inference)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#choosing-concurrency" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choosing Concurrency
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Choosing Concurrency">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#guidelines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Guidelines
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#concurrency-vs-throughput" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Concurrency vs Throughput
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#workload-patterns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Workload Patterns
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pool-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pool Behavior
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Pool Behavior">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#slot-acquisition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Slot Acquisition
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#error-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error Handling
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pool-statistics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pool Statistics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#integration-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Integration Points
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#high-queue-times" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        High Queue Times
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#out-of-memory-oom" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Out of Memory (OOM)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rate-limit-errors-cloud-apis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rate Limit Errors (Cloud APIs)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#slow-throughput" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Slow Throughput
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        References
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="concurrent-inference-backend-matrix">Concurrent Inference Backend Matrix</h1>
+<p>Guide for configuring <code>ATOM_LLM_CONCURRENCY</code> based on your LLM backend.</p>
+<h2 id="quick-reference">Quick Reference</h2>
+<table>
+<thead>
+<tr>
+<th>Backend</th>
+<th>Concurrent Support</th>
+<th>Recommended Concurrency</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>TabbyAPI</td>
+<td>Yes (batched)</td>
+<td>2-4</td>
+<td>ExLlamaV2 supports continuous batching; performance depends on VRAM headroom</td>
+</tr>
+<tr>
+<td>vLLM</td>
+<td>Yes (native)</td>
+<td>4-8</td>
+<td>Designed for high-throughput concurrent serving; PagedAttention handles many parallel requests</td>
+</tr>
+<tr>
+<td>MLX Serving</td>
+<td>Limited</td>
+<td>1-2</td>
+<td>Apple Silicon; sequential inference internally, HTTP server queues requests</td>
+</tr>
+<tr>
+<td>Ollama</td>
+<td>No</td>
+<td>1</td>
+<td>Sequential processing only — requests queue but don't parallelize. Not recommended for Swarm mode</td>
+</tr>
+<tr>
+<td>OpenAI API</td>
+<td>Yes</td>
+<td>2-4</td>
+<td>Cloud; rate-limited by tier (TPM/RPM). Monitor 429 responses</td>
+</tr>
+<tr>
+<td>Anthropic API</td>
+<td>Yes</td>
+<td>2-4</td>
+<td>Cloud; rate-limited by tier. Monitor 429 responses</td>
+</tr>
+<tr>
+<td>llama.cpp server</td>
+<td>Limited</td>
+<td>1-2</td>
+<td>Supports concurrent slots but performance degrades quickly</td>
+</tr>
+<tr>
+<td>TGI (Text Generation Inference)</td>
+<td>Yes (native)</td>
+<td>4-8</td>
+<td>HuggingFace; continuous batching, designed for concurrent serving</td>
+</tr>
+</tbody>
+</table>
+<h2 id="configuration">Configuration</h2>
+<p>Set concurrency via environment variable:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">ATOM_LLM_CONCURRENCY</span><span class="o">=</span><span class="m">2</span><span class="w">  </span><span class="c1"># default</span>
+</code></pre></div>
+<p>Or in <code>.atom.yml</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">llm</span><span class="p">:</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">concurrency</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
+</code></pre></div>
+<h2 id="backend-details">Backend Details</h2>
+<h3 id="tabbyapi-exllamav2">TabbyAPI (ExLlamaV2)</h3>
+<p><strong>Concurrent Support</strong>: Yes (continuous batching)</p>
+<p>TabbyAPI wraps the ExLlamaV2 inference engine, which implements continuous batching for concurrent request handling. Multiple requests can share GPU compute efficiently.</p>
+<p><strong>Recommended Settings</strong>:
+- <strong>2-4 concurrent requests</strong> for most configurations
+- Monitor VRAM usage — concurrent batching requires additional KV cache memory
+- 8B models on 24GB VRAM: start with 2-3 concurrency
+- 13B+ models or limited VRAM: stick to 1-2 concurrency</p>
+<p><strong>Configuration</strong>: Set <code>max_batch_size</code> in TabbyAPI config (default 1 = sequential):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">model</span><span class="p">:</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">max_batch_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">4</span><span class="w">  </span><span class="c1"># Enables batching up to 4 concurrent requests</span>
+</code></pre></div>
+<p><strong>Performance</strong>: Well-suited for Swarm mode. Latency increases sub-linearly with batch size due to continuous batching efficiency.</p>
+<h3 id="vllm">vLLM</h3>
+<p><strong>Concurrent Support</strong>: Yes (native, PagedAttention)</p>
+<p>vLLM is purpose-built for high-throughput LLM serving with PagedAttention memory management. Handles concurrent requests exceptionally well.</p>
+<p><strong>Recommended Settings</strong>:
+- <strong>4-8 concurrent requests</strong> for production
+- Can scale higher (16+) on beefy GPUs with sufficient VRAM
+- Monitor GPU utilization — vLLM batches aggressively</p>
+<p><strong>Configuration</strong>: Set via vLLM server args:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>python<span class="w"> </span>-m<span class="w"> </span>vllm.entrypoints.openai.api_server<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span>--model<span class="w"> </span>meta-llama/Llama-3.1-8B-Instruct<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span>--max-num-batched-tokens<span class="w"> </span><span class="m">8192</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span>--max-num-seqs<span class="w"> </span><span class="m">8</span><span class="w">  </span><span class="c1"># Max concurrent sequences</span>
+</code></pre></div>
+<p><strong>Performance</strong>: Excellent for Swarm mode. PagedAttention enables efficient memory sharing across requests. Best choice for multi-agent workloads.</p>
+<h3 id="mlx-serving">MLX Serving</h3>
+<p><strong>Concurrent Support</strong>: Limited (HTTP queue only)</p>
+<p>MLX framework (Apple Silicon) performs sequential inference internally. The <code>mlx_lm.server</code> HTTP wrapper queues concurrent requests but processes them one at a time.</p>
+<p><strong>Recommended Settings</strong>:
+- <strong>1-2 concurrent requests</strong> maximum
+- Setting &gt;2 just creates a longer queue — no throughput gain
+- MLX shines on M1/M2/M3 for single-user interactive workloads</p>
+<p><strong>Configuration</strong>: No special config needed — MLX server handles queueing.</p>
+<p><strong>Performance</strong>: Adequate for light Swarm usage (2 Minions). Not ideal for heavy concurrent workloads. Best for development/testing on macOS.</p>
+<h3 id="ollama">Ollama</h3>
+<p><strong>Concurrent Support</strong>: No (sequential only)</p>
+<p>Ollama processes requests strictly sequentially. Multiple concurrent requests queue but don't parallelize at the inference level.</p>
+<p><strong>Recommended Settings</strong>:
+- <strong>1 concurrent request</strong> only
+- Higher concurrency just creates unnecessary queuing
+- <strong>Not recommended for Swarm mode</strong> — Minions will block waiting for LLM access</p>
+<p><strong>Configuration</strong>: No configuration helps — Ollama is sequential by design.</p>
+<p><strong>Performance</strong>: Great for single-user chat applications. Poor fit for multi-agent systems. Consider switching to vLLM or TabbyAPI for Swarm deployments.</p>
+<h3 id="openai-api">OpenAI API</h3>
+<p><strong>Concurrent Support</strong>: Yes (cloud, rate-limited)</p>
+<p>OpenAI's API handles concurrent requests natively but imposes rate limits based on subscription tier.</p>
+<p><strong>Recommended Settings</strong>:
+- <strong>2-4 concurrent requests</strong> for Tier 1/2 accounts
+- Monitor rate limit headers: <code>x-ratelimit-remaining-requests</code>, <code>x-ratelimit-remaining-tokens</code>
+- Watch for 429 (rate limit exceeded) responses</p>
+<p><strong>Rate Limits</strong> (as of early 2025):
+- <strong>Free tier</strong>: 3 RPM, 40k TPM (GPT-4)
+- <strong>Tier 1</strong>: 500 RPM, 30k TPM (GPT-4)
+- <strong>Tier 2</strong>: 5k RPM, 450k TPM (GPT-4)</p>
+<p><strong>Configuration</strong>: Implement exponential backoff on 429 errors (OpenAI client does this automatically).</p>
+<p><strong>Performance</strong>: Reliable for Swarm mode within rate limits. Consider costs — high concurrency = faster token consumption.</p>
+<h3 id="anthropic-api">Anthropic API</h3>
+<p><strong>Concurrent Support</strong>: Yes (cloud, rate-limited)</p>
+<p>Anthropic Claude API handles concurrent requests with tier-based rate limits.</p>
+<p><strong>Recommended Settings</strong>:
+- <strong>2-4 concurrent requests</strong> for standard tiers
+- Monitor rate limit headers in responses
+- Watch for 429 (rate limit) and 529 (overloaded) responses</p>
+<p><strong>Rate Limits</strong> (as of early 2025):
+- Varies by tier and model
+- Sonnet: typically 50 RPM (free tier), higher for paid
+- Opus: lower limits due to compute cost</p>
+<p><strong>Configuration</strong>: Implement exponential backoff on 429/529 errors.</p>
+<p><strong>Performance</strong>: Reliable for Swarm mode. Claude models excel at complex reasoning tasks but cost more than local inference.</p>
+<h3 id="llamacpp-server">llama.cpp server</h3>
+<p><strong>Concurrent Support</strong>: Limited (parallel slots)</p>
+<p>llama.cpp server mode supports multiple "slots" (parallel inference contexts) but performance degrades quickly beyond 1-2 concurrent requests.</p>
+<p><strong>Recommended Settings</strong>:
+- <strong>1-2 concurrent requests</strong> maximum
+- Set <code>--parallel</code> flag when starting server:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>./server<span class="w"> </span>--model<span class="w"> </span>model.gguf<span class="w"> </span>--parallel<span class="w"> </span><span class="m">2</span><span class="w"> </span>--ctx-size<span class="w"> </span><span class="m">4096</span>
+</code></pre></div>
+<p><strong>Configuration</strong>: Each slot allocates separate KV cache — VRAM usage scales linearly.</p>
+<p><strong>Performance</strong>: Acceptable for 2 Minions on high-VRAM GPUs. Beyond that, consider vLLM or TabbyAPI for better batching efficiency.</p>
+<h3 id="tgi-text-generation-inference">TGI (Text Generation Inference)</h3>
+<p><strong>Concurrent Support</strong>: Yes (native, continuous batching)</p>
+<p>HuggingFace's TGI is optimized for production inference serving with continuous batching and efficient memory management.</p>
+<p><strong>Recommended Settings</strong>:
+- <strong>4-8 concurrent requests</strong> for production
+- Can scale higher on multi-GPU setups
+- Monitor GPU utilization and throughput</p>
+<p><strong>Configuration</strong>: Set via Docker/CLI args:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>docker<span class="w"> </span>run<span class="w"> </span>--gpus<span class="w"> </span>all<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">MAX_CONCURRENT_REQUESTS</span><span class="o">=</span><span class="m">8</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">MAX_BATCH_TOTAL_TOKENS</span><span class="o">=</span><span class="m">16384</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span>ghcr.io/huggingface/text-generation-inference:latest<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">  </span>--model-id<span class="w"> </span>meta-llama/Llama-3.1-8B-Instruct
+</code></pre></div>
+<p><strong>Performance</strong>: Excellent for Swarm mode. Production-grade serving with monitoring and observability built in.</p>
+<h2 id="choosing-concurrency">Choosing Concurrency</h2>
+<h3 id="guidelines">Guidelines</h3>
+<p><strong>Start Low (2)</strong>: Always begin with default concurrency and increase incrementally while monitoring performance.</p>
+<p><strong>Monitor VRAM</strong>: Concurrent inference increases memory usage:
+- Batching requires larger KV cache
+- Out-of-memory errors indicate over-allocation
+- Use <code>nvidia-smi</code> (NVIDIA) or <code>sudo powermetrics</code> (Apple) to monitor</p>
+<p><strong>Watch Latency</strong>: Track p50/p95/p99 response times:
+- Latency should increase sub-linearly with concurrency
+- If p95 latency spikes &gt;2x, reduce concurrency
+- Use Atom's built-in LLM pool stats for monitoring</p>
+<p><strong>Cloud APIs</strong>: Monitor rate limit headers:
+- <code>x-ratelimit-remaining-requests</code>
+- <code>x-ratelimit-remaining-tokens</code>
+- Adjust concurrency to stay below 80% of limits</p>
+<p><strong>Local Models</strong>: VRAM is the primary constraint, not network bandwidth:
+- 8B model + batch_size 4 ≈ 16-20GB VRAM (varies by quant)
+- 13B model + batch_size 2 ≈ 20-24GB VRAM
+- 70B model → typically limited to sequential inference unless multi-GPU</p>
+<h3 id="concurrency-vs-throughput">Concurrency vs Throughput</h3>
+<p>Higher concurrency ≠ always better:
+- <strong>Throughput</strong> (tokens/second) may plateau or decrease
+- <strong>Latency</strong> (time to first token) increases with queue depth
+- <strong>Memory</strong> usage scales with concurrent batch size
+- <strong>Optimal concurrency</strong> balances throughput and latency for your workload</p>
+<h3 id="workload-patterns">Workload Patterns</h3>
+<p><strong>Swarm Mode</strong> (multiple Minions):
+- Minions make frequent short LLM calls (tool selection, reasoning)
+- Benefit from moderate concurrency (2-4)
+- Prefer low latency over max throughput</p>
+<p><strong>Batch Processing</strong> (single Minion, many tasks):
+- Sequential task execution with LLM calls
+- Low concurrency (1-2) is fine
+- Focus on per-request latency</p>
+<p><strong>Interactive Chat</strong>:
+- Single user, conversational
+- Concurrency = 1 is sufficient
+- Prioritize time-to-first-token</p>
+<h2 id="pool-behavior">Pool Behavior</h2>
+<p>The LLM connection pool (<code>nebulus_swarm/overlord/llm_pool.py</code>) manages concurrent LLM access:</p>
+<h3 id="slot-acquisition">Slot Acquisition</h3>
+<ol>
+<li>Minion worker requests an LLM slot from the pool</li>
+<li>If slots are available (&lt; <code>ATOM_LLM_CONCURRENCY</code>), acquire immediately</li>
+<li>If all slots in use, worker queues with 60-second timeout</li>
+<li>On timeout, worker fails the task with <code>LLMPoolTimeout</code> error</li>
+</ol>
+<h3 id="error-handling">Error Handling</h3>
+<ul>
+<li><strong>429 (rate limit)</strong>: Pool records error; client implements backoff</li>
+<li><strong>503 (service unavailable)</strong>: Pool records error; worker retries task</li>
+<li><strong>Timeout</strong>: Worker fails gracefully; Overlord reassigns task</li>
+</ul>
+<h3 id="pool-statistics">Pool Statistics</h3>
+<p>Accessible via <code>LLMPool.stats()</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="p">{</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>    <span class="s2">&quot;concurrency_limit&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>    <span class="s2">&quot;active_requests&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    <span class="s2">&quot;queued_requests&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>    <span class="s2">&quot;total_requests&quot;</span><span class="p">:</span> <span class="mi">145</span><span class="p">,</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>    <span class="s2">&quot;total_errors&quot;</span><span class="p">:</span> <span class="mi">3</span><span class="p">,</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>    <span class="s2">&quot;error_429_count&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>    <span class="s2">&quot;error_503_count&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>    <span class="s2">&quot;average_wait_time_ms&quot;</span><span class="p">:</span> <span class="mf">12.3</span>
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="p">}</span>
+</code></pre></div>
+<h3 id="integration-points">Integration Points</h3>
+<ul>
+<li><strong>Dashboard</strong>: Real-time pool stats visualization</li>
+<li><strong>Monitoring</strong>: Prometheus-style metrics export</li>
+<li><strong>Logs</strong>: Structured logging of pool events (acquire, release, timeout)</li>
+</ul>
+<h2 id="troubleshooting">Troubleshooting</h2>
+<h3 id="high-queue-times">High Queue Times</h3>
+<p><strong>Symptom</strong>: Workers waiting &gt;5s for LLM slots</p>
+<p><strong>Diagnosis</strong>:
+- Check pool stats: <code>queued_requests</code> consistently &gt;0
+- Backend may not support claimed concurrency
+- Requests may be slow (large context, slow inference)</p>
+<p><strong>Solution</strong>:
+- Reduce <code>ATOM_LLM_CONCURRENCY</code> if backend doesn't truly parallelize
+- Increase concurrency if backend is idle (check GPU utilization)
+- Optimize prompts to reduce tokens/request</p>
+<h3 id="out-of-memory-oom">Out of Memory (OOM)</h3>
+<p><strong>Symptom</strong>: Backend crashes or returns 500 errors under concurrent load</p>
+<p><strong>Diagnosis</strong>:
+- Concurrent batching exceeds VRAM capacity
+- Check <code>nvidia-smi</code> during concurrent requests</p>
+<p><strong>Solution</strong>:
+- Reduce <code>ATOM_LLM_CONCURRENCY</code>
+- Reduce context window size (<code>max_tokens</code>)
+- Switch to smaller model or better quantization
+- For TabbyAPI: reduce <code>max_batch_size</code> in config</p>
+<h3 id="rate-limit-errors-cloud-apis">Rate Limit Errors (Cloud APIs)</h3>
+<p><strong>Symptom</strong>: Frequent 429 errors from OpenAI/Anthropic</p>
+<p><strong>Diagnosis</strong>:
+- Exceeding RPM or TPM limits for tier
+- Check rate limit headers in responses</p>
+<p><strong>Solution</strong>:
+- Reduce <code>ATOM_LLM_CONCURRENCY</code> to stay below limits
+- Upgrade API tier for higher limits
+- Implement smarter backoff (increase initial delay)</p>
+<h3 id="slow-throughput">Slow Throughput</h3>
+<p><strong>Symptom</strong>: High concurrency but low tokens/second</p>
+<p><strong>Diagnosis</strong>:
+- Backend doesn't support true concurrent batching (e.g., Ollama)
+- Requests queuing instead of parallelizing
+- VRAM bottleneck causing thrashing</p>
+<p><strong>Solution</strong>:
+- Verify backend supports batching (see Quick Reference)
+- Check backend logs for batching behavior
+- Reduce concurrency to find optimal point
+- Consider switching to vLLM or TGI for better batching</p>
+<h2 id="references">References</h2>
+<ul>
+<li><strong>ExLlamaV2</strong>: https://github.com/turboderp/exllamav2</li>
+<li><strong>vLLM</strong>: https://github.com/vllm-project/vllm</li>
+<li><strong>MLX</strong>: https://github.com/ml-explore/mlx</li>
+<li><strong>Ollama</strong>: https://github.com/ollama/ollama</li>
+<li><strong>llama.cpp</strong>: https://github.com/ggerganov/llama.cpp</li>
+<li><strong>Text Generation Inference</strong>: https://github.com/huggingface/text-generation-inference</li>
+<li><strong>OpenAI Rate Limits</strong>: https://platform.openai.com/docs/guides/rate-limits</li>
+<li><strong>Anthropic Rate Limits</strong>: https://docs.anthropic.com/en/api/rate-limits</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.expand", "navigation.indexes"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
