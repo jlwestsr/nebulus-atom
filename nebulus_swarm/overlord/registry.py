@@ -85,6 +85,15 @@ class ScheduleConfig:
 
 
 @dataclass
+class NotificationConfig:
+    """Configuration for the notification system."""
+
+    urgent_enabled: bool = True
+    digest_enabled: bool = True
+    digest_cron: str = "0 8 * * *"  # 8 AM UTC daily
+
+
+@dataclass
 class OverlordConfig:
     """Top-level Overlord configuration."""
 
@@ -94,6 +103,7 @@ class OverlordConfig:
     autonomy_pre_approved: dict[str, list[str]] = field(default_factory=dict)
     models: dict[str, dict[str, object]] = field(default_factory=dict)
     schedule: ScheduleConfig = field(default_factory=ScheduleConfig)
+    notifications: NotificationConfig = field(default_factory=NotificationConfig)
 
 
 def load_config(path: Optional[Path] = None) -> OverlordConfig:
@@ -160,6 +170,18 @@ def load_config(path: Optional[Path] = None) -> OverlordConfig:
         ScheduleConfig(tasks=schedule_tasks) if schedule_tasks else ScheduleConfig()
     )
 
+    # Parse notifications
+    raw_notif = raw.get("notifications", {})
+    notifications = (
+        NotificationConfig(
+            urgent_enabled=bool(raw_notif.get("urgent_enabled", True)),
+            digest_enabled=bool(raw_notif.get("digest_enabled", True)),
+            digest_cron=str(raw_notif.get("digest_cron", "0 8 * * *")),
+        )
+        if isinstance(raw_notif, dict)
+        else NotificationConfig()
+    )
+
     return OverlordConfig(
         projects=projects,
         autonomy_global=str(autonomy_global),
@@ -170,6 +192,7 @@ def load_config(path: Optional[Path] = None) -> OverlordConfig:
         },
         models=dict(models) if isinstance(models, dict) else {},
         schedule=schedule,
+        notifications=notifications,
     )
 
 
