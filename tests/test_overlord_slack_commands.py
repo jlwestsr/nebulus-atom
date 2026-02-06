@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -84,8 +85,9 @@ class TestCommandParsing:
         assert "Overlord Commands" in result
 
     @pytest.mark.asyncio
-    async def test_unknown_command(self, tmp_path: Path) -> None:
+    async def test_unknown_command_llm_disabled(self, tmp_path: Path) -> None:
         router = _make_router(tmp_path)
+        router._llm_config.enabled = False
         result = await router.handle("foobar", "U123", "C456")
         assert "Unknown command" in result
         assert "foobar" in result
@@ -429,3 +431,178 @@ class TestResponseFormatting:
         assert "Unknown project" in result
         assert "nope" in result
         assert "core" in result
+
+
+# --- LLM Chat Fallback Tests ---
+
+
+def _mock_llm_response(content: str) -> MagicMock:
+    """Build a mock OpenAI chat completion response."""
+    choice = MagicMock()
+    choice.message.content = content
+    response = MagicMock()
+    response.choices = [choice]
+    return response
+
+
+class TestLLMFallback:
+    """Tests for the LLM chat fallback feature."""
+
+    @pytest.mark.asyncio
+    async def test_llm_fallback_called_for_unrecognized_text(
+        self, tmp_path: Path
+    ) -> None:
+        """Unrecognized text routes to LLM when enabled."""
+        router = _make_router(tmp_path)
+        mock_response = _mock_llm_response("Here's what I think...")
+
+        with (
+            patch.object(
+                router, "_get_ecosystem", new_callable=AsyncMock, return_value=[]
+            ),
+            patch.object(router.memory, "search", return_value=[]),
+            patch("nebulus_swarm.overlord.slack_commands.AsyncOpenAI"),
+        ):
+            mock_client = AsyncMock()
+            mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+            router._llm_client = mock_client
+
+            result = await router.handle(
+                "What projects have dirty branches?", "U123", "C456"
+            )
+            assert result == "Here's what I think..."
+            mock_client.chat.completions.create.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_llm_disabled_returns_unknown_command(self, tmp_path: Path) -> None:
+        """When LLM is disabled, unrecognized text returns 'Unknown command'."""
+        router = _make_router(tmp_path)
+        router._llm_config.enabled = False
+        result = await router.handle("What should I work on?", "U123", "C456")
+        assert "Unknown command" in result
+
+    @pytest.mark.asyncio
+    async def test_llm_timeout_returns_graceful_error(self, tmp_path: Path) -> None:
+        """LLM timeout returns a graceful fallback message."""
+        router = _make_router(tmp_path)
+
+        with (
+            patch.object(
+                router, "_get_ecosystem", new_callable=AsyncMock, return_value=[]
+            ),
+            patch.object(router.memory, "search", return_value=[]),
+        ):
+            mock_client = AsyncMock()
+            mock_client.chat.completions.create = AsyncMock(
+                side_effect=asyncio.TimeoutError()
+            )
+            router._llm_client = mock_client
+
+            result = await router.handle("Tell me something", "U123", "C456")
+            assert "couldn't process that" in result
+            assert "help" in result
+
+    @pytest.mark.asyncio
+    async def test_llm_exception_returns_graceful_error(self, tmp_path: Path) -> None:
+        """LLM exception returns a graceful fallback message."""
+        router = _make_router(tmp_path)
+
+        with (
+            patch.object(
+                router, "_get_ecosystem", new_callable=AsyncMock, return_value=[]
+            ),
+            patch.object(router.memory, "search", return_value=[]),
+        ):
+            mock_client = AsyncMock()
+            mock_client.chat.completions.create = AsyncMock(
+                side_effect=RuntimeError("connection refused")
+            )
+            router._llm_client = mock_client
+
+            result = await router.handle("Tell me something", "U123", "C456")
+            assert "couldn't process that" in result
+            assert "help" in result
+
+    @pytest.mark.asyncio
+    async def test_context_includes_project_data(self, tmp_path: Path) -> None:
+        """System prompt includes project status information."""
+        router = _make_router(tmp_path)
+
+        mock_status = MagicMock()
+        mock_status.name = "core"
+        mock_status.issues = []
+        mock_status.git = MagicMock(branch="develop", clean=True, ahead=0)
+
+        mock_response = _mock_llm_response("All good.")
+
+        with (
+            patch.object(
+                router,
+                "_get_ecosystem",
+                new_callable=AsyncMock,
+                return_value=[mock_status],
+            ),
+            patch.object(router.memory, "search", return_value=[]),
+        ):
+            mock_client = AsyncMock()
+            mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+            router._llm_client = mock_client
+
+            await router.handle("How are things?", "U123", "C456")
+
+            # Verify system prompt contains project info
+            call_args = mock_client.chat.completions.create.call_args
+            messages = call_args.kwargs["messages"]
+            system_msg = messages[0]["content"]
+            assert "core" in system_msg
+            assert "develop" in system_msg
+
+    @pytest.mark.asyncio
+    async def test_context_includes_memory_results(self, tmp_path: Path) -> None:
+        """System prompt includes memory search results."""
+        router = _make_router(tmp_path)
+
+        mock_entry = MagicMock()
+        mock_entry.project = "prime"
+        mock_entry.content = "Tests failing on prime after last deploy"
+
+        mock_response = _mock_llm_response("Noted.")
+
+        with (
+            patch.object(
+                router, "_get_ecosystem", new_callable=AsyncMock, return_value=[]
+            ),
+            patch.object(router.memory, "search", return_value=[mock_entry]),
+        ):
+            mock_client = AsyncMock()
+            mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+            router._llm_client = mock_client
+
+            await router.handle("Any issues?", "U123", "C456")
+
+            call_args = mock_client.chat.completions.create.call_args
+            messages = call_args.kwargs["messages"]
+            system_msg = messages[0]["content"]
+            assert "Tests failing on prime" in system_msg
+
+    @pytest.mark.asyncio
+    async def test_known_commands_use_pattern_matching(self, tmp_path: Path) -> None:
+        """Known commands like 'status' bypass LLM entirely."""
+        router = _make_router(tmp_path)
+
+        with patch(
+            "nebulus_swarm.overlord.slack_commands.scan_ecosystem",
+            return_value=[],
+        ):
+            result = await router.handle("status", "U123", "C456")
+            assert "Ecosystem Status" in result
+            # LLM client should never have been initialized
+            assert router._llm_client is None
+
+    @pytest.mark.asyncio
+    async def test_greeting_handled_without_llm(self, tmp_path: Path) -> None:
+        """Greetings are pattern-matched, not sent to LLM."""
+        router = _make_router(tmp_path)
+        result = await router.handle("hello", "U123", "C456")
+        assert "Overlord" in result
+        assert router._llm_client is None

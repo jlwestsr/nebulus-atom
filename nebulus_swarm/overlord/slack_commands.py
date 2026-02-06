@@ -12,8 +12,12 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+import time
 from typing import TYPE_CHECKING, Optional
 
+from openai import AsyncOpenAI
+
+from nebulus_swarm.config import OverlordLLMConfig
 from nebulus_swarm.overlord.autonomy import AutonomyEngine, get_autonomy_summary
 from nebulus_swarm.overlord.detectors import DetectionEngine
 from nebulus_swarm.overlord.dispatch import DispatchEngine
@@ -44,6 +48,10 @@ _RE_MEMORY = re.compile(r"^memory\s+(.+)$", re.IGNORECASE)
 _RE_APPROVE = re.compile(r"^approve\s+(\S+)$", re.IGNORECASE)
 _RE_DENY = re.compile(r"^deny\s+(\S+)$", re.IGNORECASE)
 _RE_HELP = re.compile(r"^help$", re.IGNORECASE)
+_RE_GREETING = re.compile(
+    r"^(hi|hello|hey|howdy|yo|sup|what'?s\s*up|how\s*are\s*you|how'?s\s*it\s*going)\b",
+    re.IGNORECASE,
+)
 
 
 class SlackCommandRouter:
@@ -72,6 +80,14 @@ class SlackCommandRouter:
         )
         self.proposal_manager = proposal_manager
         self._detection_engine = DetectionEngine(config, self.graph, self.autonomy)
+
+        # LLM chat fallback
+        self._llm_config = OverlordLLMConfig()
+        self._llm_client: Optional[AsyncOpenAI] = None
+        self._chat_history: dict[str, list[dict[str, str]]] = {}
+        self._ecosystem_cache: Optional[list] = None
+        self._cache_ts: float = 0.0
+        self._CACHE_TTL: float = 60.0
 
     async def handle(self, text: str, user_id: str, channel_id: str) -> str:
         """Parse a command and dispatch to the appropriate handler.
@@ -126,7 +142,13 @@ class SlackCommandRouter:
             if m:
                 return await self._handle_help()
 
-            return f"Unknown command: `{text}`\nType `help` to see available commands."
+            if _RE_GREETING.match(text):
+                return (
+                    "👋 Hey! I'm the Overlord — your ecosystem orchestrator.\n"
+                    "Type `help` to see what I can do."
+                )
+
+            return await self._handle_llm_fallback(text, user_id, channel_id)
 
         except Exception as e:
             logger.exception("Error handling Slack command: %s", text)
@@ -397,6 +419,141 @@ class SlackCommandRouter:
             proposal_id, ProposalState.DENIED, result_summary="Denied via command"
         )
         return f"Proposal `{proposal_id}` denied."
+
+    @property
+    def _llm_enabled(self) -> bool:
+        """Check if LLM fallback is enabled."""
+        return self._llm_config.enabled
+
+    @property
+    def _client(self) -> AsyncOpenAI:
+        """Get or create the AsyncOpenAI client (lazy init)."""
+        if self._llm_client is None:
+            self._llm_client = AsyncOpenAI(
+                base_url=self._llm_config.base_url,
+                api_key="not-needed",
+                timeout=self._llm_config.timeout,
+            )
+        return self._llm_client
+
+    async def _get_ecosystem(self) -> list:
+        """Return cached ecosystem scan results, refreshing if stale."""
+        now = time.monotonic()
+        if self._ecosystem_cache is None or (now - self._cache_ts) > self._CACHE_TTL:
+            self._ecosystem_cache = await asyncio.to_thread(scan_ecosystem, self.config)
+            self._cache_ts = now
+        return self._ecosystem_cache
+
+    def _build_system_prompt(self, ecosystem: list, memory_results: list) -> str:
+        """Build the system prompt with ecosystem state and memory.
+
+        Args:
+            ecosystem: List of ProjectStatus from scan_ecosystem.
+            memory_results: List of memory entries from search.
+
+        Returns:
+            System prompt string for the LLM.
+        """
+        # Project summaries
+        project_lines = []
+        for status in ecosystem:
+            clean = "clean" if status.git.clean else "dirty"
+            line = f"- {status.name}: branch={status.git.branch}, {clean}"
+            if status.git.ahead:
+                line += f", {status.git.ahead} ahead"
+            if status.issues:
+                line += f", issues: {'; '.join(status.issues)}"
+            project_lines.append(line)
+        projects_text = "\n".join(project_lines) if project_lines else "(no projects)"
+
+        # Memory entries
+        memory_lines = []
+        for entry in memory_results:
+            proj = entry.project or "global"
+            memory_lines.append(f"- [{proj}] {entry.content[:120]}")
+        memory_text = (
+            "\n".join(memory_lines) if memory_lines else "(no recent observations)"
+        )
+
+        return (
+            "You are Overlord, the ecosystem orchestrator for Nebulus AI Labs.\n"
+            f"You manage {len(ecosystem)} projects. Current state:\n\n"
+            f"{projects_text}\n\n"
+            f"Recent observations:\n{memory_text}\n\n"
+            "The user can also run these commands directly:\n"
+            "status [project], scan [project], merge <project> <src> to <target>, "
+            "release <project> <version>, autonomy [level], memory <query>, help\n\n"
+            "Answer concisely. If a command would help, suggest it.\n"
+            "Do not generate destructive shell commands."
+        )
+
+    async def _handle_llm_fallback(
+        self, text: str, user_id: str, channel_id: str
+    ) -> str:
+        """Handle unrecognized text via LLM chat.
+
+        Args:
+            text: The unrecognized user message.
+            user_id: Slack user ID.
+            channel_id: Slack channel ID.
+
+        Returns:
+            LLM response or graceful fallback message.
+        """
+        if not self._llm_enabled:
+            return f"Unknown command: `{text}`\nType `help` to see available commands."
+
+        try:
+            # Gather context
+            ecosystem = await self._get_ecosystem()
+            memory_results = await asyncio.to_thread(self.memory.search, text, limit=5)
+
+            system_prompt = self._build_system_prompt(ecosystem, memory_results)
+
+            # Build messages with conversation history
+            messages: list[dict[str, str]] = [
+                {"role": "system", "content": system_prompt}
+            ]
+            history = self._chat_history.get(channel_id, [])
+            messages.extend(history)
+            messages.append({"role": "user", "content": text})
+
+            # Call LLM
+            response = await asyncio.wait_for(
+                self._client.chat.completions.create(
+                    model=self._llm_config.model,
+                    messages=messages,
+                    max_tokens=512,
+                    temperature=0.7,
+                ),
+                timeout=15.0,
+            )
+
+            content = response.choices[0].message.content or ""
+
+            # Update conversation history (sliding window of 5 exchanges)
+            if channel_id not in self._chat_history:
+                self._chat_history[channel_id] = []
+            self._chat_history[channel_id].append({"role": "user", "content": text})
+            self._chat_history[channel_id].append(
+                {"role": "assistant", "content": content}
+            )
+            # Keep last 10 messages (5 exchanges)
+            self._chat_history[channel_id] = self._chat_history[channel_id][-10:]
+
+            return content
+
+        except asyncio.TimeoutError:
+            logger.warning("LLM chat fallback timed out for: %s", text)
+            return (
+                "I couldn't process that in time. Try `help` to see available commands."
+            )
+        except Exception as e:
+            logger.warning("LLM chat fallback failed: %s", e)
+            return (
+                "I couldn't process that right now. "
+                "Try `help` to see available commands."
+            )
 
     async def _handle_help(self) -> str:
         """List available commands.
