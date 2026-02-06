@@ -1,15 +1,15 @@
 # Nebulus Atom
 
 ![Python Version](https://img.shields.io/badge/python-3.12+-blue.svg)
-![Version](https://img.shields.io/badge/version-2.1.0-green.svg)
-![Tests](https://img.shields.io/badge/tests-936%20passing-brightgreen.svg)
+![Version](https://img.shields.io/badge/version-2.3.0-green.svg)
+![Tests](https://img.shields.io/badge/tests-1219%20passing-brightgreen.svg)
 ![License](https://img.shields.io/badge/license-proprietary-red.svg)
 
-> **v2.1.0** - A professional, autonomous AI engineer CLI powered by local LLMs for GitHub automation, code generation, and multi-agent orchestration.
+> **v2.3.0** - A professional, autonomous AI engineer CLI powered by local LLMs for GitHub automation, code generation, and multi-agent orchestration.
 
 Nebulus Atom is a privacy-first, self-hosted AI coding assistant and autonomous software engineering agent. It connects to local LLM servers (Nebulus Prime, Nebulus Edge, Ollama, TabbyAPI, vLLM) to provide intelligent code assistance, automated GitHub issue processing, and multi-agent task orchestration. Perfect for developers who want AI-powered coding tools without cloud dependencies.
 
-**Key capabilities**: Autonomous code generation • GitHub issue automation • Multi-agent swarm orchestration • Local RAG code search • TDD automation • Docker-based minion dispatch • Cross-project dependency analysis • Test-driven development • CI/CD integration
+**Key capabilities**: Autonomous code generation • GitHub issue automation • Multi-agent swarm orchestration • Local RAG code search • TDD automation • Docker-based minion dispatch • Cross-project dependency analysis • Slack-controlled daemon mode • Proactive monitoring • Approval workflows • Test-driven development • CI/CD integration
 
 ## Quick Start
 
@@ -57,6 +57,13 @@ See the [Installation Guide](https://github.com/jlwestsr/nebulus-atom/wiki/Insta
 - **Cross-Project Memory** - SQLite-backed observation store with search and pruning
 - **Autonomy Engine** - Confidence-based auto-dispatch with test health correlation
 
+**Slack + Background Mode (Phase 3)**
+- **Slack Command Router** - Multi-project commands: status, scan, merge, release, autonomy, memory
+- **Proposal Manager** - Approval lifecycle with Slack thread binding (propose/approve/deny/execute)
+- **Background Daemon** - Persistent process with croniter-based scheduled sweeps
+- **Proactive Detectors** - Stale branch, ahead-of-main, and failing test detection
+- **Notification System** - Urgent alerts and daily digest with category-based routing
+
 **Control Plane (Phase 0)**
 - **Overlord** - Slack-driven control plane with natural language commands via LLM parsing
 - **Minions** - Containerized Docker agents that clone repos, work issues, and create PRs
@@ -78,16 +85,21 @@ nebulus-atom/
 │   └── main.py             # Entry point
 ├── nebulus_swarm/           # Multi-agent swarm
 │   ├── overlord/            # Meta-orchestrator & control plane
-│   │   ├── registry.py      # Project discovery & dependencies
-│   │   ├── scanner.py       # Git state & health monitoring
-│   │   ├── graph.py         # Dependency graph & blast radius
-│   │   ├── memory.py        # Cross-project observations
-│   │   ├── autonomy.py      # Confidence scoring & dispatch
-│   │   └── main.py          # Slack/Docker/State control
+│   │   ├── registry.py         # Project discovery & dependencies
+│   │   ├── scanner.py          # Git state & health monitoring
+│   │   ├── graph.py            # Dependency graph & blast radius
+│   │   ├── memory.py           # Cross-project observations
+│   │   ├── autonomy.py         # Confidence scoring & dispatch
+│   │   ├── slack_commands.py   # Multi-project Slack commands
+│   │   ├── proposal_manager.py # Approval workflow lifecycle
+│   │   ├── overlord_daemon.py  # Background daemon & scheduler
+│   │   ├── detectors.py        # Proactive issue detection
+│   │   ├── notifications.py    # Alerts & daily digest
+│   │   └── main.py             # Slack/Docker/State control
 │   ├── minion/              # Worker agents
 │   ├── dashboard/           # Streamlit monitoring
 │   └── reviewer/            # PR review
-└── tests/                   # 936 tests
+└── tests/                   # 1219 tests
 ```
 
 ## Commands
@@ -122,6 +134,19 @@ status
 queue
 ```
 
+### Overlord Daemon (Phase 3)
+
+```bash
+# Start the background daemon with scheduled sweeps
+nebulus-atom overlord daemon start
+
+# Slack commands (in #nebulus-ops channel)
+@atom status              # Ecosystem health
+@atom scan core           # Deep scan a project
+@atom merge core develop to main  # Propose a merge (requires approval)
+@atom help                # List all commands
+```
+
 ## Tech Stack
 
 | Component | Technology |
@@ -134,7 +159,7 @@ queue
 | Swarm | Docker, Slack Bolt, aiohttp |
 | Dashboard | Streamlit |
 | Database | SQLite, ChromaDB |
-| Testing | pytest (936 tests) |
+| Testing | pytest (1219 tests) |
 | CI/CD | pre-commit hooks, ruff |
 
 ## Documentation
