@@ -13,6 +13,16 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.tree import Tree
 
+from nebulus_swarm.overlord.action_scope import (
+    ActionScope,
+    ScopeVerdict,
+    evaluate_scope,
+    scope_for_merge,
+    scope_for_push,
+    scope_for_release,
+)
+from nebulus_swarm.overlord.graph import DependencyGraph
+from nebulus_swarm.overlord.memory import OverlordMemory
 from nebulus_swarm.overlord.registry import (
     DEFAULT_CONFIG_PATH,
     OverlordConfig,
@@ -165,6 +175,126 @@ def show_config() -> None:
         )
     else:
         console.print("\n[green]Config is valid.[/green]")
+
+
+@overlord_app.command("graph")
+def show_graph(
+    project: Optional[str] = typer.Argument(
+        None, help="Project to analyze (shows full graph if omitted)"
+    ),
+) -> None:
+    """Show dependency graph or impact analysis for a project."""
+    registry = _load_registry_or_exit()
+    if registry is None:
+        return
+
+    dep_graph = DependencyGraph(registry)
+
+    if project:
+        if project not in registry.projects:
+            console.print(f"[red]Unknown project: {project}[/red]")
+            console.print(f"Available: {', '.join(sorted(registry.projects.keys()))}")
+            return
+
+        upstream = dep_graph.get_upstream(project)
+        downstream = dep_graph.get_downstream(project)
+        affected = dep_graph.get_affected_by(project)
+
+        console.print(f"\n[bold cyan]Impact Analysis: {project}[/bold cyan]\n")
+        console.print(
+            f"[bold]Upstream[/bold] (dependencies): "
+            f"{', '.join(upstream) if upstream else '(none)'}"
+        )
+        console.print(
+            f"[bold]Downstream[/bold] (dependents): "
+            f"{', '.join(downstream) if downstream else '(none)'}"
+        )
+        console.print(f"[bold]Affected by change[/bold]: {', '.join(affected)}")
+    else:
+        console.print("\n[bold cyan]Dependency Graph[/bold cyan]\n")
+        console.print(dep_graph.render_ascii())
+
+
+@overlord_app.command("memory")
+def manage_memory(
+    action: str = typer.Argument(help="Action: search, recent, forget, prune"),
+    query: Optional[str] = typer.Argument(None, help="Search query or entry ID"),
+    project: Optional[str] = typer.Option(
+        None, "--project", "-p", help="Filter by project"
+    ),
+    limit: int = typer.Option(20, "--limit", "-n", help="Max results"),
+) -> None:
+    """Manage cross-project memory."""
+    mem = OverlordMemory()
+
+    if action == "search":
+        if not query:
+            console.print("[red]Search requires a query argument.[/red]")
+            return
+        results = mem.search(query, project=project, limit=limit)
+        _render_memory_entries(results)
+
+    elif action == "recent":
+        results = mem.get_recent(limit=limit)
+        _render_memory_entries(results)
+
+    elif action == "forget":
+        if not query:
+            console.print("[red]Forget requires an entry ID argument.[/red]")
+            return
+        if mem.forget(query):
+            console.print(f"[green]Deleted memory {query}[/green]")
+        else:
+            console.print(f"[yellow]No memory found with ID {query}[/yellow]")
+
+    elif action == "prune":
+        days = int(query) if query else 90
+        deleted = mem.prune(older_than_days=days)
+        console.print(
+            f"[green]Pruned {deleted} entries older than {days} days.[/green]"
+        )
+
+    else:
+        console.print(
+            f"[red]Unknown action: {action}[/red]\n"
+            "Valid actions: search, recent, forget, prune"
+        )
+
+
+@overlord_app.command("scope")
+def show_scope(
+    action: str = typer.Argument(help="Action to preview: merge, push, release"),
+    project: str = typer.Argument(help="Target project"),
+) -> None:
+    """Preview blast radius for an action."""
+    registry = _load_registry_or_exit()
+    if registry is None:
+        return
+
+    if project not in registry.projects:
+        console.print(f"[red]Unknown project: {project}[/red]")
+        console.print(f"Available: {', '.join(sorted(registry.projects.keys()))}")
+        return
+
+    dep_graph = DependencyGraph(registry)
+
+    if action == "merge":
+        scope = scope_for_merge(project, "develop", "main")
+    elif action == "push":
+        scope = scope_for_push([project])
+    elif action == "release":
+        scope = scope_for_release(project, dep_graph)
+    else:
+        console.print(
+            f"[red]Unknown action: {action}[/red]\nValid actions: merge, push, release"
+        )
+        return
+
+    # Evaluate against current autonomy level
+    autonomy = registry.autonomy_overrides.get(project, registry.autonomy_global)
+    verdict = evaluate_scope(scope, autonomy, registry)
+
+    _render_scope(scope, verdict, autonomy)
 
 
 # --- Helpers ---
@@ -400,3 +530,55 @@ def _generate_config_yaml(discovered: list[dict]) -> str:
     }
 
     return yaml.dump(config, default_flow_style=False, sort_keys=False)
+
+
+def _render_memory_entries(entries: list) -> None:
+    """Render a list of MemoryEntry objects as a Rich table."""
+    if not entries:
+        console.print("[dim]No memories found.[/dim]")
+        return
+
+    table = Table(title="Overlord Memory")
+    table.add_column("ID", style="dim", max_width=8)
+    table.add_column("Timestamp", max_width=20)
+    table.add_column("Category")
+    table.add_column("Project")
+    table.add_column("Content")
+
+    for entry in entries:
+        table.add_row(
+            entry.id[:8],
+            entry.timestamp[:19],
+            entry.category,
+            entry.project or "(global)",
+            entry.content[:80],
+        )
+
+    console.print(table)
+
+
+def _render_scope(scope: ActionScope, verdict: ScopeVerdict, autonomy: str) -> None:
+    """Render an ActionScope and its verdict as a Rich panel."""
+    lines = [
+        f"[bold]Projects:[/bold] {', '.join(scope.projects) if scope.projects else '(none)'}",
+        f"[bold]Branches:[/bold] {', '.join(scope.branches) if scope.branches else '(none)'}",
+        f"[bold]Destructive:[/bold] {'Yes' if scope.destructive else 'No'}",
+        f"[bold]Reversible:[/bold] {'Yes' if scope.reversible else 'No'}",
+        f"[bold]Affects Remote:[/bold] {'Yes' if scope.affects_remote else 'No'}",
+        f"[bold]Estimated Impact:[/bold] {scope.estimated_impact}",
+        "",
+        f"[bold]Autonomy Level:[/bold] {autonomy}",
+    ]
+
+    if verdict.approved:
+        lines.append("[green bold]Verdict: APPROVED[/green bold]")
+    else:
+        lines.append("[red bold]Verdict: REQUIRES APPROVAL[/red bold]")
+
+    lines.append(f"[bold]Reason:[/bold] {verdict.reason}")
+
+    if verdict.escalation_required:
+        lines.append("[yellow bold]Escalation required[/yellow bold]")
+
+    border = "green" if verdict.approved else "red"
+    console.print(Panel("\n".join(lines), title="Blast Radius", border_style=border))
