@@ -12,8 +12,11 @@ logger = logging.getLogger(__name__)
 # Type alias for message handlers (sync or async)
 MessageHandler = Callable[[str, str, str], Union[str, Awaitable[str]]]
 
-# Type alias for thread reply handlers
-ThreadReplyHandler = Callable[[str, str], None]  # (thread_ts, reply_text)
+# Type alias for thread reply handlers (async-aware)
+ThreadReplyHandler = Union[
+    Callable[[str, str], None],
+    Callable[[str, str], Awaitable[None]],
+]
 
 
 class SlackBot:
@@ -75,7 +78,10 @@ class SlackBot:
             if thread_ts and thread_ts != event.get("ts"):
                 logger.debug(f"Thread reply in {thread_ts}: {text}")
                 if self.thread_reply_handler:
-                    self.thread_reply_handler(thread_ts, text)
+                    if asyncio.iscoroutinefunction(self.thread_reply_handler):
+                        await self.thread_reply_handler(thread_ts, text)
+                    else:
+                        self.thread_reply_handler(thread_ts, text)
                 return  # Thread replies don't go to the command handler
 
             logger.info(f"Received message from {user}: {text}")
