@@ -367,3 +367,133 @@ When implementing large features:
 **This pattern scales**: Successfully delivered 5 components, 2,800+ lines, 151 tests in single session with zero failures.
 
 ---
+
+## 2026-02-06: Session Continuity and AI Memory Patterns
+
+### Context
+This session continued previous work (README SEO, wiki updates) after context compaction. Demonstrates patterns for maintaining continuity across AI sessions and using AI_INSIGHTS.md as canonical memory.
+
+### Pattern 1: AI_INSIGHTS.md as Canonical Memory
+
+**Discovery**: The user directive "update your memory for this session" initially caused confusion. After trying multiple approaches (overlord memory CLI, JournalService, scratchpad summary), the correct pattern emerged: **AI_INSIGHTS.md is the canonical memory system**.
+
+**Why This Works**:
+- Persistent across all sessions (committed to git)
+- Survives context compaction
+- Accessible to all AIs working on the project
+- Structured format for pattern documentation
+- Searchable and maintainable
+
+**Anti-Pattern**: Creating session summaries in temporary locations (`/tmp`, scratchpad) that aren't committed to the repository. These are lost between AI instances.
+
+**Best Practice**:
+```bash
+# After significant work or discoveries:
+1. Update docs/AI_INSIGHTS.md with new insights
+2. Commit with descriptive message
+3. Push to develop/main
+```
+
+### Pattern 2: Git Log Analysis for Multi-AI Detection
+
+**Discovery**: When returning to a branch after another AI has worked on it, git log reveals the parallel work:
+```bash
+git log -10 --oneline
+git log main..develop
+git log develop..main
+```
+
+**Signals of Multi-AI Activity**:
+- Commits with timestamps between your sessions
+- Feature branches you didn't create
+- Uncommitted changes in working tree (previous AI didn't finish)
+- Stashed changes on feature branches
+
+**Response Protocol**:
+1. Run `git status` and `git stash list` on arrival
+2. Review recent commits: `git log -10 --oneline`
+3. Check for divergence: `git log main..develop`
+4. If conflicts detected, communicate with user before proceeding
+5. Pull latest: `git pull origin develop`
+
+### Pattern 3: Documentation as Living Memory
+
+**Observation**: Three documentation systems serve different purposes:
+- **AI_INSIGHTS.md**: Patterns, lessons learned, architectural decisions (for AIs)
+- **README.md**: User-facing features, setup, quickstart (for users)
+- **GitHub Wiki**: Comprehensive reference documentation (for users)
+
+**Synchronization Strategy**:
+- AI_INSIGHTS.md updates independently (AI-specific learnings)
+- README.md updates trigger wiki updates (user-facing changes)
+- Version numbers must stay synchronized across all three
+- Test counts must stay synchronized across all three
+
+**Best Practice**: When updating user-facing features:
+```
+1. Update code
+2. Run tests
+3. Update README.md (version, features, test count)
+4. Update GitHub Wiki (detailed docs, CLI references)
+5. Update AI_INSIGHTS.md (patterns discovered during implementation)
+6. Commit all together OR in sequence (README → Wiki → Insights)
+```
+
+### Pattern 4: Session Summary vs. Permanent Memory
+
+**Distinction**:
+- **Session Summary** (scratchpad): Temporary, detailed, task-focused. For immediate context preservation during long sessions.
+- **AI_INSIGHTS.md**: Permanent, pattern-focused, lesson-focused. For cross-session learning and future AI guidance.
+
+**When to Use Each**:
+- Session Summary: Mid-session context preservation, debugging, task tracking
+- AI_INSIGHTS.md: End of session, pattern discovery, architectural decisions, anti-patterns
+
+**Anti-Pattern**: Confusing the two purposes. Session summaries are ephemeral and tactical. AI insights are permanent and strategic.
+
+### Pattern 5: Branch Synchronization Awareness
+
+**Discovery**: With `--no-ff` merge workflow:
+- `main..develop` shows commits to be merged from develop to main
+- `develop..main` shows merge commits on main (expected)
+- Empty `main..develop` means branches are synchronized
+
+**Git Workflow Reminder**:
+```bash
+# Check sync status
+git log main..develop --oneline  # Should be empty after merge
+
+# Proper merge workflow
+git checkout main
+git merge --no-ff develop -m "descriptive merge message"
+git push origin main
+
+# Return to develop for next work
+git checkout develop
+```
+
+**Why This Matters**: Prevents accidental double-merges and helps AIs understand current repository state.
+
+### Lessons for Future Sessions
+
+1. **Always check AI_INSIGHTS.md first** when starting work on this project. It contains accumulated wisdom from all previous AI sessions.
+
+2. **Update AI_INSIGHTS.md at session end** with any patterns discovered, even if they seem minor. Future AIs will benefit.
+
+3. **Use git log analysis** to detect multi-AI activity and coordinate work appropriately.
+
+4. **Keep documentation synchronized**: README + Wiki + AI_INSIGHTS must reflect current state.
+
+5. **Commit AI_INSIGHTS.md updates separately** from code changes for cleaner history and easier review.
+
+### Metrics
+
+**This Session**:
+- Duration: ~2 hours
+- Commits: 3 (README SEO, wiki updates, AI insights documentation)
+- Merges to main: 2
+- Documentation files updated: 6 (README.md, 4 wiki pages, AI_INSIGHTS.md)
+- Insights captured: 3 on 2026-02-05 + 5 patterns on 2026-02-06
+- Multi-AI coordination: Successfully worked around parallel Overlord Phase 2 work
+
+---
