@@ -424,3 +424,115 @@ class TestScopeCommand:
         ):
             result = runner.invoke(overlord_app, ["scope", "yolo", "nebulus-core"])
         assert "Unknown action" in result.output
+
+
+class TestAutonomyCommand:
+    """Tests for `overlord autonomy`."""
+
+    def test_autonomy_shows_settings(self, tmp_path: Path) -> None:
+        config_file = _make_dep_config_file(tmp_path)
+        with (
+            patch(
+                "nebulus_atom.commands.overlord_commands.DEFAULT_CONFIG_PATH",
+                config_file,
+            ),
+            patch(
+                "nebulus_swarm.overlord.registry.DEFAULT_CONFIG_PATH",
+                config_file,
+            ),
+        ):
+            result = runner.invoke(overlord_app, ["autonomy"])
+        assert "Autonomy Settings" in result.output
+        assert "(global)" in result.output
+        assert "cautious" in result.output
+
+    def test_autonomy_list_approved_empty(self, tmp_path: Path) -> None:
+        config_file = _make_dep_config_file(tmp_path)
+        with (
+            patch(
+                "nebulus_atom.commands.overlord_commands.DEFAULT_CONFIG_PATH",
+                config_file,
+            ),
+            patch(
+                "nebulus_swarm.overlord.registry.DEFAULT_CONFIG_PATH",
+                config_file,
+            ),
+        ):
+            result = runner.invoke(overlord_app, ["autonomy", "--list-approved"])
+        assert "No pre-approved actions" in result.output
+
+    def test_autonomy_list_approved_shows_actions(self, tmp_path: Path) -> None:
+        # Create config with pre-approved actions
+        core_dir = tmp_path / "core"
+        core_dir.mkdir()
+        config = {
+            "projects": {
+                "core": {
+                    "path": str(core_dir),
+                    "remote": "test/core",
+                    "role": "shared-library",
+                    "branch_model": "develop-main",
+                    "depends_on": [],
+                }
+            },
+            "autonomy": {
+                "global": "scheduled",
+                "overrides": {},
+                "pre_approved": {
+                    "core": ["run tests", "clean branches"],
+                },
+            },
+        }
+        config_file = tmp_path / "overlord.yml"
+        config_file.write_text(yaml.dump(config, default_flow_style=False))
+
+        with (
+            patch(
+                "nebulus_atom.commands.overlord_commands.DEFAULT_CONFIG_PATH",
+                config_file,
+            ),
+            patch(
+                "nebulus_swarm.overlord.registry.DEFAULT_CONFIG_PATH",
+                config_file,
+            ),
+        ):
+            result = runner.invoke(overlord_app, ["autonomy", "--list-approved"])
+        assert "Pre-Approved Actions" in result.output
+        assert "run tests" in result.output
+        assert "clean branches" in result.output
+
+    def test_autonomy_set_global_shows_instructions(self, tmp_path: Path) -> None:
+        config_file = _make_dep_config_file(tmp_path)
+        with (
+            patch(
+                "nebulus_atom.commands.overlord_commands.DEFAULT_CONFIG_PATH",
+                config_file,
+            ),
+            patch(
+                "nebulus_swarm.overlord.registry.DEFAULT_CONFIG_PATH",
+                config_file,
+            ),
+        ):
+            result = runner.invoke(overlord_app, ["autonomy", "--global", "proactive"])
+        assert "edit" in result.output.lower()
+        assert "proactive" in result.output
+
+    def test_autonomy_set_project_shows_instructions(self, tmp_path: Path) -> None:
+        config_file = _make_dep_config_file(tmp_path)
+        with (
+            patch(
+                "nebulus_atom.commands.overlord_commands.DEFAULT_CONFIG_PATH",
+                config_file,
+            ),
+            patch(
+                "nebulus_swarm.overlord.registry.DEFAULT_CONFIG_PATH",
+                config_file,
+            ),
+        ):
+            result = runner.invoke(
+                overlord_app,
+                ["autonomy", "--project", "nebulus-core", "--level", "proactive"],
+            )
+        assert "edit" in result.output.lower()
+        assert "nebulus-core" in result.output
+        assert "proactive" in result.output
