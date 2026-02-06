@@ -58,6 +58,33 @@ class ProjectConfig:
 
 
 @dataclass
+class ScheduledTask:
+    """A single scheduled task definition."""
+
+    name: str
+    cron: str
+    enabled: bool = True
+
+
+@dataclass
+class ScheduleConfig:
+    """Configuration for the daemon scheduler."""
+
+    tasks: list[ScheduledTask] = field(default_factory=list)
+
+    @staticmethod
+    def default() -> ScheduleConfig:
+        """Return sensible default schedule."""
+        return ScheduleConfig(
+            tasks=[
+                ScheduledTask(name="scan", cron="0 * * * *"),
+                ScheduledTask(name="test-all", cron="0 2 * * *"),
+                ScheduledTask(name="clean-stale-branches", cron="0 3 * * 0"),
+            ]
+        )
+
+
+@dataclass
 class OverlordConfig:
     """Top-level Overlord configuration."""
 
@@ -66,6 +93,7 @@ class OverlordConfig:
     autonomy_overrides: dict[str, str] = field(default_factory=dict)
     autonomy_pre_approved: dict[str, list[str]] = field(default_factory=dict)
     models: dict[str, dict[str, object]] = field(default_factory=dict)
+    schedule: ScheduleConfig = field(default_factory=ScheduleConfig)
 
 
 def load_config(path: Optional[Path] = None) -> OverlordConfig:
@@ -112,6 +140,26 @@ def load_config(path: Optional[Path] = None) -> OverlordConfig:
     autonomy_pre_approved = raw.get("autonomy", {}).get("pre_approved", {})
     models = raw.get("models", {})
 
+    # Parse schedule
+    raw_schedule = raw.get("schedule", {})
+    schedule_tasks: list[ScheduledTask] = []
+    if isinstance(raw_schedule, dict):
+        for task_name, task_data in raw_schedule.items():
+            if isinstance(task_data, dict):
+                schedule_tasks.append(
+                    ScheduledTask(
+                        name=task_name,
+                        cron=str(task_data.get("cron", "")),
+                        enabled=bool(task_data.get("enabled", True)),
+                    )
+                )
+            elif isinstance(task_data, str):
+                # Short form: task_name: "cron_expression"
+                schedule_tasks.append(ScheduledTask(name=task_name, cron=task_data))
+    schedule = (
+        ScheduleConfig(tasks=schedule_tasks) if schedule_tasks else ScheduleConfig()
+    )
+
     return OverlordConfig(
         projects=projects,
         autonomy_global=str(autonomy_global),
@@ -121,6 +169,7 @@ def load_config(path: Optional[Path] = None) -> OverlordConfig:
             for k, v in autonomy_pre_approved.items()
         },
         models=dict(models) if isinstance(models, dict) else {},
+        schedule=schedule,
     )
 
 

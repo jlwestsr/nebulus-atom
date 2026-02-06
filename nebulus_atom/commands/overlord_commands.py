@@ -848,6 +848,53 @@ def release(
         raise typer.Exit(1)
 
 
+@overlord_app.command()
+def daemon(
+    action: str = typer.Argument("start", help="Action: start, status"),
+) -> None:
+    """Run the Overlord background daemon."""
+    import asyncio
+
+    registry = _load_registry_or_exit()
+    if registry is None:
+        return
+
+    if action == "start":
+        from nebulus_swarm.overlord.overlord_daemon import OverlordDaemon
+
+        console.print("[bold cyan]Starting Overlord daemon...[/bold cyan]")
+
+        schedule = registry.schedule
+        if schedule.tasks:
+            table = Table(title="Scheduled Tasks")
+            table.add_column("Task", style="bold")
+            table.add_column("Cron")
+            table.add_column("Enabled")
+            for task in schedule.tasks:
+                table.add_row(
+                    task.name,
+                    task.cron or "(default)",
+                    "yes" if task.enabled else "no",
+                )
+            console.print(table)
+        else:
+            console.print("[dim]Using default schedule[/dim]")
+
+        d = OverlordDaemon(registry)
+        try:
+            asyncio.run(d.run())
+        except KeyboardInterrupt:
+            console.print("\n[yellow]Daemon stopped.[/yellow]")
+
+    elif action == "status":
+        console.print("[dim]Daemon status check not yet implemented.[/dim]")
+        console.print("Use 'overlord daemon start' to launch the daemon.")
+
+    else:
+        console.print(f"[red]Unknown daemon action: {action}[/red]")
+        console.print("Valid actions: start, status")
+
+
 def _render_scope(scope: ActionScope, verdict: ScopeVerdict, autonomy: str) -> None:
     """Render an ActionScope and its verdict as a Rich panel."""
     lines = [
