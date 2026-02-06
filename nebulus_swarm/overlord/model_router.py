@@ -1,183 +1,260 @@
-"""Multi-LLM model router for complexity-based model selection."""
+"""Overlord Model Router — three-tier routing with health checking."""
+
+from __future__ import annotations
 
 import logging
-import re
-from dataclasses import dataclass
-from typing import Optional
+import time
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Optional
 
-from nebulus_swarm.config import ModelProfile, RoutingConfig
+if TYPE_CHECKING:
+    from nebulus_swarm.overlord.registry import OverlordConfig
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
-class ComplexityScore:
-    """Result of issue complexity analysis."""
+class ModelEndpoint:
+    """Configuration for a single LLM endpoint."""
 
-    score: int
-    tier: str
-    reasons: list[str]
-
-
-# Label hints that suggest simple or complex issues
-SIMPLE_LABELS = {"typo", "docs", "documentation", "good-first-issue", "easy", "minor"}
-COMPLEX_LABELS = {
-    "refactor",
-    "architecture",
-    "performance",
-    "security",
-    "breaking-change",
-    "multi-file",
-}
+    name: str
+    endpoint: str
+    model: str
+    tier: str  # "local", "cloud-fast", "cloud-heavy"
+    concurrent: int = 1
+    health_check_url: Optional[str] = None
+    _last_health_check: float = field(default=0.0, init=False, repr=False)
+    _is_healthy: bool = field(default=True, init=False, repr=False)
 
 
 class ModelRouter:
-    """Selects the appropriate LLM model based on issue complexity.
+    """Routes tasks to appropriate LLM tier with health checking and fallback."""
 
-    Complexity is scored from 0-10 using heuristics:
-    - Body length and structure (checklists, code blocks, file references)
-    - Label hints (simple vs complex labels)
-    - Title keywords
-
-    Scores at or above the threshold route to "heavy" tier,
-    below route to "light" tier.
-    """
-
-    def __init__(self, config: RoutingConfig):
+    def __init__(self, config: OverlordConfig):
         """Initialize the router.
 
         Args:
-            config: Routing configuration with model profiles and thresholds.
+            config: Overlord configuration containing models section.
         """
         self.config = config
+        self.endpoints: dict[str, ModelEndpoint] = {}
+        self._load_endpoints()
 
-    def analyze_complexity(
-        self,
-        title: str,
-        body: str,
-        labels: list[str],
-    ) -> ComplexityScore:
-        """Analyze issue complexity and return a score with tier recommendation.
+    def _load_endpoints(self) -> None:
+        """Parse models config into ModelEndpoint instances."""
+        for name, data in self.config.models.items():
+            if not isinstance(data, dict):
+                logger.warning(f"Skipping invalid model config: {name}")
+                continue
 
-        Args:
-            title: Issue title.
-            body: Issue body text.
-            labels: Issue label names.
-
-        Returns:
-            ComplexityScore with score (0-10), tier, and reasons.
-        """
-        score = 0
-        reasons: list[str] = []
-
-        # --- Label signals ---
-        lower_labels = {label.lower() for label in labels}
-
-        simple_matches = lower_labels & SIMPLE_LABELS
-        if simple_matches:
-            score -= 2
-            reasons.append(f"simple labels: {', '.join(simple_matches)}")
-
-        complex_matches = lower_labels & COMPLEX_LABELS
-        if complex_matches:
-            score += 2
-            reasons.append(f"complex labels: {', '.join(complex_matches)}")
-
-        # --- Body length ---
-        body_len = len(body) if body else 0
-        if body_len > 2000:
-            score += 2
-            reasons.append(f"long body ({body_len} chars)")
-        elif body_len > 800:
-            score += 1
-            reasons.append(f"medium body ({body_len} chars)")
-
-        # --- Checklist items ---
-        if body:
-            checklist_items = len(re.findall(r"- \[[ x]\]", body))
-            if checklist_items >= 5:
-                score += 2
-                reasons.append(f"{checklist_items} checklist items")
-            elif checklist_items >= 2:
-                score += 1
-                reasons.append(f"{checklist_items} checklist items")
-
-        # --- Code blocks ---
-        if body:
-            code_blocks = len(re.findall(r"```", body)) // 2
-            if code_blocks >= 3:
-                score += 1
-                reasons.append(f"{code_blocks} code blocks")
-
-        # --- File references ---
-        if body:
-            file_refs = len(re.findall(r"[\w/]+\.\w{1,5}", body))
-            if file_refs >= 5:
-                score += 2
-                reasons.append(f"{file_refs} file references")
-            elif file_refs >= 2:
-                score += 1
-                reasons.append(f"{file_refs} file references")
-
-        # --- Title complexity keywords ---
-        title_lower = title.lower() if title else ""
-        complex_keywords = {"refactor", "redesign", "migrate", "rewrite", "overhaul"}
-        simple_keywords = {"fix typo", "update readme", "bump version", "rename"}
-
-        if any(kw in title_lower for kw in complex_keywords):
-            score += 2
-            reasons.append("complex keyword in title")
-
-        if any(kw in title_lower for kw in simple_keywords):
-            score -= 1
-            reasons.append("simple keyword in title")
-
-        # Clamp to 0-10
-        score = max(0, min(10, score))
-
-        # Determine tier
-        tier = "heavy" if score >= self.config.complexity_threshold else "light"
-
-        return ComplexityScore(score=score, tier=tier, reasons=reasons)
-
-    def select_model(
-        self,
-        title: str,
-        body: str,
-        labels: list[str],
-    ) -> Optional[ModelProfile]:
-        """Select the appropriate model for an issue.
-
-        Args:
-            title: Issue title.
-            body: Issue body text.
-            labels: Issue label names.
-
-        Returns:
-            ModelProfile for the selected tier, or None if routing is disabled
-            or no model is configured for the tier.
-        """
-        if not self.config.enabled:
-            return None
-
-        complexity = self.analyze_complexity(title, body, labels)
-
-        logger.info(
-            f"Complexity analysis: score={complexity.score}, "
-            f"tier={complexity.tier}, reasons={complexity.reasons}"
-        )
-
-        model = self.config.get_model(complexity.tier)
-        if model is None:
-            # Fall back to default tier
-            model = self.config.get_model(self.config.default_tier)
-
-        if model:
-            logger.info(f"Selected model: {model.name} (tier={model.tier})")
-        else:
-            logger.warning(
-                f"No model configured for tier={complexity.tier}, "
-                f"falling back to default LLM config"
+            self.endpoints[name] = ModelEndpoint(
+                name=name,
+                endpoint=str(data.get("endpoint", "")),
+                model=str(data.get("model", "")),
+                tier=str(data.get("tier", "cloud-fast")),
+                concurrent=int(data.get("concurrent", 1)),
+                health_check_url=data.get("health_check_url"),
             )
 
-        return model
+    def select_model(
+        self, task_type: str, complexity: str = "medium", prefer_local: bool = True
+    ) -> Optional[ModelEndpoint]:
+        """Select best available model for a task.
+
+        Args:
+            task_type: Task category (format, feature, review, architecture, etc.)
+            complexity: Complexity level (low, medium, high).
+            prefer_local: Whether to prefer local endpoints when available.
+
+        Returns:
+            ModelEndpoint if available, None if no models configured.
+        """
+        if not self.endpoints:
+            logger.warning("No models configured")
+            return None
+
+        # Infer target tier
+        target_tier = self._infer_tier(task_type, complexity)
+
+        logger.info(
+            f"Selecting model: task_type={task_type}, complexity={complexity}, "
+            f"target_tier={target_tier}"
+        )
+
+        # Try target tier
+        endpoint = self._get_healthy_endpoint(target_tier, prefer_local)
+        if endpoint:
+            logger.info(f"Selected {endpoint.name} ({endpoint.tier})")
+            return endpoint
+
+        # Fallback
+        endpoint = self._fallback(target_tier, prefer_local)
+        if endpoint:
+            logger.warning(
+                f"Tier '{target_tier}' unavailable, falling back to "
+                f"{endpoint.name} ({endpoint.tier})"
+            )
+            return endpoint
+
+        logger.error("No healthy endpoints available")
+        return None
+
+    def _infer_tier(self, task_type: str, complexity: str) -> str:
+        """Infer target tier from task type and complexity.
+
+        Args:
+            task_type: Task category.
+            complexity: Complexity level.
+
+        Returns:
+            One of: "local", "cloud-fast", "cloud-heavy"
+        """
+        # Simple/mechanical tasks → local
+        if task_type in ("format", "lint", "boilerplate"):
+            return "local"
+
+        # Feature implementation
+        if task_type == "feature":
+            if complexity in ("low", "medium"):
+                return "local"
+            return "cloud-fast"
+
+        # Code review → cloud-fast
+        if task_type == "review":
+            return "cloud-fast"
+
+        # Architecture/planning → cloud-heavy
+        if task_type in ("architecture", "planning"):
+            return "cloud-heavy"
+
+        # Default to cloud-fast
+        return "cloud-fast"
+
+    def _get_healthy_endpoint(
+        self, tier: str, prefer_local: bool
+    ) -> Optional[ModelEndpoint]:
+        """Get a healthy endpoint from the target tier.
+
+        Args:
+            tier: Target tier.
+            prefer_local: Whether to prefer local endpoints.
+
+        Returns:
+            Healthy endpoint or None.
+        """
+        candidates = [ep for ep in self.endpoints.values() if ep.tier == tier]
+
+        if not candidates:
+            return None
+
+        # Sort: local first if preferred, then by name for stability
+        candidates.sort(
+            key=lambda ep: (not prefer_local or ep.endpoint != "local", ep.name)
+        )
+
+        for endpoint in candidates:
+            if self._is_healthy(endpoint):
+                return endpoint
+
+        return None
+
+    def _is_healthy(self, endpoint: ModelEndpoint) -> bool:
+        """Check if endpoint is healthy (with caching).
+
+        Args:
+            endpoint: Endpoint to check.
+
+        Returns:
+            True if healthy.
+        """
+        now = time.time()
+        cache_ttl = 60.0  # Cache health checks for 60 seconds
+
+        # Use cached result if recent
+        if now - endpoint._last_health_check < cache_ttl:
+            return endpoint._is_healthy
+
+        # Local endpoints assumed healthy
+        if not endpoint.health_check_url:
+            endpoint._is_healthy = True
+            endpoint._last_health_check = now
+            return True
+
+        # TODO: Implement HTTP health check
+        # For now, assume healthy
+        endpoint._is_healthy = True
+        endpoint._last_health_check = now
+        return True
+
+    def _fallback(
+        self, preferred_tier: str, prefer_local: bool
+    ) -> Optional[ModelEndpoint]:
+        """Find fallback endpoint when preferred tier unavailable.
+
+        Fallback order:
+        - local → cloud-fast → cloud-heavy
+        - cloud-fast → local → cloud-heavy
+        - cloud-heavy → cloud-fast → local
+
+        Args:
+            preferred_tier: The tier that was unavailable.
+            prefer_local: Whether to prefer local endpoints.
+
+        Returns:
+            Fallback endpoint or None.
+        """
+        fallback_order = {
+            "local": ["cloud-fast", "cloud-heavy"],
+            "cloud-fast": (
+                ["local", "cloud-heavy"] if prefer_local else ["cloud-heavy", "local"]
+            ),
+            "cloud-heavy": ["cloud-fast", "local"],
+        }
+
+        for tier in fallback_order.get(preferred_tier, []):
+            endpoint = self._get_healthy_endpoint(tier, prefer_local)
+            if endpoint:
+                return endpoint
+
+        return None
+
+    def refresh_health(self) -> None:
+        """Force refresh health checks for all endpoints."""
+        for endpoint in self.endpoints.values():
+            endpoint._last_health_check = 0.0
+            self._is_healthy(endpoint)
+
+    def get_tier_summary(self) -> dict[str, list[str]]:
+        """Get summary of endpoints by tier.
+
+        Returns:
+            Dict mapping tier -> list of endpoint names.
+        """
+        summary: dict[str, list[str]] = {
+            "local": [],
+            "cloud-fast": [],
+            "cloud-heavy": [],
+        }
+
+        for endpoint in self.endpoints.values():
+            if endpoint.tier in summary:
+                summary[endpoint.tier].append(endpoint.name)
+
+        return summary
+
+
+def get_task_tier_mapping() -> dict[str, str]:
+    """Get default task type → tier mapping.
+
+    Returns:
+        Dict mapping task types to their default tier.
+    """
+    return {
+        "format": "local",
+        "lint": "local",
+        "boilerplate": "local",
+        "feature": "local/cloud-fast",  # Depends on complexity
+        "review": "cloud-fast",
+        "architecture": "cloud-heavy",
+        "planning": "cloud-heavy",
+    }
