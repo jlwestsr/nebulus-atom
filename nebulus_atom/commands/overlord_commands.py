@@ -33,6 +33,11 @@ from nebulus_swarm.overlord.registry import (
     load_config,
     validate_config,
 )
+from nebulus_swarm.overlord.release import (
+    ReleaseCoordinator,
+    ReleaseSpec,
+    validate_release_spec,
+)
 from nebulus_swarm.overlord.scanner import (
     ProjectStatus,
     scan_ecosystem,
@@ -728,6 +733,115 @@ def dispatch(
         raise typer.Exit(1)
     else:
         console.print(f"\n[red bold]✗ Plan failed:[/red bold] {result.reason}")
+        for step_result in result.steps:
+            if not step_result.success:
+                console.print(f"  [{step_result.step_id}] {step_result.error}")
+        raise typer.Exit(1)
+
+
+@overlord_app.command()
+def release(
+    project: str = typer.Argument(..., help="Project to release"),
+    version: str = typer.Argument(..., help="Version to release (e.g., v0.1.0)"),
+    source: str = typer.Option("develop", "--source", "-s", help="Source branch"),
+    target: str = typer.Option("main", "--target", "-t", help="Target branch"),
+    no_dependents: bool = typer.Option(
+        False, "--no-dependents", help="Skip updating dependent projects"
+    ),
+    push: bool = typer.Option(False, "--push", help="Push to remote after release"),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", "-n", help="Plan only, don't execute"
+    ),
+    auto_approve: bool = typer.Option(
+        False, "--yes", "-y", help="Skip approval prompts"
+    ),
+) -> None:
+    """Execute a coordinated release across dependent projects."""
+    registry = _load_registry_or_exit()
+    if registry is None:
+        return
+
+    # Build spec
+    spec = ReleaseSpec(
+        project=project,
+        version=version,
+        source_branch=source,
+        target_branch=target,
+        update_dependents=not no_dependents,
+        push_to_remote=push,
+    )
+
+    # Validate spec
+    errors = validate_release_spec(spec, registry)
+    if errors:
+        console.print("[red bold]Invalid release specification:[/red bold]")
+        for error in errors:
+            console.print(f"  • {error}")
+        raise typer.Exit(1)
+
+    # Build dependencies
+    graph = DependencyGraph(registry)
+    autonomy = AutonomyEngine(registry)
+    router = ModelRouter(registry)
+    dispatch = DispatchEngine(registry, autonomy, graph, router)
+    memory = OverlordMemory()
+    coordinator = ReleaseCoordinator(registry, graph, dispatch, memory)
+
+    console.print(f"\n[bold]Planning release:[/bold] {project} {version}")
+    console.print(f"  Source: {source} → Target: {target}")
+    console.print(f"  Update dependents: {spec.update_dependents}")
+    console.print(f"  Push to remote: {push}")
+
+    try:
+        plan = coordinator.plan_release(spec)
+    except ValueError as e:
+        console.print(f"[red]Failed to plan release:[/red] {e}")
+        raise typer.Exit(1)
+
+    # Show plan
+    console.print("\n[bold]Release Plan:[/bold]")
+    console.print(f"Steps: {len(plan.steps)}")
+    console.print(f"Estimated duration: {plan.estimated_duration}s")
+
+    table = Table(title="Steps", show_header=True)
+    table.add_column("ID", style="cyan")
+    table.add_column("Action", style="white")
+    table.add_column("Project", style="green")
+    table.add_column("Deps", style="yellow")
+
+    for step in plan.steps:
+        deps = ", ".join(step.dependencies) if step.dependencies else "-"
+        table.add_row(step.id, step.action, step.project, deps)
+
+    console.print(table)
+
+    # Show affected projects
+    console.print("\n[bold]Affected Projects:[/bold]")
+    for proj in plan.scope.projects:
+        console.print(f"  • {proj}")
+
+    if dry_run:
+        console.print("\n[yellow]Dry run — execution skipped[/yellow]")
+        return
+
+    # Execute
+    console.print("\n[bold yellow]⚠ This is a high-impact operation![/bold yellow]")
+    console.print("[bold]Executing release...[/bold]\n")
+    result = coordinator.execute_release(spec, auto_approve=auto_approve)
+
+    if result.status == "success":
+        console.print("\n[green bold]✓ Release completed successfully[/green bold]")
+        console.print("\n[bold]Release logged to memory:[/bold]")
+        console.print(f"  Project: {project}")
+        console.print(f"  Version: {version}")
+        if spec.update_dependents:
+            downstream = graph.get_downstream(project)
+            console.print(f"  Downstream updated: {', '.join(downstream)}")
+    elif result.status == "cancelled":
+        console.print(f"\n[yellow]✗ Release cancelled:[/yellow] {result.reason}")
+        raise typer.Exit(1)
+    else:
+        console.print(f"\n[red bold]✗ Release failed:[/red bold] {result.reason}")
         for step_result in result.steps:
             if not step_result.success:
                 console.print(f"  [{step_result.step_id}] {step_result.error}")
