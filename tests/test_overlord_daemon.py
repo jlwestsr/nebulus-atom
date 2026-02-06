@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -344,3 +345,123 @@ class TestCLIIntegration:
         )
         assert config.tasks[0].enabled is True
         assert config.tasks[1].enabled is False
+
+
+# --- PID File Tests ---
+
+
+class TestPidFileManagement:
+    """Tests for PID file write/read/remove and process lifecycle helpers."""
+
+    def test_write_and_read_pid_file(self, tmp_path: Path) -> None:
+        pid_file = tmp_path / "daemon.pid"
+        with patch(
+            "nebulus_swarm.overlord.overlord_daemon.DEFAULT_PID_FILE",
+            str(pid_file),
+        ):
+            daemon = _make_daemon(tmp_path)
+            daemon._write_pid_file()
+            assert pid_file.exists()
+            assert OverlordDaemon.read_pid() == os.getpid()
+
+    def test_remove_pid_file(self, tmp_path: Path) -> None:
+        pid_file = tmp_path / "daemon.pid"
+        pid_file.write_text("12345")
+        with patch(
+            "nebulus_swarm.overlord.overlord_daemon.DEFAULT_PID_FILE",
+            str(pid_file),
+        ):
+            daemon = _make_daemon(tmp_path)
+            daemon._remove_pid_file()
+            assert not pid_file.exists()
+
+    def test_remove_pid_file_missing(self, tmp_path: Path) -> None:
+        pid_file = tmp_path / "daemon.pid"
+        with patch(
+            "nebulus_swarm.overlord.overlord_daemon.DEFAULT_PID_FILE",
+            str(pid_file),
+        ):
+            daemon = _make_daemon(tmp_path)
+            # Should not raise
+            daemon._remove_pid_file()
+
+    def test_read_pid_missing_file(self, tmp_path: Path) -> None:
+        pid_file = tmp_path / "daemon.pid"
+        with patch(
+            "nebulus_swarm.overlord.overlord_daemon.DEFAULT_PID_FILE",
+            str(pid_file),
+        ):
+            assert OverlordDaemon.read_pid() is None
+
+    def test_read_pid_invalid_content(self, tmp_path: Path) -> None:
+        pid_file = tmp_path / "daemon.pid"
+        pid_file.write_text("not-a-number")
+        with patch(
+            "nebulus_swarm.overlord.overlord_daemon.DEFAULT_PID_FILE",
+            str(pid_file),
+        ):
+            assert OverlordDaemon.read_pid() is None
+
+    def test_check_running_with_current_process(self, tmp_path: Path) -> None:
+        pid_file = tmp_path / "daemon.pid"
+        pid_file.write_text(str(os.getpid()))
+        with patch(
+            "nebulus_swarm.overlord.overlord_daemon.DEFAULT_PID_FILE",
+            str(pid_file),
+        ):
+            assert OverlordDaemon.check_running() is True
+
+    def test_check_running_no_pid_file(self, tmp_path: Path) -> None:
+        pid_file = tmp_path / "daemon.pid"
+        with patch(
+            "nebulus_swarm.overlord.overlord_daemon.DEFAULT_PID_FILE",
+            str(pid_file),
+        ):
+            assert OverlordDaemon.check_running() is False
+
+    def test_check_running_dead_process(self, tmp_path: Path) -> None:
+        pid_file = tmp_path / "daemon.pid"
+        # Use a PID that almost certainly doesn't exist
+        pid_file.write_text("4999999")
+        with patch(
+            "nebulus_swarm.overlord.overlord_daemon.DEFAULT_PID_FILE",
+            str(pid_file),
+        ):
+            assert OverlordDaemon.check_running() is False
+
+    def test_stop_daemon_not_running(self, tmp_path: Path) -> None:
+        pid_file = tmp_path / "daemon.pid"
+        with patch(
+            "nebulus_swarm.overlord.overlord_daemon.DEFAULT_PID_FILE",
+            str(pid_file),
+        ):
+            assert OverlordDaemon.stop_daemon() is True
+
+    def test_stop_daemon_stale_pid(self, tmp_path: Path) -> None:
+        pid_file = tmp_path / "daemon.pid"
+        pid_file.write_text("4999999")
+        with patch(
+            "nebulus_swarm.overlord.overlord_daemon.DEFAULT_PID_FILE",
+            str(pid_file),
+        ):
+            assert OverlordDaemon.stop_daemon() is True
+            # Stale PID file should be cleaned up
+            assert not pid_file.exists()
+
+    @pytest.mark.asyncio
+    async def test_run_writes_pid_shutdown_removes(self, tmp_path: Path) -> None:
+        pid_file = tmp_path / "daemon.pid"
+        with patch(
+            "nebulus_swarm.overlord.overlord_daemon.DEFAULT_PID_FILE",
+            str(pid_file),
+        ):
+            daemon = _make_daemon(tmp_path)
+
+            async def stop_soon() -> None:
+                await asyncio.sleep(0.1)
+                daemon._shutdown_event.set()
+
+            asyncio.create_task(stop_soon())
+            await daemon.run()
+            # After clean shutdown, PID file should be gone
+            assert not pid_file.exists()

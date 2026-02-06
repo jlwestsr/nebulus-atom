@@ -850,17 +850,59 @@ def release(
 
 @overlord_app.command()
 def daemon(
-    action: str = typer.Argument("start", help="Action: start, status"),
+    action: str = typer.Argument("start", help="Action: start, status, stop, restart"),
 ) -> None:
-    """Run the Overlord background daemon."""
+    """Manage the Overlord background daemon."""
     import asyncio
 
-    registry = _load_registry_or_exit()
-    if registry is None:
+    from nebulus_swarm.overlord.overlord_daemon import OverlordDaemon
+
+    if action == "status":
+        pid = OverlordDaemon.read_pid()
+        if pid is not None and OverlordDaemon.check_running():
+            console.print(f"[bold green]Daemon is running[/bold green] (PID {pid})")
+        elif pid is not None:
+            console.print(f"[yellow]Stale PID file[/yellow] (PID {pid} is not running)")
+        else:
+            console.print("[dim]Daemon is not running.[/dim]")
         return
 
+    if action == "stop":
+        if not OverlordDaemon.check_running():
+            console.print("[dim]Daemon is not running.[/dim]")
+            return
+        pid = OverlordDaemon.read_pid()
+        console.print(f"[yellow]Stopping daemon (PID {pid})...[/yellow]")
+        if OverlordDaemon.stop_daemon():
+            console.print("[green]Daemon stopped.[/green]")
+        else:
+            console.print("[red]Failed to stop daemon within timeout.[/red]")
+            raise typer.Exit(1)
+        return
+
+    if action == "restart":
+        if OverlordDaemon.check_running():
+            pid = OverlordDaemon.read_pid()
+            console.print(f"[yellow]Stopping daemon (PID {pid})...[/yellow]")
+            if not OverlordDaemon.stop_daemon():
+                console.print("[red]Failed to stop daemon within timeout.[/red]")
+                raise typer.Exit(1)
+            console.print("[green]Daemon stopped.[/green]")
+        # Fall through to start
+        action = "start"
+
     if action == "start":
-        from nebulus_swarm.overlord.overlord_daemon import OverlordDaemon
+        if OverlordDaemon.check_running():
+            pid = OverlordDaemon.read_pid()
+            console.print(
+                f"[yellow]Daemon is already running[/yellow] (PID {pid}). "
+                "Use 'overlord daemon restart' to restart."
+            )
+            return
+
+        registry = _load_registry_or_exit()
+        if registry is None:
+            return
 
         console.print("[bold cyan]Starting Overlord daemon...[/bold cyan]")
 
@@ -885,14 +927,9 @@ def daemon(
             asyncio.run(d.run())
         except KeyboardInterrupt:
             console.print("\n[yellow]Daemon stopped.[/yellow]")
-
-    elif action == "status":
-        console.print("[dim]Daemon status check not yet implemented.[/dim]")
-        console.print("Use 'overlord daemon start' to launch the daemon.")
-
     else:
         console.print(f"[red]Unknown daemon action: {action}[/red]")
-        console.print("Valid actions: start, status")
+        console.print("Valid actions: start, status, stop, restart")
 
 
 def _render_scope(scope: ActionScope, verdict: ScopeVerdict, autonomy: str) -> None:

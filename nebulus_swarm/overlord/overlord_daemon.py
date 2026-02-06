@@ -12,6 +12,7 @@ import logging
 import os
 import signal
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
 from croniter import croniter
@@ -37,6 +38,9 @@ logger = logging.getLogger(__name__)
 
 # Default DB path for proposals
 DEFAULT_PROPOSALS_DB = os.path.expanduser("~/.atom/overlord/proposals.db")
+
+# PID file for daemon lifecycle management
+DEFAULT_PID_FILE = os.path.expanduser("~/.atom/overlord/daemon.pid")
 
 
 class OverlordDaemon:
@@ -87,6 +91,9 @@ class OverlordDaemon:
         """Start the daemon: Slack bot + scheduler loop."""
         self._running = True
         logger.info("Overlord daemon starting...")
+
+        # Write PID file
+        self._write_pid_file()
 
         # Set up signal handlers
         loop = asyncio.get_running_loop()
@@ -303,8 +310,9 @@ class OverlordDaemon:
             pass
 
     async def shutdown(self) -> None:
-        """Graceful shutdown: stop Slack, close connections."""
+        """Graceful shutdown: stop Slack, close connections, remove PID file."""
         self._running = False
+        self._remove_pid_file()
         if self.slack_bot:
             await self.slack_bot.stop()
         logger.info("Daemon shutdown complete")
@@ -313,6 +321,96 @@ class OverlordDaemon:
         """Handle SIGINT/SIGTERM."""
         logger.info("Received shutdown signal")
         self._shutdown_event.set()
+
+    def _write_pid_file(self) -> None:
+        """Write the current process PID to the PID file."""
+        pid_path = Path(DEFAULT_PID_FILE)
+        pid_path.parent.mkdir(parents=True, exist_ok=True)
+        pid_path.write_text(str(os.getpid()))
+        logger.info("PID file written: %s (pid=%d)", DEFAULT_PID_FILE, os.getpid())
+
+    def _remove_pid_file(self) -> None:
+        """Remove the PID file if it exists."""
+        pid_path = Path(DEFAULT_PID_FILE)
+        if pid_path.exists():
+            pid_path.unlink()
+            logger.info("PID file removed: %s", DEFAULT_PID_FILE)
+
+    @staticmethod
+    def read_pid() -> int | None:
+        """Read the daemon PID from the PID file.
+
+        Returns:
+            The PID as an integer, or None if the file is missing or invalid.
+        """
+        pid_path = Path(DEFAULT_PID_FILE)
+        if not pid_path.exists():
+            return None
+        try:
+            return int(pid_path.read_text().strip())
+        except (ValueError, OSError):
+            return None
+
+    @staticmethod
+    def check_running() -> bool:
+        """Check if the daemon process is alive.
+
+        Returns:
+            True if a daemon process is running with the PID from the PID file.
+        """
+        pid = OverlordDaemon.read_pid()
+        if pid is None:
+            return False
+        try:
+            os.kill(pid, 0)
+            return True
+        except (ProcessLookupError, PermissionError):
+            return False
+
+    @staticmethod
+    def stop_daemon(timeout: float = 5.0) -> bool:
+        """Send SIGTERM to the running daemon and wait for it to exit.
+
+        Args:
+            timeout: Maximum seconds to wait for the process to exit.
+
+        Returns:
+            True if the daemon was stopped (or wasn't running), False on timeout.
+        """
+        import time
+
+        pid = OverlordDaemon.read_pid()
+        if pid is None:
+            return True
+
+        try:
+            os.kill(pid, 0)
+        except (ProcessLookupError, PermissionError):
+            # Process already gone, clean up stale PID file
+            Path(DEFAULT_PID_FILE).unlink(missing_ok=True)
+            return True
+
+        # Send SIGTERM
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except (ProcessLookupError, PermissionError):
+            Path(DEFAULT_PID_FILE).unlink(missing_ok=True)
+            return True
+
+        # Wait for exit
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            try:
+                os.kill(pid, 0)
+            except ProcessLookupError:
+                # Process exited — PID file should be cleaned by shutdown()
+                Path(DEFAULT_PID_FILE).unlink(missing_ok=True)
+                return True
+            except PermissionError:
+                return False
+            time.sleep(0.2)
+
+        return False
 
     @property
     def is_running(self) -> bool:

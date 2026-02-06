@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import yaml
 from typer.testing import CliRunner
@@ -536,3 +536,135 @@ class TestAutonomyCommand:
         assert "edit" in result.output.lower()
         assert "nebulus-core" in result.output
         assert "proactive" in result.output
+
+
+class TestDaemonCommand:
+    """Tests for `overlord daemon` lifecycle commands."""
+
+    def test_status_when_running(self) -> None:
+        with patch(
+            "nebulus_swarm.overlord.overlord_daemon.OverlordDaemon"
+        ) as MockDaemon:
+            MockDaemon.read_pid.return_value = 12345
+            MockDaemon.check_running.return_value = True
+            result = runner.invoke(overlord_app, ["daemon", "status"])
+        assert "running" in result.output.lower()
+        assert "12345" in result.output
+
+    def test_status_when_stopped(self) -> None:
+        with patch(
+            "nebulus_swarm.overlord.overlord_daemon.OverlordDaemon"
+        ) as MockDaemon:
+            MockDaemon.read_pid.return_value = None
+            MockDaemon.check_running.return_value = False
+            result = runner.invoke(overlord_app, ["daemon", "status"])
+        assert "not running" in result.output.lower()
+
+    def test_status_stale_pid_file(self) -> None:
+        with patch(
+            "nebulus_swarm.overlord.overlord_daemon.OverlordDaemon"
+        ) as MockDaemon:
+            MockDaemon.read_pid.return_value = 99999
+            MockDaemon.check_running.return_value = False
+            result = runner.invoke(overlord_app, ["daemon", "status"])
+        assert "stale" in result.output.lower()
+        assert "99999" in result.output
+
+    def test_stop_sends_sigterm(self) -> None:
+        with patch(
+            "nebulus_swarm.overlord.overlord_daemon.OverlordDaemon"
+        ) as MockDaemon:
+            MockDaemon.check_running.return_value = True
+            MockDaemon.read_pid.return_value = 12345
+            MockDaemon.stop_daemon.return_value = True
+            result = runner.invoke(overlord_app, ["daemon", "stop"])
+        assert "stopped" in result.output.lower()
+        MockDaemon.stop_daemon.assert_called_once()
+
+    def test_stop_when_not_running(self) -> None:
+        with patch(
+            "nebulus_swarm.overlord.overlord_daemon.OverlordDaemon"
+        ) as MockDaemon:
+            MockDaemon.check_running.return_value = False
+            result = runner.invoke(overlord_app, ["daemon", "stop"])
+        assert "not running" in result.output.lower()
+
+    def test_stop_timeout_fails(self) -> None:
+        with patch(
+            "nebulus_swarm.overlord.overlord_daemon.OverlordDaemon"
+        ) as MockDaemon:
+            MockDaemon.check_running.return_value = True
+            MockDaemon.read_pid.return_value = 12345
+            MockDaemon.stop_daemon.return_value = False
+            result = runner.invoke(overlord_app, ["daemon", "stop"])
+        assert "failed" in result.output.lower()
+        assert result.exit_code == 1
+
+    def test_start_refuses_if_already_running(self) -> None:
+        with patch(
+            "nebulus_swarm.overlord.overlord_daemon.OverlordDaemon"
+        ) as MockDaemon:
+            MockDaemon.check_running.return_value = True
+            MockDaemon.read_pid.return_value = 12345
+            result = runner.invoke(overlord_app, ["daemon", "start"])
+        assert "already running" in result.output.lower()
+        assert "12345" in result.output
+
+    def test_restart_stops_then_starts(
+        self, temp_git_repo: Path, tmp_path: Path
+    ) -> None:
+        config_file = _make_config_file(
+            tmp_path,
+            {
+                "my-project": {
+                    "path": str(temp_git_repo),
+                    "remote": "test/my-project",
+                    "role": "tooling",
+                    "branch_model": "develop-main",
+                    "depends_on": [],
+                },
+            },
+        )
+
+        # Mock OverlordDaemon at the import location
+        mock_daemon_cls = MagicMock()
+        # First call: check_running for restart's stop phase → True
+        # Second call: check_running for start phase → False
+        mock_daemon_cls.check_running.side_effect = [True, False]
+        mock_daemon_cls.read_pid.return_value = 12345
+        mock_daemon_cls.stop_daemon.return_value = True
+        # Mock the instance returned by the constructor
+        mock_instance = MagicMock()
+        mock_daemon_cls.return_value = mock_instance
+        # Make asyncio.run with mock work by making run() return immediately
+        mock_instance.run = MagicMock(return_value=None)
+
+        with (
+            patch(
+                "nebulus_swarm.overlord.overlord_daemon.OverlordDaemon",
+                mock_daemon_cls,
+            ),
+            patch(
+                "nebulus_atom.commands.overlord_commands.DEFAULT_CONFIG_PATH",
+                config_file,
+            ),
+            patch(
+                "nebulus_swarm.overlord.registry.DEFAULT_CONFIG_PATH",
+                config_file,
+            ),
+        ):
+            result = runner.invoke(overlord_app, ["daemon", "restart"])
+        # Should have stopped the old daemon
+        mock_daemon_cls.stop_daemon.assert_called_once()
+        # Should have started a new one
+        assert "stopped" in result.output.lower()
+        assert "starting" in result.output.lower()
+
+    def test_unknown_daemon_action(self) -> None:
+        with patch(
+            "nebulus_swarm.overlord.overlord_daemon.OverlordDaemon"
+        ) as MockDaemon:
+            MockDaemon.check_running.return_value = False
+            result = runner.invoke(overlord_app, ["daemon", "bogus"])
+        assert "unknown" in result.output.lower()
+        assert "bogus" in result.output
