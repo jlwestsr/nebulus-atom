@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Optional
 from croniter import croniter
 
 from nebulus_swarm.overlord.autonomy import AutonomyEngine
+from nebulus_swarm.overlord.detectors import DetectionEngine
 from nebulus_swarm.overlord.dispatch import DispatchEngine
 from nebulus_swarm.overlord.graph import DependencyGraph
 from nebulus_swarm.overlord.memory import OverlordMemory
@@ -68,6 +69,7 @@ class OverlordDaemon:
         self.command_router = SlackCommandRouter(
             config, proposal_manager=self.proposal_manager
         )
+        self.detection_engine = DetectionEngine(config, self.graph, self.autonomy)
 
         # Slack bot (configured lazily via environment)
         self.slack_bot: Optional[SlackBot] = None
@@ -217,10 +219,21 @@ class OverlordDaemon:
                     )
                     if self.slack_bot:
                         await self.slack_bot.post_message(f"Scheduled scan: {summary}")
+
+                # Run detectors on scan results
+                detections = await asyncio.to_thread(self.detection_engine.run_all)
+                if detections:
+                    filtered = self.detection_engine.filter_by_autonomy(detections)
+                    if filtered and self.slack_bot:
+                        await self.slack_bot.post_message(
+                            self.detection_engine.format_summary(filtered)
+                        )
+
                 logger.info(
-                    "Scan complete: %d/%d healthy",
+                    "Scan complete: %d/%d healthy, %d detections",
                     len(results) - len(issues),
                     len(results),
+                    len(detections),
                 )
 
             elif task.name == "test-all":

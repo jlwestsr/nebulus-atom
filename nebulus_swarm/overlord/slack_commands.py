@@ -15,6 +15,7 @@ import re
 from typing import TYPE_CHECKING, Optional
 
 from nebulus_swarm.overlord.autonomy import AutonomyEngine, get_autonomy_summary
+from nebulus_swarm.overlord.detectors import DetectionEngine
 from nebulus_swarm.overlord.dispatch import DispatchEngine
 from nebulus_swarm.overlord.graph import DependencyGraph
 from nebulus_swarm.overlord.memory import OverlordMemory
@@ -70,6 +71,7 @@ class SlackCommandRouter:
             config, self.graph, self.dispatch, self.memory
         )
         self.proposal_manager = proposal_manager
+        self._detection_engine = DetectionEngine(config, self.graph, self.autonomy)
 
     async def handle(self, text: str, user_id: str, channel_id: str) -> str:
         """Parse a command and dispatch to the appropriate handler.
@@ -151,13 +153,13 @@ class SlackCommandRouter:
             return _format_ecosystem_status(results)
 
     async def _handle_scan(self, project: Optional[str]) -> str:
-        """Detailed scan with issue detection.
+        """Detailed scan with issue detection and proactive detectors.
 
         Args:
             project: Optional project name to scan.
 
         Returns:
-            Formatted scan results.
+            Formatted scan results with detection findings.
         """
         if project:
             if project not in self.config.projects:
@@ -165,11 +167,20 @@ class SlackCommandRouter:
             result = await asyncio.to_thread(
                 scan_project, self.config.projects[project]
             )
-            return _format_scan_detail(result)
+            scan_text = _format_scan_detail(result)
         else:
             results = await asyncio.to_thread(scan_ecosystem, self.config)
-            lines = [_format_scan_detail(r) for r in results]
-            return "\n\n".join(lines)
+            scan_text = "\n\n".join(_format_scan_detail(r) for r in results)
+
+        # Run detectors
+        if self._detection_engine:
+            detections = await asyncio.to_thread(
+                self._detection_engine.run_all, project
+            )
+            if detections:
+                scan_text += "\n\n" + self._detection_engine.format_summary(detections)
+
+        return scan_text
 
     async def _handle_dispatch(self, task: str) -> str:
         """Dispatch a task via TaskParser and DispatchEngine.
