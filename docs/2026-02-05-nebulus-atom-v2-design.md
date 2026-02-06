@@ -23,6 +23,7 @@ Atom has two packages today:
 **V2 Phase 3:** COMPLETE — Proposals CLI wired, Evaluator.evaluate() method, LLM connection pool, Minion pool integration, backend compatibility matrix, skill evolution workflow. 738 tests passing (47 new).
 **V2 Phase 4:** COMPLETE — Provisioning config documentation, example configs, MCP client integration with graceful degradation. 754 tests passing (16 new).
 **V2 Phase 5:** COMPLETE — Small-model auditor, hybrid audit trail with hash chains, platform health API client, certification packages. 826 tests passing (72 new).
+**Overlord Phase 1:** COMPLETE — Project registry, scanner, dependency graph, action scope, cross-project memory, CLI commands (status/scan/config/discover/graph/memory/scope). 110 overlord tests passing.
 
 ## V2 Vision
 

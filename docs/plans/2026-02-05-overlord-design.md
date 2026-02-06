@@ -2,7 +2,7 @@
 
 **Author:** West AI Labs
 **Date:** 2026-02-05
-**Status:** Draft
+**Status:** Phase 1 Complete
 **Atom Version:** V3 (evolves the existing Swarm Overlord)
 
 ---
@@ -586,17 +586,18 @@ CLI interface only. Cautious autonomy only.
 
 **Deliverables:**
 
-- [ ] Project Registry (`~/.atom/overlord.yml` parsing + validation)
-- [ ] Auto-discovery command (`overlord discover` — scans workspace for repos,
+- [x] Project Registry (`~/.atom/overlord.yml` parsing + validation)
+- [x] Auto-discovery command (`overlord discover` — scans workspace for repos,
       generates starter YAML; explicit YAML config stays as source of truth)
-- [ ] Ecosystem Scanner (git state, test health, branch analysis across all repos)
-- [ ] CLI commands: `overlord status`, `overlord scan`, `overlord config`, `overlord discover`
-- [ ] Dependency graph construction and traversal
-- [ ] Action scope model and blast radius evaluation
-- [ ] Cross-project memory store (SQLite + embeddings)
+- [x] Ecosystem Scanner (git state, test health, branch analysis across all repos)
+- [x] CLI commands: `overlord status`, `overlord scan`, `overlord config`, `overlord discover`
+- [x] Dependency graph construction and traversal
+- [x] Action scope model and blast radius evaluation
+- [x] Cross-project memory store (SQLite-backed, text search)
+- [x] CLI commands: `overlord graph`, `overlord memory`, `overlord scope`
 - [ ] Migration path from existing `nebulus_swarm/overlord/`
 
-**Tests:** Unit tests for registry, scanner, dependency graph, scope evaluation.
+**Tests:** 110 tests — registry (18), scanner (14), graph (21), action scope (20), memory (17), CLI (19). All passing.
 
 ### Phase 2: Dispatch + Autonomy
 
