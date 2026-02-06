@@ -21,8 +21,11 @@ from nebulus_swarm.overlord.action_scope import (
     scope_for_push,
     scope_for_release,
 )
+from nebulus_swarm.overlord.autonomy import AutonomyEngine
+from nebulus_swarm.overlord.dispatch import DispatchEngine
 from nebulus_swarm.overlord.graph import DependencyGraph
 from nebulus_swarm.overlord.memory import OverlordMemory
+from nebulus_swarm.overlord.model_router import ModelRouter
 from nebulus_swarm.overlord.registry import (
     DEFAULT_CONFIG_PATH,
     OverlordConfig,
@@ -30,11 +33,17 @@ from nebulus_swarm.overlord.registry import (
     load_config,
     validate_config,
 )
+from nebulus_swarm.overlord.release import (
+    ReleaseCoordinator,
+    ReleaseSpec,
+    validate_release_spec,
+)
 from nebulus_swarm.overlord.scanner import (
     ProjectStatus,
     scan_ecosystem,
     scan_project,
 )
+from nebulus_swarm.overlord.task_parser import TaskParser
 
 overlord_app = typer.Typer(help="Cross-project ecosystem orchestrator.")
 console = Console()
@@ -646,6 +655,197 @@ def _render_memory_entries(entries: list) -> None:
         )
 
     console.print(table)
+
+
+@overlord_app.command()
+def dispatch(
+    task: str = typer.Argument(
+        ..., help="Task to execute (e.g., 'merge Core develop to main')"
+    ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", "-n", help="Plan only, don't execute"
+    ),
+    auto_approve: bool = typer.Option(
+        False, "--yes", "-y", help="Skip approval prompts"
+    ),
+) -> None:
+    """Execute a task across projects using natural language dispatch."""
+    registry = _load_registry_or_exit()
+    if registry is None:
+        return
+
+    # Build dependencies
+    graph = DependencyGraph(registry)
+    autonomy = AutonomyEngine(registry)
+    router = ModelRouter(registry)
+    engine = DispatchEngine(registry, autonomy, graph, router)
+    parser = TaskParser(graph)
+
+    console.print(f"\n[bold]Parsing task:[/bold] {task}")
+
+    try:
+        plan = parser.parse(task)
+    except ValueError as e:
+        console.print(f"[red]Failed to parse task:[/red] {e}")
+        raise typer.Exit(1)
+
+    # Show plan
+    console.print(f"\n[bold]Execution Plan:[/bold] {plan.task}")
+    console.print(f"Steps: {len(plan.steps)}")
+    console.print(f"Estimated duration: {plan.estimated_duration}s")
+    console.print(f"Requires approval: {plan.requires_approval}")
+
+    table = Table(title="Steps", show_header=True)
+    table.add_column("ID", style="cyan")
+    table.add_column("Action", style="white")
+    table.add_column("Project", style="green")
+    table.add_column("Deps", style="yellow")
+    table.add_column("Tier", style="magenta")
+
+    for step in plan.steps:
+        deps = ", ".join(step.dependencies) if step.dependencies else "-"
+        tier = step.model_tier or "direct"
+        table.add_row(step.id, step.action, step.project, deps, tier)
+
+    console.print(table)
+
+    # Show scope
+    console.print("\n[bold]Blast Radius:[/bold]")
+    console.print(f"  Projects: {', '.join(plan.scope.projects)}")
+    console.print(f"  Impact: {plan.scope.estimated_impact}")
+    console.print(f"  Destructive: {plan.scope.destructive}")
+    console.print(f"  Affects remote: {plan.scope.affects_remote}")
+
+    if dry_run:
+        console.print("\n[yellow]Dry run — execution skipped[/yellow]")
+        return
+
+    # Execute
+    console.print("\n[bold]Executing plan...[/bold]\n")
+    result = engine.execute(plan, auto_approve=auto_approve)
+
+    if result.status == "success":
+        console.print("\n[green bold]✓ Plan completed successfully[/green bold]")
+        for step_result in result.steps:
+            console.print(f"  [{step_result.step_id}] {step_result.output}")
+    elif result.status == "cancelled":
+        console.print(f"\n[yellow]✗ Plan cancelled:[/yellow] {result.reason}")
+        raise typer.Exit(1)
+    else:
+        console.print(f"\n[red bold]✗ Plan failed:[/red bold] {result.reason}")
+        for step_result in result.steps:
+            if not step_result.success:
+                console.print(f"  [{step_result.step_id}] {step_result.error}")
+        raise typer.Exit(1)
+
+
+@overlord_app.command()
+def release(
+    project: str = typer.Argument(..., help="Project to release"),
+    version: str = typer.Argument(..., help="Version to release (e.g., v0.1.0)"),
+    source: str = typer.Option("develop", "--source", "-s", help="Source branch"),
+    target: str = typer.Option("main", "--target", "-t", help="Target branch"),
+    no_dependents: bool = typer.Option(
+        False, "--no-dependents", help="Skip updating dependent projects"
+    ),
+    push: bool = typer.Option(False, "--push", help="Push to remote after release"),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", "-n", help="Plan only, don't execute"
+    ),
+    auto_approve: bool = typer.Option(
+        False, "--yes", "-y", help="Skip approval prompts"
+    ),
+) -> None:
+    """Execute a coordinated release across dependent projects."""
+    registry = _load_registry_or_exit()
+    if registry is None:
+        return
+
+    # Build spec
+    spec = ReleaseSpec(
+        project=project,
+        version=version,
+        source_branch=source,
+        target_branch=target,
+        update_dependents=not no_dependents,
+        push_to_remote=push,
+    )
+
+    # Validate spec
+    errors = validate_release_spec(spec, registry)
+    if errors:
+        console.print("[red bold]Invalid release specification:[/red bold]")
+        for error in errors:
+            console.print(f"  • {error}")
+        raise typer.Exit(1)
+
+    # Build dependencies
+    graph = DependencyGraph(registry)
+    autonomy = AutonomyEngine(registry)
+    router = ModelRouter(registry)
+    dispatch = DispatchEngine(registry, autonomy, graph, router)
+    memory = OverlordMemory()
+    coordinator = ReleaseCoordinator(registry, graph, dispatch, memory)
+
+    console.print(f"\n[bold]Planning release:[/bold] {project} {version}")
+    console.print(f"  Source: {source} → Target: {target}")
+    console.print(f"  Update dependents: {spec.update_dependents}")
+    console.print(f"  Push to remote: {push}")
+
+    try:
+        plan = coordinator.plan_release(spec)
+    except ValueError as e:
+        console.print(f"[red]Failed to plan release:[/red] {e}")
+        raise typer.Exit(1)
+
+    # Show plan
+    console.print("\n[bold]Release Plan:[/bold]")
+    console.print(f"Steps: {len(plan.steps)}")
+    console.print(f"Estimated duration: {plan.estimated_duration}s")
+
+    table = Table(title="Steps", show_header=True)
+    table.add_column("ID", style="cyan")
+    table.add_column("Action", style="white")
+    table.add_column("Project", style="green")
+    table.add_column("Deps", style="yellow")
+
+    for step in plan.steps:
+        deps = ", ".join(step.dependencies) if step.dependencies else "-"
+        table.add_row(step.id, step.action, step.project, deps)
+
+    console.print(table)
+
+    # Show affected projects
+    console.print("\n[bold]Affected Projects:[/bold]")
+    for proj in plan.scope.projects:
+        console.print(f"  • {proj}")
+
+    if dry_run:
+        console.print("\n[yellow]Dry run — execution skipped[/yellow]")
+        return
+
+    # Execute
+    console.print("\n[bold yellow]⚠ This is a high-impact operation![/bold yellow]")
+    console.print("[bold]Executing release...[/bold]\n")
+    result = coordinator.execute_release(spec, auto_approve=auto_approve)
+
+    if result.status == "success":
+        console.print("\n[green bold]✓ Release completed successfully[/green bold]")
+        console.print("\n[bold]Release logged to memory:[/bold]")
+        console.print(f"  Project: {project}")
+        console.print(f"  Version: {version}")
+        if spec.update_dependents:
+            downstream = graph.get_downstream(project)
+            console.print(f"  Downstream updated: {', '.join(downstream)}")
+    elif result.status == "cancelled":
+        console.print(f"\n[yellow]✗ Release cancelled:[/yellow] {result.reason}")
+        raise typer.Exit(1)
+    else:
+        console.print(f"\n[red bold]✗ Release failed:[/red bold] {result.reason}")
+        for step_result in result.steps:
+            if not step_result.success:
+                console.print(f"  [{step_result.step_id}] {step_result.error}")
+        raise typer.Exit(1)
 
 
 def _render_scope(scope: ActionScope, verdict: ScopeVerdict, autonomy: str) -> None:
