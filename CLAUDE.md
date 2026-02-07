@@ -61,13 +61,13 @@ When you update user-facing features, version numbers, or key metrics:
 
 ## Overlord Status
 
-Cross-project meta-orchestrator for the Nebulus ecosystem (v2.3.0, 463 Overlord tests).
+Cross-project meta-orchestrator for the Nebulus ecosystem (v2.3.0, 500 Overlord tests).
 
 | Phase | Scope | Status |
 |-------|-------|--------|
 | 1. Foundation | Registry, scanner, dependency graph, action scope, memory, CLI | Done (110 tests) |
 | 2. Dispatch + Autonomy | Multi-repo dispatch, model router, autonomy engine, release coordination, Claude Code worker | Done (193 tests) |
-| 3. Slack + Background | Slack commands, proposals, daemon, detectors, notifications | Done (151 tests) |
+| 3. Slack + Background | Slack commands, proposals, daemon, detectors, notifications | Done (188 tests) |
 | 4. Gantry Integration | Visual control plane — dashboard, dispatch console, memory browser | Planned |
 | 5. Observability | Dispatch outcome tracking, performance dashboards, reporting | Planned |
 
