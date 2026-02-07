@@ -23,7 +23,7 @@ from nebulus_swarm.overlord.autonomy import AutonomyEngine, get_autonomy_summary
 from nebulus_swarm.overlord.detectors import DetectionEngine
 from nebulus_swarm.overlord.dispatch import DispatchEngine
 from nebulus_swarm.overlord.graph import DependencyGraph
-from nebulus_swarm.overlord.memory import OverlordMemory
+from nebulus_swarm.overlord.memory import VALID_CATEGORIES, OverlordMemory
 from nebulus_swarm.overlord.model_router import ModelRouter
 from nebulus_swarm.overlord.release import (
     ReleaseCoordinator,
@@ -57,6 +57,7 @@ _RE_UPDATE = re.compile(
     r"^(?:update|status\s+update|report|fyi|heads\s*up|completed?|shipped|deployed|pushed)\b",
     re.IGNORECASE,
 )
+_RE_MEMORY_FILTER = re.compile(r"(cat|proj):(\S+)", re.IGNORECASE)
 _RE_STRUCTURED_REPORT = re.compile(
     r"(?:commits?\s+pushed|tests?\s+pass|merged|shipped|deployed|zero\s+regressions)",
     re.IGNORECASE,
@@ -441,16 +442,62 @@ class SlackCommandRouter:
             lines.append(f"  {proj_name}: {summary[proj_name]}")
         return "\n".join(lines)
 
+    def _parse_memory_filters(
+        self, query: str
+    ) -> tuple[str, Optional[str], Optional[str], Optional[str]]:
+        """Extract cat: and proj: filters from a memory query.
+
+        Args:
+            query: Raw query string, e.g. "cat:update proj:core gantry".
+
+        Returns:
+            Tuple of (clean_query, category, project, error).
+            If error is not None, the other values are meaningless.
+        """
+        category: Optional[str] = None
+        project: Optional[str] = None
+
+        for match in _RE_MEMORY_FILTER.finditer(query):
+            key = match.group(1).lower()
+            value = match.group(2)
+            if key == "cat":
+                category = value
+            elif key == "proj":
+                project = value
+
+        clean_query = _RE_MEMORY_FILTER.sub("", query).strip()
+
+        if category and category not in VALID_CATEGORIES:
+            valid = ", ".join(sorted(VALID_CATEGORIES))
+            return ("", None, None, f"Invalid category: `{category}`\nValid: {valid}")
+
+        if project and project not in self.config.projects:
+            available = ", ".join(sorted(self.config.projects.keys()))
+            return (
+                "",
+                None,
+                None,
+                f"Unknown project: `{project}`\nAvailable: {available}",
+            )
+
+        return (clean_query, category, project, None)
+
     async def _handle_memory(self, query: str) -> str:
         """Search cross-project memory.
 
         Args:
-            query: Search query string.
+            query: Search query string with optional cat:/proj: filters.
 
         Returns:
             Formatted memory results.
         """
-        results = await asyncio.to_thread(self.memory.search, query, limit=5)
+        clean_query, category, project, error = self._parse_memory_filters(query)
+        if error:
+            return error
+
+        results = await asyncio.to_thread(
+            self.memory.search, clean_query, category=category, project=project, limit=5
+        )
         if not results:
             return f"No memories found for: {query}"
 
@@ -671,7 +718,7 @@ class SlackCommandRouter:
             "  `merge <project> <source> to <target>` — dispatch a merge\n"
             "  `release <project> <version>` — coordinated release\n"
             "  `autonomy [level]` — show/describe autonomy level\n"
-            "  `memory <query>` — search cross-project memory\n"
+            "  `memory <query> [cat:<category>] [proj:<project>]` — search memory with optional filters\n"
             "  `approve <id>` — approve a pending proposal\n"
             "  `deny <id>` — deny a pending proposal\n"
             "  `help` — show this message"

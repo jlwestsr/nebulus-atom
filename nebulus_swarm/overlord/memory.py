@@ -170,8 +170,12 @@ class OverlordMemory:
         Returns:
             List of matching MemoryEntry objects, newest first.
         """
-        sql = "SELECT * FROM memory WHERE content LIKE ?"
-        params: list[object] = [f"%{query}%"]
+        if query:
+            sql = "SELECT * FROM memory WHERE content LIKE ?"
+            params: list[object] = [f"%{query}%"]
+        else:
+            sql = "SELECT * FROM memory WHERE 1=1"
+            params: list[object] = []
 
         if category:
             sql += " AND category = ?"

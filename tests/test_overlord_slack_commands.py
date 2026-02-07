@@ -767,3 +767,86 @@ class TestAIDirectives:
             result = SlackCommandRouter._load_ai_directives()
             # Should not raise — returns empty or the real file's content
             assert isinstance(result, str)
+
+
+# --- Memory Filter Tests ---
+
+
+class TestMemoryFilters:
+    """Tests for cat:/proj: filter parsing in memory commands."""
+
+    def test_parse_cat_filter(self, tmp_path: Path) -> None:
+        router = _make_router(tmp_path)
+        query, cat, proj, err = router._parse_memory_filters("cat:update gantry")
+        assert query == "gantry"
+        assert cat == "update"
+        assert proj is None
+        assert err is None
+
+    def test_parse_proj_filter(self, tmp_path: Path) -> None:
+        router = _make_router(tmp_path)
+        query, cat, proj, err = router._parse_memory_filters("proj:core release")
+        assert query == "release"
+        assert cat is None
+        assert proj == "core"
+        assert err is None
+
+    def test_parse_both_filters(self, tmp_path: Path) -> None:
+        router = _make_router(tmp_path)
+        query, cat, proj, err = router._parse_memory_filters("cat:update proj:core")
+        assert query == ""
+        assert cat == "update"
+        assert proj == "core"
+        assert err is None
+
+    def test_parse_invalid_category(self, tmp_path: Path) -> None:
+        router = _make_router(tmp_path)
+        _, _, _, err = router._parse_memory_filters("cat:invalid query")
+        assert err is not None
+        assert "Invalid category" in err
+        assert "invalid" in err
+
+    def test_parse_unknown_project(self, tmp_path: Path) -> None:
+        router = _make_router(tmp_path)
+        _, _, _, err = router._parse_memory_filters("proj:nonexistent query")
+        assert err is not None
+        assert "Unknown project" in err
+        assert "nonexistent" in err
+
+    def test_parse_plain_query(self, tmp_path: Path) -> None:
+        router = _make_router(tmp_path)
+        query, cat, proj, err = router._parse_memory_filters("plain query")
+        assert query == "plain query"
+        assert cat is None
+        assert proj is None
+        assert err is None
+
+    @pytest.mark.asyncio
+    async def test_handle_memory_with_cat_filter(self, tmp_path: Path) -> None:
+        """memory cat:update calls search with category='update'."""
+        router = _make_router(tmp_path)
+        with patch.object(router.memory, "search", return_value=[]) as mock_search:
+            await router.handle("memory cat:update", "U123", "C456")
+            mock_search.assert_called_once_with(
+                "", category="update", project=None, limit=5
+            )
+
+    @pytest.mark.asyncio
+    async def test_handle_memory_with_both_filters(self, tmp_path: Path) -> None:
+        """memory cat:update proj:core calls search with both filters."""
+        router = _make_router(tmp_path)
+        with patch.object(router.memory, "search", return_value=[]) as mock_search:
+            await router.handle("memory cat:update proj:core", "U123", "C456")
+            mock_search.assert_called_once_with(
+                "", category="update", project="core", limit=5
+            )
+
+    @pytest.mark.asyncio
+    async def test_handle_memory_invalid_cat_returns_error(
+        self, tmp_path: Path
+    ) -> None:
+        """memory cat:bogus returns a validation error."""
+        router = _make_router(tmp_path)
+        result = await router.handle("memory cat:bogus", "U123", "C456")
+        assert "Invalid category" in result
+        assert "bogus" in result
