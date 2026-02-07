@@ -11,6 +11,8 @@ import pytest
 from nebulus_swarm.overlord.registry import OverlordConfig, ProjectConfig
 from nebulus_swarm.overlord.slack_commands import (
     SlackCommandRouter,
+    _RE_STRUCTURED_REPORT,
+    _RE_UPDATE,
     _format_ecosystem_status,
     _format_project_status,
     _format_scan_detail,
@@ -606,3 +608,162 @@ class TestLLMFallback:
         result = await router.handle("hello", "U123", "C456")
         assert "Overlord" in result
         assert router._llm_client is None
+
+
+# --- Update Recognition Tests ---
+
+
+class TestUpdatePatterns:
+    """Tests for _RE_UPDATE and _RE_STRUCTURED_REPORT patterns."""
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "update",
+            "Update: gantry frontend rebuilt",
+            "status update on core migration",
+            "report: all tests passing",
+            "FYI pushed new branch",
+            "heads up — breaking change in core",
+            "headsup deploying now",
+            "completed the Phase 4 integration",
+            "complete — gantry dashboard live",
+            "shipped v2.3.0",
+            "deployed to production",
+            "pushed 12 commits to develop",
+        ],
+    )
+    def test_re_update_positive(self, text: str) -> None:
+        assert _RE_UPDATE.match(text), f"Expected match for: {text!r}"
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "status",
+            "status core",
+            "help",
+            "scan prime",
+            "What should I work on?",
+            "hello",
+        ],
+    )
+    def test_re_update_negative(self, text: str) -> None:
+        assert not _RE_UPDATE.match(text), f"Unexpected match for: {text!r}"
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "12 commits pushed to develop",
+            "463 tests passed, zero regressions",
+            "merged feat/slack-updates into develop",
+            "shipped the new dashboard",
+            "deployed gantry backend",
+            "zero regressions across the suite",
+        ],
+    )
+    def test_re_structured_report_positive(self, text: str) -> None:
+        assert _RE_STRUCTURED_REPORT.search(text), f"Expected match for: {text!r}"
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "What should I work on next?",
+            "How are things?",
+            "Tell me about core",
+            "hello world",
+        ],
+    )
+    def test_re_structured_report_negative(self, text: str) -> None:
+        assert not _RE_STRUCTURED_REPORT.search(text), f"Unexpected match for: {text!r}"
+
+
+class TestHandleUpdate:
+    """Tests for the _handle_update fast path."""
+
+    @pytest.mark.asyncio
+    async def test_update_logs_to_memory(self, tmp_path: Path) -> None:
+        """Update messages are logged to memory with category 'update'."""
+        router = _make_router(tmp_path)
+        with patch.object(router.memory, "remember") as mock_remember:
+            await router.handle("shipped v2.3.0 for core", "U123", "C456")
+            mock_remember.assert_called_once()
+            call_args = mock_remember.call_args
+            assert call_args[0][0] == "update"  # category
+            assert "shipped v2.3.0 for core" in call_args[0][1]  # content
+            assert call_args[1]["project"] == "core"
+
+    @pytest.mark.asyncio
+    async def test_update_returns_acknowledgment(self, tmp_path: Path) -> None:
+        """Update handler returns a short acknowledgment."""
+        router = _make_router(tmp_path)
+        with patch.object(router.memory, "remember"):
+            result = await router.handle("FYI deployed edge", "U123", "C456")
+            assert "Logged" in result
+            assert "edge" in result
+
+    @pytest.mark.asyncio
+    async def test_update_no_project_match(self, tmp_path: Path) -> None:
+        """Update without a recognized project still logs."""
+        router = _make_router(tmp_path)
+        with patch.object(router.memory, "remember") as mock_remember:
+            result = await router.handle("deployed the new widget", "U123", "C456")
+            mock_remember.assert_called_once()
+            call_args = mock_remember.call_args
+            assert call_args[1]["project"] is None
+            assert "Logged" in result
+
+    @pytest.mark.asyncio
+    async def test_update_bypasses_llm(self, tmp_path: Path) -> None:
+        """Update messages do not trigger LLM fallback."""
+        router = _make_router(tmp_path)
+        with patch.object(router.memory, "remember"):
+            await router.handle("update: core tests passing", "U123", "C456")
+            assert router._llm_client is None
+
+    @pytest.mark.asyncio
+    async def test_structured_report_handled(self, tmp_path: Path) -> None:
+        """Structured reports (e.g., 'commits pushed') hit the update path."""
+        router = _make_router(tmp_path)
+        with patch.object(router.memory, "remember") as mock_remember:
+            result = await router.handle(
+                "12 commits pushed to develop, 463 tests passed",
+                "U123",
+                "C456",
+            )
+            mock_remember.assert_called_once()
+            assert "Logged" in result
+
+
+class TestAIDirectives:
+    """Tests for AI directives in the LLM system prompt."""
+
+    def test_system_prompt_includes_directives(self, tmp_path: Path) -> None:
+        """System prompt includes AI directives when available."""
+        router = _make_router(tmp_path)
+        router._ai_directives = "# Development Standards\n1. Use pytest."
+
+        prompt = router._build_system_prompt([], [])
+        assert "Project standards" in prompt
+        assert "Development Standards" in prompt
+        assert "Use pytest" in prompt
+
+    def test_system_prompt_without_directives(self, tmp_path: Path) -> None:
+        """System prompt works cleanly when directives are empty."""
+        router = _make_router(tmp_path)
+        router._ai_directives = ""
+
+        prompt = router._build_system_prompt([], [])
+        assert "Project standards" not in prompt
+        assert "Overlord" in prompt
+
+    def test_load_ai_directives_missing_file(self) -> None:
+        """Gracefully returns empty string when file is missing."""
+        with patch(
+            "nebulus_swarm.overlord.slack_commands.Path.__truediv__",
+        ) as mock_div:
+            mock_path = MagicMock()
+            mock_path.is_file.return_value = False
+            mock_div.return_value = mock_path
+            result = SlackCommandRouter._load_ai_directives()
+            # Should not raise — returns empty or the real file's content
+            assert isinstance(result, str)

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from pathlib import Path
 import re
 import time
 from typing import TYPE_CHECKING, Optional
@@ -52,6 +53,14 @@ _RE_GREETING = re.compile(
     r"^(hi|hello|hey|howdy|yo|sup|what'?s\s*up|how\s*are\s*you|how'?s\s*it\s*going)\b",
     re.IGNORECASE,
 )
+_RE_UPDATE = re.compile(
+    r"^(?:update|status\s+update|report|fyi|heads\s*up|completed?|shipped|deployed|pushed)\b",
+    re.IGNORECASE,
+)
+_RE_STRUCTURED_REPORT = re.compile(
+    r"(?:commits?\s+pushed|tests?\s+pass|merged|shipped|deployed|zero\s+regressions)",
+    re.IGNORECASE,
+)
 
 
 class SlackCommandRouter:
@@ -88,6 +97,12 @@ class SlackCommandRouter:
         self._ecosystem_cache: Optional[list] = None
         self._cache_ts: float = 0.0
         self._CACHE_TTL: float = 60.0
+
+        # AI directives — loaded once for LLM system prompt enrichment
+        self._ai_directives: str = self._load_ai_directives()
+
+        # Known project names for update tagging
+        self._project_names: set[str] = set(config.projects.keys())
 
     async def handle(self, text: str, user_id: str, channel_id: str) -> str:
         """Parse a command and dispatch to the appropriate handler.
@@ -148,11 +163,91 @@ class SlackCommandRouter:
                     "Type `help` to see what I can do."
                 )
 
+            if _RE_UPDATE.match(text) or _RE_STRUCTURED_REPORT.search(text):
+                return await self._handle_update(text)
+
             return await self._handle_llm_fallback(text, user_id, channel_id)
 
         except Exception as e:
             logger.exception("Error handling Slack command: %s", text)
             return f"Error processing command: {e}"
+
+    @staticmethod
+    def _load_ai_directives() -> str:
+        """Load and condense AI_DIRECTIVES.md for LLM system prompt.
+
+        Reads the file from the nebulus-atom project root and extracts
+        the Development Standards, Architecture Standards, and Source
+        Control sections. Returns empty string if file not found.
+        """
+        # Walk up from this file to find AI_DIRECTIVES.md at project root
+        directives_path = Path(__file__).resolve().parents[2] / "AI_DIRECTIVES.md"
+        if not directives_path.is_file():
+            return ""
+
+        try:
+            content = directives_path.read_text(encoding="utf-8")
+        except OSError:
+            return ""
+
+        # Extract relevant sections (skip Autonomy Mandates, Execution
+        # Protocol, and Communication Standards which are agent-specific)
+        sections: list[str] = []
+        capture = False
+        for line in content.splitlines():
+            if (
+                line.startswith("# Development Standards")
+                or line.startswith("# Architecture Standards")
+                or line.startswith("## Source Control Standards")
+            ):
+                capture = True
+            elif (
+                line.startswith("# Strict Execution Protocol")
+                or line.startswith("# Autonomy Mandates")
+                or line.startswith("## Communication Standards")
+            ):
+                capture = False
+            if capture:
+                sections.append(line)
+
+        return "\n".join(sections).strip()
+
+    def _infer_project(self, text: str) -> Optional[str]:
+        """Infer a project name from freeform text.
+
+        Args:
+            text: Message text to scan.
+
+        Returns:
+            First matching project name, or None.
+        """
+        text_lower = text.lower()
+        for name in self._project_names:
+            if name.lower() in text_lower:
+                return name
+        return None
+
+    async def _handle_update(self, text: str) -> str:
+        """Log an update/notification to memory and acknowledge.
+
+        Args:
+            text: The update message text.
+
+        Returns:
+            Short acknowledgment string.
+        """
+        project = self._infer_project(text)
+        summary = text[:120].strip()
+
+        await asyncio.to_thread(
+            self.memory.remember,
+            "update",
+            text,
+            project=project,
+        )
+
+        proj_label = f" for *{project}*" if project else ""
+        return f"Logged{proj_label}. Noted: {summary}"
 
     async def _handle_status(self, project: Optional[str]) -> str:
         """Show ecosystem or project health via scanner.
@@ -475,7 +570,7 @@ class SlackCommandRouter:
             "\n".join(memory_lines) if memory_lines else "(no recent observations)"
         )
 
-        return (
+        prompt = (
             "You are Overlord, the ecosystem orchestrator for Nebulus AI Labs.\n"
             f"You manage {len(ecosystem)} projects. Current state:\n\n"
             f"{projects_text}\n\n"
@@ -486,6 +581,14 @@ class SlackCommandRouter:
             "Answer concisely. If a command would help, suggest it.\n"
             "Do not generate destructive shell commands."
         )
+
+        if self._ai_directives:
+            prompt += (
+                "\n\nProject standards (follow these when answering):\n"
+                f"{self._ai_directives}"
+            )
+
+        return prompt
 
     async def _handle_llm_fallback(
         self, text: str, user_id: str, channel_id: str
