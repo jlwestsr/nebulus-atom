@@ -657,6 +657,77 @@ def _render_memory_entries(entries: list) -> None:
     console.print(table)
 
 
+@overlord_app.command("worker")
+def show_worker() -> None:
+    """Show Claude Code worker status and configuration."""
+    import shutil
+
+    from nebulus_swarm.overlord.worker_claude import ClaudeWorker, load_worker_config
+
+    registry = _load_registry_or_exit()
+    if registry is None:
+        return
+
+    worker_cfg = load_worker_config(registry.workers)
+
+    if not worker_cfg:
+        console.print(
+            "[dim]No Claude worker configured.[/dim]\n"
+            "Add a 'workers.claude' section to ~/.atom/overlord.yml to enable."
+        )
+        return
+
+    # Status table
+    table = Table(title="Claude Code Worker")
+    table.add_column("Setting", style="bold")
+    table.add_column("Value")
+
+    table.add_row(
+        "Enabled", "[green]yes[/green]" if worker_cfg.enabled else "[dim]no[/dim]"
+    )
+    table.add_row("Binary path", worker_cfg.binary_path)
+
+    binary_found = shutil.which(worker_cfg.binary_path)
+    if binary_found:
+        table.add_row("Binary resolved", f"[green]{binary_found}[/green]")
+    else:
+        table.add_row("Binary resolved", "[red]NOT FOUND[/red]")
+
+    table.add_row("Default model", worker_cfg.default_model)
+    table.add_row("Timeout", f"{worker_cfg.timeout}s")
+
+    if worker_cfg.model_overrides:
+        overrides = ", ".join(
+            f"{k}={v}" for k, v in sorted(worker_cfg.model_overrides.items())
+        )
+        table.add_row("Model overrides", overrides)
+    else:
+        table.add_row("Model overrides", "[dim](none)[/dim]")
+
+    console.print(table)
+
+    if not worker_cfg.enabled:
+        console.print(
+            "\n[yellow]Worker is disabled. Set enabled: true to activate.[/yellow]"
+        )
+        return
+
+    if not binary_found:
+        console.print(
+            "\n[red]Claude binary not found.[/red] "
+            "Install Claude Code or update binary_path in config."
+        )
+        return
+
+    # Quick connectivity test
+    console.print("\n[cyan]Running quick test...[/cyan]")
+    worker = ClaudeWorker(worker_cfg)
+    if worker.available:
+        console.print("[green]Worker is ready.[/green]")
+    else:
+        console.print("[red]Worker initialization failed.[/red]")
+
+
 @overlord_app.command()
 def dispatch(
     task: str = typer.Argument(

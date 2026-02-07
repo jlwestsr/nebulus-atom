@@ -104,6 +104,7 @@ class OverlordConfig:
     models: dict[str, dict[str, object]] = field(default_factory=dict)
     schedule: ScheduleConfig = field(default_factory=ScheduleConfig)
     notifications: NotificationConfig = field(default_factory=NotificationConfig)
+    workers: dict[str, dict[str, object]] = field(default_factory=dict)
 
 
 def load_config(path: Optional[Path] = None) -> OverlordConfig:
@@ -182,6 +183,10 @@ def load_config(path: Optional[Path] = None) -> OverlordConfig:
         else NotificationConfig()
     )
 
+    # Parse workers
+    raw_workers = raw.get("workers", {})
+    workers = dict(raw_workers) if isinstance(raw_workers, dict) else {}
+
     return OverlordConfig(
         projects=projects,
         autonomy_global=str(autonomy_global),
@@ -193,6 +198,7 @@ def load_config(path: Optional[Path] = None) -> OverlordConfig:
         models=dict(models) if isinstance(models, dict) else {},
         schedule=schedule,
         notifications=notifications,
+        workers=workers,
     )
 
 
@@ -257,6 +263,12 @@ def validate_config(config: OverlordConfig) -> list[str]:
                 errors.append(
                     f"Project '{name}': depends_on references unknown project '{dep}'"
                 )
+
+    # Validate workers
+    claude_worker = config.workers.get("claude")
+    if isinstance(claude_worker, dict) and claude_worker.get("enabled"):
+        if not claude_worker.get("binary_path"):
+            errors.append("Worker 'claude': binary_path is required when enabled")
 
     # Check for circular dependencies
     cycle = _find_cycle(config)
