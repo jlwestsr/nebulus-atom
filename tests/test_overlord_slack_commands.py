@@ -10,12 +10,16 @@ import pytest
 
 from nebulus_swarm.overlord.registry import OverlordConfig, ProjectConfig
 from nebulus_swarm.overlord.slack_commands import (
+    CommandValidator,
     SlackCommandRouter,
     _RE_STRUCTURED_REPORT,
     _RE_UPDATE,
     _format_ecosystem_status,
     _format_project_status,
     _format_scan_detail,
+    _parse_overlord_md_section,
+    _parse_track_plans,
+    _parse_tracks_md,
     _unknown_project,
 )
 
@@ -51,10 +55,12 @@ def _make_config(tmp_path: Path) -> OverlordConfig:
     )
 
 
-def _make_router(tmp_path: Path) -> SlackCommandRouter:
+def _make_router(
+    tmp_path: Path, workspace_root: Path | None = None
+) -> SlackCommandRouter:
     """Build a SlackCommandRouter with test config."""
     config = _make_config(tmp_path)
-    return SlackCommandRouter(config)
+    return SlackCommandRouter(config, workspace_root=workspace_root)
 
 
 # --- Command Parsing Tests ---
@@ -850,3 +856,198 @@ class TestMemoryFilters:
         result = await router.handle("memory cat:bogus", "U123", "C456")
         assert "Invalid category" in result
         assert "bogus" in result
+
+
+# --- Roadmap Command Tests ---
+
+
+def _make_workspace(tmp_path: Path) -> Path:
+    """Create a minimal workspace with governance and conductor files."""
+    ws = tmp_path / "workspace"
+    ws.mkdir()
+
+    # OVERLORD.md with Critical Path section
+    (ws / "OVERLORD.md").write_text(
+        "# OVERLORD.md\n\n"
+        "## Critical Path\n\n"
+        "| Phase | Description | Status | Priority |\n"
+        "|-------|-------------|--------|----------|\n"
+        "| A | MCP Server Migration | Pending | 1 |\n"
+        "| B | Gantry Refactor | Pending | 1 |\n"
+    )
+
+    # BUSINESS.md with Strategic Priorities
+    (ws / "BUSINESS.md").write_text(
+        "# BUSINESS.md\n\n"
+        "## Strategic Priorities\n\n"
+        "| Priority | Goal | Key Result |\n"
+        "|----------|------|------------|\n"
+        "| 1 | Ship appliance | End-to-end on Tier 1 |\n"
+        "| 2 | Demo-ready UI | Fix 13 issues |\n"
+    )
+
+    # conductor/tracks.md
+    conductor = ws / "conductor"
+    conductor.mkdir()
+    (conductor / "tracks.md").write_text(
+        "# Project Tracks\n\n"
+        "- [ ] **Track: Overlord Slack Intelligence**\n"
+        "- [x] **Track: Schema Design**\n"
+    )
+
+    # conductor/tracks/track_a/plan.md
+    tracks_dir = conductor / "tracks"
+    tracks_dir.mkdir()
+    track_a = tracks_dir / "track_a"
+    track_a.mkdir()
+    (track_a / "plan.md").write_text(
+        "# Plan\n\n"
+        "## Phase 1\n"
+        "- [x] Task: Done thing\n"
+        "- [ ] Task: Pending thing\n"
+        "- [ ] Task: Another pending\n"
+    )
+
+    return ws
+
+
+class TestRoadmapCommand:
+    """Tests for the roadmap Slack command."""
+
+    @pytest.mark.asyncio
+    async def test_roadmap_no_workspace(self, tmp_path: Path) -> None:
+        """Roadmap without workspace_root returns error."""
+        router = _make_router(tmp_path)
+        result = await router.handle("roadmap", "U123", "C456")
+        assert "Workspace root not configured" in result
+
+    @pytest.mark.asyncio
+    async def test_roadmap_with_workspace(self, tmp_path: Path) -> None:
+        """Roadmap with workspace reads governance files."""
+        ws = _make_workspace(tmp_path)
+        router = _make_router(tmp_path, workspace_root=ws)
+        result = await router.handle("roadmap", "U123", "C456")
+        assert "Critical Path" in result
+        assert "MCP Server Migration" in result
+        assert "Active Tracks" in result
+        assert "Overlord Slack Intelligence" in result
+        assert "Track Progress" in result
+        assert "track_a: 1/3 tasks done" in result
+        assert "Strategic Priorities" in result
+        assert "Ship appliance" in result
+
+    @pytest.mark.asyncio
+    async def test_roadmap_case_insensitive(self, tmp_path: Path) -> None:
+        """Roadmap command is case-insensitive."""
+        ws = _make_workspace(tmp_path)
+        router = _make_router(tmp_path, workspace_root=ws)
+        result = await router.handle("ROADMAP", "U123", "C456")
+        assert "Critical Path" in result
+
+    @pytest.mark.asyncio
+    async def test_roadmap_empty_workspace(self, tmp_path: Path) -> None:
+        """Roadmap with empty workspace returns no-data message."""
+        ws = tmp_path / "empty_ws"
+        ws.mkdir()
+        router = _make_router(tmp_path, workspace_root=ws)
+        result = await router.handle("roadmap", "U123", "C456")
+        assert "No roadmap data found" in result
+
+
+class TestRoadmapParsers:
+    """Tests for roadmap file parsing helpers."""
+
+    def test_parse_overlord_md_critical_path(self, tmp_path: Path) -> None:
+        ws = _make_workspace(tmp_path)
+        rows = _parse_overlord_md_section(ws / "OVERLORD.md", "Critical Path")
+        assert len(rows) == 2
+        assert "MCP Server Migration" in rows[0]
+        assert "Pending" in rows[0]
+
+    def test_parse_overlord_md_missing_section(self, tmp_path: Path) -> None:
+        ws = _make_workspace(tmp_path)
+        rows = _parse_overlord_md_section(ws / "OVERLORD.md", "Nonexistent")
+        assert rows == []
+
+    def test_parse_overlord_md_missing_file(self, tmp_path: Path) -> None:
+        rows = _parse_overlord_md_section(tmp_path / "nope.md", "Critical Path")
+        assert rows == []
+
+    def test_parse_tracks_md(self, tmp_path: Path) -> None:
+        ws = _make_workspace(tmp_path)
+        tracks = _parse_tracks_md(ws / "conductor" / "tracks.md")
+        assert len(tracks) == 2
+        assert "[pending] Track: Overlord Slack Intelligence" in tracks[0]
+        assert "[done] Track: Schema Design" in tracks[1]
+
+    def test_parse_track_plans(self, tmp_path: Path) -> None:
+        ws = _make_workspace(tmp_path)
+        plans = _parse_track_plans(ws / "conductor" / "tracks")
+        assert len(plans) == 1
+        assert "track_a: 1/3 tasks done" in plans[0]
+
+
+class TestCommandValidator:
+    """Tests for CommandValidator guardrails."""
+
+    def test_valid_commands_pass(self, tmp_path: Path) -> None:
+        config = _make_config(tmp_path)
+        validator = CommandValidator(config)
+        warnings = validator.validate_suggestion(
+            "Try `status core` or `autonomy cautious`"
+        )
+        assert warnings == []
+
+    def test_invalid_autonomy_level(self, tmp_path: Path) -> None:
+        config = _make_config(tmp_path)
+        validator = CommandValidator(config)
+        warnings = validator.validate_suggestion("Try `autonomy high`")
+        assert len(warnings) == 1
+        assert "Invalid autonomy level" in warnings[0]
+        assert "high" in warnings[0]
+
+    def test_unknown_project_in_status(self, tmp_path: Path) -> None:
+        config = _make_config(tmp_path)
+        validator = CommandValidator(config)
+        warnings = validator.validate_suggestion("Run `status nebulus-forge`")
+        assert len(warnings) == 1
+        assert "Unknown project" in warnings[0]
+
+    def test_non_overlord_commands_ignored(self, tmp_path: Path) -> None:
+        config = _make_config(tmp_path)
+        validator = CommandValidator(config)
+        warnings = validator.validate_suggestion("Run `cd ~/projects` and `ls`")
+        assert warnings == []
+
+    def test_annotate_response_clean(self, tmp_path: Path) -> None:
+        config = _make_config(tmp_path)
+        validator = CommandValidator(config)
+        text = "Try `status core`"
+        assert validator.annotate_response(text) == text
+
+    def test_annotate_response_with_warnings(self, tmp_path: Path) -> None:
+        config = _make_config(tmp_path)
+        validator = CommandValidator(config)
+        result = validator.annotate_response("Try `autonomy high`")
+        assert "Note: Some suggested commands may be incorrect" in result
+        assert "Invalid autonomy level" in result
+
+    @pytest.mark.asyncio
+    async def test_llm_fallback_uses_guardrails(self, tmp_path: Path) -> None:
+        """LLM fallback responses are validated by CommandValidator."""
+        router = _make_router(tmp_path)
+        mock_response = _mock_llm_response("Try `autonomy high` for full control.")
+
+        with (
+            patch.object(
+                router, "_get_ecosystem", new_callable=AsyncMock, return_value=[]
+            ),
+            patch.object(router.memory, "search", return_value=[]),
+        ):
+            mock_client = AsyncMock()
+            mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+            router._llm_client = mock_client
+
+            result = await router.handle("How do I enable automation?", "U123", "C456")
+            assert "Note: Some suggested commands may be incorrect" in result
+            assert "Invalid autonomy level" in result

@@ -58,6 +58,7 @@ _RE_UPDATE = re.compile(
     re.IGNORECASE,
 )
 _RE_MEMORY_FILTER = re.compile(r"(cat|proj):(\S+)", re.IGNORECASE)
+_RE_ROADMAP = re.compile(r"^roadmap$", re.IGNORECASE)
 _RE_STRUCTURED_REPORT = re.compile(
     r"(?:commits?\s+pushed|tests?\s+pass|merged|shipped|deployed|zero\s+regressions)",
     re.IGNORECASE,
@@ -71,14 +72,18 @@ class SlackCommandRouter:
         self,
         config: OverlordConfig,
         proposal_manager: Optional[ProposalManager] = None,
+        workspace_root: Optional[Path] = None,
     ):
         """Initialize the command router with the full Phase 2 stack.
 
         Args:
             config: Overlord configuration with project registry.
             proposal_manager: Optional proposal manager for approval workflows.
+            workspace_root: Root directory of the workspace. Used to locate
+                conductor/tracks.md, OVERLORD.md, and other governance files.
         """
         self.config = config
+        self.workspace_root = workspace_root
         self.graph = DependencyGraph(config)
         self.autonomy = AutonomyEngine(config)
         self.router = ModelRouter(config)
@@ -104,6 +109,9 @@ class SlackCommandRouter:
 
         # Known project names for update tagging
         self._project_names: set[str] = set(config.projects.keys())
+
+        # Command validator for LLM guardrails
+        self._command_validator = CommandValidator(config)
 
     async def handle(self, text: str, user_id: str, channel_id: str) -> str:
         """Parse a command and dispatch to the appropriate handler.
@@ -145,6 +153,10 @@ class SlackCommandRouter:
             m = _RE_MEMORY.match(text)
             if m:
                 return await self._handle_memory(m.group(1))
+
+            m = _RE_ROADMAP.match(text)
+            if m:
+                return await self._handle_roadmap()
 
             m = _RE_APPROVE.match(text)
             if m:
@@ -509,6 +521,67 @@ class SlackCommandRouter:
             )
         return "\n".join(lines)
 
+    async def _handle_roadmap(self) -> str:
+        """Show the current roadmap from governance files and conductor tracks.
+
+        Reads OVERLORD.md (critical path + active tracks) and falls back to
+        conductor/tracks.md if the workspace root is configured. Pure file
+        reads — no LLM involved.
+
+        Returns:
+            Formatted roadmap string for Slack.
+        """
+        if not self.workspace_root:
+            return "Workspace root not configured — cannot read roadmap files."
+
+        lines: list[str] = []
+
+        # Read critical path from OVERLORD.md
+        overlord_md = self.workspace_root / "OVERLORD.md"
+        if overlord_md.is_file():
+            critical_path = await asyncio.to_thread(
+                _parse_overlord_md_section, overlord_md, "Critical Path"
+            )
+            if critical_path:
+                lines.append("*Critical Path:*")
+                lines.extend(f"  {line}" for line in critical_path)
+
+        # Read active tracks from conductor/tracks.md
+        tracks_md = self.workspace_root / "conductor" / "tracks.md"
+        if tracks_md.is_file():
+            tracks = await asyncio.to_thread(_parse_tracks_md, tracks_md)
+            if tracks:
+                if lines:
+                    lines.append("")
+                lines.append("*Active Tracks:*")
+                lines.extend(f"  {line}" for line in tracks)
+
+            # For each track, read the plan.md and count done/total
+            tracks_dir = self.workspace_root / "conductor" / "tracks"
+            if tracks_dir.is_dir():
+                plan_summaries = await asyncio.to_thread(_parse_track_plans, tracks_dir)
+                if plan_summaries:
+                    lines.append("")
+                    lines.append("*Track Progress:*")
+                    lines.extend(f"  {line}" for line in plan_summaries)
+
+        # Read strategic priorities from BUSINESS.md
+        business_md = self.workspace_root / "BUSINESS.md"
+        if business_md.is_file():
+            priorities = await asyncio.to_thread(
+                _parse_overlord_md_section, business_md, "Strategic Priorities"
+            )
+            if priorities:
+                if lines:
+                    lines.append("")
+                lines.append("*Strategic Priorities:*")
+                lines.extend(f"  {line}" for line in priorities)
+
+        if not lines:
+            return "No roadmap data found. Ensure OVERLORD.md and conductor/tracks.md exist."
+
+        return "\n".join(lines)
+
     async def _handle_approve(self, proposal_id: str) -> str:
         """Approve a pending proposal by ID.
 
@@ -691,7 +764,8 @@ class SlackCommandRouter:
             # Keep last 10 messages (5 exchanges)
             self._chat_history[channel_id] = self._chat_history[channel_id][-10:]
 
-            return content
+            # Validate LLM-suggested commands before returning
+            return self._command_validator.annotate_response(content)
 
         except asyncio.TimeoutError:
             logger.warning("LLM chat fallback timed out for: %s", text)
@@ -719,6 +793,7 @@ class SlackCommandRouter:
             "  `release <project> <version>` — coordinated release\n"
             "  `autonomy [level]` — show/describe autonomy level\n"
             "  `memory <query> [cat:<category>] [proj:<project>]` — search memory with optional filters\n"
+            "  `roadmap` — show active tracks, critical path, and priorities\n"
             "  `approve <id>` — approve a pending proposal\n"
             "  `deny <id>` — deny a pending proposal\n"
             "  `help` — show this message"
@@ -785,3 +860,212 @@ def _format_scan_detail(result: object) -> str:
         for issue in result.issues:
             lines.append(f"    - {issue}")
     return "\n".join(lines)
+
+
+# --- Roadmap parsing helpers ---
+
+_RE_MD_TABLE_ROW = re.compile(r"^\|(.+)\|$")
+_RE_MD_CHECKBOX = re.compile(r"^- \[([ xX])\] \*\*(.+?)\*\*")
+
+
+def _parse_overlord_md_section(path: Path, section_name: str) -> list[str]:
+    """Extract table rows from a named section in a Markdown file.
+
+    Args:
+        path: Path to the Markdown file.
+        section_name: Heading text to find (e.g. "Critical Path").
+
+    Returns:
+        List of formatted strings, one per table row (excluding header/separator).
+    """
+    try:
+        content = path.read_text(encoding="utf-8")
+    except OSError:
+        return []
+
+    lines: list[str] = []
+    in_section = False
+    header_skipped = False
+
+    for line in content.splitlines():
+        stripped = line.strip()
+
+        # Detect section start
+        if stripped.startswith("#") and section_name in stripped:
+            in_section = True
+            header_skipped = False
+            continue
+
+        # Detect next section (stop)
+        if in_section and stripped.startswith("#"):
+            break
+
+        if not in_section:
+            continue
+
+        # Parse table rows
+        m = _RE_MD_TABLE_ROW.match(stripped)
+        if m:
+            cells = [c.strip() for c in m.group(1).split("|")]
+            # Skip header row and separator row (---|---)
+            if any("---" in c for c in cells):
+                header_skipped = True
+                continue
+            if not header_skipped:
+                header_skipped = True
+                continue
+            # Format: "Phase | Description | Status" or similar
+            lines.append(" | ".join(c for c in cells if c))
+
+    return lines
+
+
+def _parse_tracks_md(path: Path) -> list[str]:
+    """Parse conductor/tracks.md for track names and status.
+
+    Args:
+        path: Path to tracks.md.
+
+    Returns:
+        List of formatted track strings.
+    """
+    try:
+        content = path.read_text(encoding="utf-8")
+    except OSError:
+        return []
+
+    lines: list[str] = []
+    for line in content.splitlines():
+        m = _RE_MD_CHECKBOX.match(line.strip())
+        if m:
+            done = m.group(1).lower() == "x"
+            name = m.group(2).strip()
+            icon = "done" if done else "pending"
+            lines.append(f"[{icon}] {name}")
+
+    return lines
+
+
+def _parse_track_plans(tracks_dir: Path) -> list[str]:
+    """Parse plan.md files in each track directory for task completion counts.
+
+    Args:
+        tracks_dir: Path to conductor/tracks/ directory.
+
+    Returns:
+        List of formatted progress strings.
+    """
+    lines: list[str] = []
+    for plan_path in sorted(tracks_dir.glob("*/plan.md")):
+        track_name = plan_path.parent.name
+        try:
+            content = plan_path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+
+        total = 0
+        done = 0
+        for line in content.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("- ["):
+                total += 1
+                if stripped.startswith("- [x]") or stripped.startswith("- [X]"):
+                    done += 1
+
+        if total > 0:
+            lines.append(f"{track_name}: {done}/{total} tasks done")
+
+    return lines
+
+
+# --- Command validation ---
+
+# Known Overlord Slack commands for guardrail validation.
+KNOWN_COMMANDS: frozenset[str] = frozenset(
+    {
+        "status",
+        "scan",
+        "merge",
+        "release",
+        "autonomy",
+        "memory",
+        "roadmap",
+        "approve",
+        "deny",
+        "help",
+    }
+)
+
+# Known autonomy levels
+KNOWN_AUTONOMY_LEVELS: frozenset[str] = frozenset(
+    {"cautious", "proactive", "scheduled"}
+)
+
+
+class CommandValidator:
+    """Validates LLM-suggested commands against the known command registry.
+
+    Prevents hallucinated commands like 'autonomy high' from reaching
+    the user. Used as a post-filter on LLM fallback responses.
+    """
+
+    def __init__(self, config: "OverlordConfig") -> None:
+        self._project_names: set[str] = set(config.projects.keys())
+
+    def validate_suggestion(self, text: str) -> list[str]:
+        """Check LLM response text for invalid command suggestions.
+
+        Scans for backtick-wrapped commands and validates them against
+        the known command registry.
+
+        Args:
+            text: LLM response text to validate.
+
+        Returns:
+            List of warning strings for invalid commands found.
+            Empty list if all commands are valid.
+        """
+        warnings: list[str] = []
+        # Find backtick-wrapped command suggestions
+        for match in re.finditer(r"`([^`]+)`", text):
+            candidate = match.group(1).strip()
+            tokens = candidate.split()
+            if not tokens:
+                continue
+
+            cmd = tokens[0].lower()
+            if cmd not in KNOWN_COMMANDS:
+                continue  # Not an Overlord command reference
+
+            # Validate arguments for known commands
+            if cmd == "autonomy" and len(tokens) > 1:
+                level = tokens[1].lower()
+                if level not in KNOWN_AUTONOMY_LEVELS:
+                    warnings.append(
+                        f"Invalid autonomy level `{tokens[1]}`. "
+                        f"Valid: {', '.join(sorted(KNOWN_AUTONOMY_LEVELS))}"
+                    )
+
+            if cmd in ("status", "scan") and len(tokens) > 1:
+                proj = tokens[1]
+                if proj not in self._project_names:
+                    warnings.append(f"Unknown project `{proj}` in `{candidate}`")
+
+        return warnings
+
+    def annotate_response(self, text: str) -> str:
+        """Validate and annotate an LLM response with warnings.
+
+        Args:
+            text: LLM response text.
+
+        Returns:
+            Original text with appended warnings, or unmodified if valid.
+        """
+        warnings = self.validate_suggestion(text)
+        if not warnings:
+            return text
+        correction = "\n".join(f"  - {w}" for w in warnings)
+        return (
+            f"{text}\n\n_Note: Some suggested commands may be incorrect:_\n{correction}"
+        )
