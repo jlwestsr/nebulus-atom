@@ -72,7 +72,9 @@ class OverlordDaemon:
             memory=self.memory,
         )
         self.command_router = SlackCommandRouter(
-            config, proposal_manager=self.proposal_manager
+            config,
+            proposal_manager=self.proposal_manager,
+            workspace_root=config.workspace_root,
         )
         self.detection_engine = DetectionEngine(config, self.graph, self.autonomy)
         notif_config = config.notifications

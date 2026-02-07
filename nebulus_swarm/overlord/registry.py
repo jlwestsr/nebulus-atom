@@ -97,6 +97,7 @@ class NotificationConfig:
 class OverlordConfig:
     """Top-level Overlord configuration."""
 
+    workspace_root: Optional[Path] = None
     projects: dict[str, ProjectConfig] = field(default_factory=dict)
     autonomy_global: str = "cautious"
     autonomy_overrides: dict[str, str] = field(default_factory=dict)
@@ -187,7 +188,23 @@ def load_config(path: Optional[Path] = None) -> OverlordConfig:
     raw_workers = raw.get("workers", {})
     workers = dict(raw_workers) if isinstance(raw_workers, dict) else {}
 
+    # Parse workspace_root — explicit from YAML or auto-detected from project paths
+    raw_ws = raw.get("workspace_root")
+    if raw_ws:
+        workspace_root: Optional[Path] = Path(str(raw_ws)).expanduser().resolve()
+    elif projects:
+        # Auto-detect: common parent of all project paths
+        paths = [p.path for p in projects.values()]
+        candidate = paths[0].parent
+        if all(str(p).startswith(str(candidate)) for p in paths):
+            workspace_root = candidate
+        else:
+            workspace_root = None
+    else:
+        workspace_root = None
+
     return OverlordConfig(
+        workspace_root=workspace_root,
         projects=projects,
         autonomy_global=str(autonomy_global),
         autonomy_overrides={str(k): str(v) for k, v in autonomy_overrides.items()},
