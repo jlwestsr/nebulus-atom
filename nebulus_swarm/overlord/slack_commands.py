@@ -32,6 +32,7 @@ from nebulus_swarm.overlord.release import (
 )
 from nebulus_swarm.overlord.scanner import scan_ecosystem, scan_project
 from nebulus_swarm.overlord.task_parser import TaskParser
+from nebulus_swarm.overlord.worker_claude import ClaudeWorker
 
 if TYPE_CHECKING:
     from nebulus_swarm.overlord.proposal_manager import ProposalManager
@@ -59,6 +60,7 @@ _RE_UPDATE = re.compile(
 )
 _RE_MEMORY_FILTER = re.compile(r"(cat|proj):(\S+)", re.IGNORECASE)
 _RE_ROADMAP = re.compile(r"^roadmap$", re.IGNORECASE)
+_RE_INVESTIGATE = re.compile(r"^investigate\s+(.+)$", re.IGNORECASE)
 _RE_STRUCTURED_REPORT = re.compile(
     r"(?:commits?\s+pushed|tests?\s+pass|merged|shipped|deployed|zero\s+regressions)",
     re.IGNORECASE,
@@ -113,6 +115,20 @@ class SlackCommandRouter:
         # Command validator for LLM guardrails
         self._command_validator = CommandValidator(config)
 
+        # Claude worker for investigation dispatch
+        self._claude_worker: Optional[ClaudeWorker] = None
+        workers_raw = getattr(config, "workers", {}) or {}
+        claude_cfg = workers_raw.get("claude")
+        if claude_cfg and isinstance(claude_cfg, dict) and claude_cfg.get("enabled"):
+            from nebulus_swarm.overlord.worker_claude import load_worker_config
+
+            worker_config = load_worker_config(workers_raw)
+            if worker_config:
+                self._claude_worker = ClaudeWorker(worker_config)
+
+        # Slack bot reference for buffered responses (set externally by daemon)
+        self.slack_bot: Optional[object] = None
+
     async def handle(self, text: str, user_id: str, channel_id: str) -> str:
         """Parse a command and dispatch to the appropriate handler.
 
@@ -157,6 +173,10 @@ class SlackCommandRouter:
             m = _RE_ROADMAP.match(text)
             if m:
                 return await self._handle_roadmap()
+
+            m = _RE_INVESTIGATE.match(text)
+            if m:
+                return await self._handle_investigate(m.group(1), user_id, channel_id)
 
             m = _RE_APPROVE.match(text)
             if m:
@@ -546,7 +566,7 @@ class SlackCommandRouter:
                 lines.append("*Critical Path:*")
                 lines.extend(f"  {line}" for line in critical_path)
 
-        # Read active tracks from conductor/tracks.md
+        # Read active tracks from conductor/tracks.md or OVERLORD.md fallback
         tracks_md = self.workspace_root / "conductor" / "tracks.md"
         if tracks_md.is_file():
             tracks = await asyncio.to_thread(_parse_tracks_md, tracks_md)
@@ -555,15 +575,26 @@ class SlackCommandRouter:
                     lines.append("")
                 lines.append("*Active Tracks:*")
                 lines.extend(f"  {line}" for line in tracks)
-
-            # For each track, read the plan.md and count done/total
-            tracks_dir = self.workspace_root / "conductor" / "tracks"
-            if tracks_dir.is_dir():
-                plan_summaries = await asyncio.to_thread(_parse_track_plans, tracks_dir)
-                if plan_summaries:
+        elif overlord_md.is_file():
+            # Fallback: read Active Tracks table from OVERLORD.md
+            active_tracks = await asyncio.to_thread(
+                _parse_overlord_md_section, overlord_md, "Active Tracks"
+            )
+            if active_tracks:
+                if lines:
                     lines.append("")
-                    lines.append("*Track Progress:*")
-                    lines.extend(f"  {line}" for line in plan_summaries)
+                lines.append("*Active Tracks:*")
+                lines.extend(f"  {line}" for line in active_tracks)
+
+        # For each track, read the plan.md and count done/total
+        tracks_dir = self.workspace_root / "conductor" / "tracks"
+        if tracks_dir.is_dir():
+            plan_summaries = await asyncio.to_thread(_parse_track_plans, tracks_dir)
+            if plan_summaries:
+                if lines:
+                    lines.append("")
+                lines.append("*Track Progress:*")
+                lines.extend(f"  {line}" for line in plan_summaries)
 
         # Read strategic priorities from BUSINESS.md
         business_md = self.workspace_root / "BUSINESS.md"
@@ -581,6 +612,108 @@ class SlackCommandRouter:
             return "No roadmap data found. Ensure OVERLORD.md and conductor/tracks.md exist."
 
         return "\n".join(lines)
+
+    async def _handle_investigate(
+        self, query: str, user_id: str, channel_id: str
+    ) -> str:
+        """Dispatch a freeform research query to the Claude worker.
+
+        Returns an immediate acknowledgment and posts the result
+        asynchronously when the investigation completes.
+
+        Args:
+            query: Natural language research question.
+            user_id: Slack user ID.
+            channel_id: Slack channel ID.
+
+        Returns:
+            Immediate acknowledgment string.
+        """
+        if not self._claude_worker or not self._claude_worker.available:
+            return (
+                "Investigation dispatch is not available — "
+                "Claude worker is not configured or not found."
+            )
+
+        # Build a research prompt with ecosystem context
+        project = self._infer_project(query)
+        project_path = (
+            self.config.projects[project].path
+            if project and project in self.config.projects
+            else self.workspace_root or Path.cwd()
+        )
+
+        prompt = (
+            f"Research request from Slack user {user_id}:\n\n"
+            f"{query}\n\n"
+            "Provide a concise, factual answer. Cite file paths and line numbers "
+            "where relevant. Do not speculate."
+        )
+
+        # Fire-and-forget: run investigation in background, post result when done
+        asyncio.create_task(
+            self._run_investigation(prompt, project_path, channel_id, query)
+        )
+
+        proj_label = f" (in *{project}*)" if project else ""
+        return (
+            f"Investigating{proj_label}: _{query[:100]}_\nI'll post results when ready."
+        )
+
+    async def _run_investigation(
+        self,
+        prompt: str,
+        project_path: Path,
+        channel_id: str,
+        original_query: str,
+    ) -> None:
+        """Execute an investigation in the background and post the result.
+
+        Args:
+            prompt: The research prompt for the worker.
+            project_path: Working directory for the subprocess.
+            channel_id: Slack channel to post the result to.
+            original_query: The user's original query for context.
+        """
+        try:
+            result = await asyncio.to_thread(
+                self._claude_worker.execute,  # type: ignore[union-attr]
+                prompt,
+                project_path,
+                task_type="research",
+            )
+
+            if result.success:
+                # Truncate long output for Slack (4000 char limit)
+                output = result.output[:3800]
+                response = (
+                    f"*Investigation complete* ({result.duration:.1f}s):\n"
+                    f"> {original_query[:100]}\n\n"
+                    f"{output}"
+                )
+            else:
+                response = (
+                    f"*Investigation failed* ({result.duration:.1f}s):\n"
+                    f"> {original_query[:100]}\n\n"
+                    f"Error: {result.error}"
+                )
+
+            # Post buffered result back to Slack
+            if self.slack_bot and hasattr(self.slack_bot, "post_message"):
+                await self.slack_bot.post_message(response, channel=channel_id)  # type: ignore[attr-defined]
+            else:
+                logger.info("Investigation result (no Slack bot): %s", response[:200])
+
+            # Log to memory
+            await asyncio.to_thread(
+                self.memory.remember,
+                "observation",
+                f"Investigation: {original_query[:120]} → "
+                f"{'success' if result.success else 'failed'}",
+            )
+
+        except Exception:
+            logger.exception("Investigation failed for: %s", original_query[:100])
 
     async def _handle_approve(self, proposal_id: str) -> str:
         """Approve a pending proposal by ID.
@@ -794,6 +927,7 @@ class SlackCommandRouter:
             "  `autonomy [level]` — show/describe autonomy level\n"
             "  `memory <query> [cat:<category>] [proj:<project>]` — search memory with optional filters\n"
             "  `roadmap` — show active tracks, critical path, and priorities\n"
+            "  `investigate <question>` — research a question (async, posts result when done)\n"
             "  `approve <id>` — approve a pending proposal\n"
             "  `deny <id>` — deny a pending proposal\n"
             "  `help` — show this message"
@@ -990,6 +1124,7 @@ KNOWN_COMMANDS: frozenset[str] = frozenset(
         "autonomy",
         "memory",
         "roadmap",
+        "investigate",
         "approve",
         "deny",
         "help",

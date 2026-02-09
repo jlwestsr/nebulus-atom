@@ -10,6 +10,7 @@ import pytest
 
 from nebulus_swarm.overlord.registry import OverlordConfig, ProjectConfig
 from nebulus_swarm.overlord.slack_commands import (
+    KNOWN_COMMANDS,
     CommandValidator,
     SlackCommandRouter,
     _RE_STRUCTURED_REPORT,
@@ -22,6 +23,7 @@ from nebulus_swarm.overlord.slack_commands import (
     _parse_tracks_md,
     _unknown_project,
 )
+from nebulus_swarm.overlord.task_parser import InvestigationTask, TaskParser
 
 
 def _make_config(tmp_path: Path) -> OverlordConfig:
@@ -1051,3 +1053,178 @@ class TestCommandValidator:
             result = await router.handle("How do I enable automation?", "U123", "C456")
             assert "Note: Some suggested commands may be incorrect" in result
             assert "Invalid autonomy level" in result
+
+
+# --- Roadmap OVERLORD.md Fallback Tests ---
+
+
+def _make_workspace_no_tracks_md(tmp_path: Path) -> Path:
+    """Create a workspace with OVERLORD.md but no conductor/tracks.md."""
+    ws = tmp_path / "workspace"
+    ws.mkdir()
+
+    (ws / "OVERLORD.md").write_text(
+        "# OVERLORD.md\n\n"
+        "## Critical Path\n\n"
+        "| Phase | Description | Status | Priority |\n"
+        "|-------|-------------|--------|----------|\n"
+        "| A | MCP Migration | Pending | 1 |\n"
+        "\n"
+        "## Active Tracks\n\n"
+        "| Track | Status | Priority | Link |\n"
+        "|-------|--------|----------|------|\n"
+        "| Overlord Slack Intel | In Progress | 3 | tracks/overlord_slack/ |\n"
+        "| Forge Profile | Completed | 3 | tracks/forge/ |\n"
+    )
+
+    # conductor/tracks/ dir with plan.md (but no tracks.md)
+    tracks_dir = ws / "conductor" / "tracks" / "overlord_slack"
+    tracks_dir.mkdir(parents=True)
+    (tracks_dir / "plan.md").write_text(
+        "# Plan\n"
+        "- [x] Task: Roadmap command\n"
+        "- [x] Task: CommandValidator\n"
+        "- [ ] Task: Workspace path\n"
+    )
+
+    return ws
+
+
+class TestRoadmapFallback:
+    """Tests for OVERLORD.md Active Tracks fallback when tracks.md is missing."""
+
+    @pytest.mark.asyncio
+    async def test_roadmap_reads_active_tracks_from_overlord_md(
+        self, tmp_path: Path
+    ) -> None:
+        """When conductor/tracks.md is missing, falls back to OVERLORD.md Active Tracks."""
+        ws = _make_workspace_no_tracks_md(tmp_path)
+        router = _make_router(tmp_path, workspace_root=ws)
+        result = await router.handle("roadmap", "U123", "C456")
+        assert "Active Tracks" in result
+        assert "Overlord Slack Intel" in result
+        assert "In Progress" in result
+
+    @pytest.mark.asyncio
+    async def test_roadmap_shows_track_progress_without_tracks_md(
+        self, tmp_path: Path
+    ) -> None:
+        """Track progress is shown even when conductor/tracks.md is missing."""
+        ws = _make_workspace_no_tracks_md(tmp_path)
+        router = _make_router(tmp_path, workspace_root=ws)
+        result = await router.handle("roadmap", "U123", "C456")
+        assert "Track Progress" in result
+        assert "overlord_slack: 2/3 tasks done" in result
+
+
+# --- Investigation Command Tests ---
+
+
+class TestInvestigateCommand:
+    """Tests for the investigate command dispatch."""
+
+    @pytest.mark.asyncio
+    async def test_investigate_no_worker(self, tmp_path: Path) -> None:
+        """investigate without a Claude worker returns an error."""
+        router = _make_router(tmp_path)
+        result = await router.handle(
+            "investigate why are tests failing?", "U123", "C456"
+        )
+        assert "not available" in result
+
+    @pytest.mark.asyncio
+    async def test_investigate_returns_ack(self, tmp_path: Path) -> None:
+        """investigate with a worker returns immediate acknowledgment."""
+        router = _make_router(tmp_path)
+        mock_worker = MagicMock()
+        mock_worker.available = True
+        router._claude_worker = mock_worker
+
+        # Patch asyncio.create_task so the background task doesn't actually run
+        with patch("nebulus_swarm.overlord.slack_commands.asyncio.create_task"):
+            result = await router.handle(
+                "investigate why are core tests failing?", "U123", "C456"
+            )
+            assert "Investigating" in result
+            assert "core" in result
+            assert "I'll post results when ready" in result
+
+    @pytest.mark.asyncio
+    async def test_investigate_infers_project(self, tmp_path: Path) -> None:
+        """investigate infers project name from query."""
+        router = _make_router(tmp_path)
+        mock_worker = MagicMock()
+        mock_worker.available = True
+        router._claude_worker = mock_worker
+
+        with patch("nebulus_swarm.overlord.slack_commands.asyncio.create_task"):
+            result = await router.handle(
+                "investigate prime deployment issues", "U123", "C456"
+            )
+            assert "prime" in result
+
+    @pytest.mark.asyncio
+    async def test_investigate_in_known_commands(self) -> None:
+        """investigate is in KNOWN_COMMANDS for guardrail validation."""
+        assert "investigate" in KNOWN_COMMANDS
+
+
+# --- InvestigationTask Schema Tests ---
+
+
+class TestInvestigationTask:
+    """Tests for InvestigationTask dataclass and TaskParser.parse_investigation."""
+
+    def test_investigation_task_defaults(self) -> None:
+        task = InvestigationTask(query="Why are tests failing?")
+        assert task.task_type == "research"
+        assert task.timeout == 600
+        assert task.project is None
+        assert task.tags == []
+
+    def test_parse_investigation_infers_project(self, tmp_path: Path) -> None:
+        config = _make_config(tmp_path)
+        from nebulus_swarm.overlord.graph import DependencyGraph
+
+        graph = DependencyGraph(config)
+        parser = TaskParser(graph)
+        task = parser.parse_investigation("What tests are failing in core?")
+        assert task.project == "core"
+        assert task.query == "What tests are failing in core?"
+
+    def test_parse_investigation_tags_testing(self, tmp_path: Path) -> None:
+        config = _make_config(tmp_path)
+        from nebulus_swarm.overlord.graph import DependencyGraph
+
+        graph = DependencyGraph(config)
+        parser = TaskParser(graph)
+        task = parser.parse_investigation("How do tests work in this repo?")
+        assert "testing" in task.tags
+
+    def test_parse_investigation_tags_debugging(self, tmp_path: Path) -> None:
+        config = _make_config(tmp_path)
+        from nebulus_swarm.overlord.graph import DependencyGraph
+
+        graph = DependencyGraph(config)
+        parser = TaskParser(graph)
+        task = parser.parse_investigation("Why is there a bug in the scanner?")
+        assert "debugging" in task.tags
+
+    def test_parse_investigation_tags_architecture(self, tmp_path: Path) -> None:
+        config = _make_config(tmp_path)
+        from nebulus_swarm.overlord.graph import DependencyGraph
+
+        graph = DependencyGraph(config)
+        parser = TaskParser(graph)
+        task = parser.parse_investigation("What is the architecture of the dispatch?")
+        assert "architecture" in task.tags
+
+    def test_parse_investigation_no_project(self, tmp_path: Path) -> None:
+        config = _make_config(tmp_path)
+        from nebulus_swarm.overlord.graph import DependencyGraph
+
+        graph = DependencyGraph(config)
+        parser = TaskParser(graph)
+        task = parser.parse_investigation("How does Python GIL work?")
+        assert task.project is None
+        assert task.tags == []
