@@ -571,3 +571,74 @@ When you discover a critical pattern that future AIs must follow:
 **Example**: This session's commit `b3951e3` referenced the pattern documented in commit `a196209`, creating a traceable chain from discovery → documentation → enforcement.
 
 ---
+
+## 2026-02-09: Cross-Project Module Migration Pattern (OverlordMemory → nebulus-core)
+
+### Context
+Migrated `OverlordMemory` from `nebulus-atom` to `nebulus-core` as the canonical shared implementation, making it available to all ecosystem agents (Gemini, Prime, Edge) without requiring atom as a dependency.
+
+### The Problem
+`OverlordMemory` is a pure-stdlib SQLite observation store used by the Overlord daemon, Slack commands, and CLI. It lived exclusively in `nebulus-atom`, making it inaccessible to other ecosystem projects. However, atom does not depend on nebulus-core (which would pull in chromadb, networkx, pandas, etc.), so a standard "extract and import" refactor wasn't viable.
+
+### The Solution: Canonical Copy + Import Shim
+
+**Strategy**: Copy the implementation to nebulus-core as the canonical source, then replace atom's module with a shim that tries importing from nebulus-core first, falling back to the local copy.
+
+```python
+# nebulus-atom/nebulus_swarm/overlord/memory.py (shim)
+try:
+    from nebulus_core.memory.overlord import (
+        DEFAULT_DB_PATH, VALID_CATEGORIES, MemoryEntry, OverlordMemory,
+    )
+except ImportError:
+    # Fallback: full local implementation for standalone installs
+    ...
+```
+
+**Key Properties**:
+- Zero changes to 9 consumer files (6 source + 3 test) — all continue importing from `nebulus_swarm.overlord.memory`
+- No new dependencies in either direction
+- Pure stdlib module (sqlite3, json, uuid, datetime, pathlib) — no dependency bloat in nebulus-core
+- Same SQLite schema and default path (`~/.atom/overlord/memory.db`) — existing databases remain readable
+
+### Implementation Details
+
+| Repo | File | Action |
+|------|------|--------|
+| nebulus-core | `src/nebulus_core/memory/overlord.py` | Created (267 lines, canonical copy) |
+| nebulus-core | `src/nebulus_core/memory/__init__.py` | Edited (added exports to `__all__`) |
+| nebulus-core | `tests/test_memory/test_overlord.py` | Created (17 tests, 6 test classes) |
+| nebulus-atom | `nebulus_swarm/overlord/memory.py` | Replaced with import shim + fallback |
+
+### Gotcha: `from __future__ import annotations` in Except Blocks
+
+Python requires `from __future__ import annotations` as the first statement in a module (after docstring). It **cannot** appear inside a `try/except` block. When building the shim, this import had to be placed at module level before the `try` block, not inside the `except ImportError` fallback.
+
+### Verification Pattern
+
+Multi-repo migrations need verification in both directions:
+1. New canonical tests pass in nebulus-core (17/17)
+2. No regressions in nebulus-core memory module (37/37)
+3. Existing atom tests still pass via shim (17/17)
+4. Full atom overlord suite passes (590/590)
+5. Runtime verification: `OverlordMemory.__module__` resolves to `nebulus_core.memory.overlord`
+
+### Reusable Pattern for Future Migrations
+
+This shim pattern works for any module that:
+- Is pure stdlib (no dependency concerns)
+- Has consumers that import from a single path
+- Needs to be shared across repos without adding cross-dependencies
+
+**Candidates for future migration** (same pattern applies):
+- `action_scope.py` — blast radius model (pure stdlib)
+- `registry.py` — project config and YAML loader (needs pyyaml, already in core)
+
+### Anti-Patterns Avoided
+
+- **Don't**: Add nebulus-core as a dependency of atom (pulls in heavy packages)
+- **Don't**: Maintain two independent copies without a shim (creates drift)
+- **Don't**: Move the module and update all consumers (breaks standalone atom installs)
+- **Don't**: Use `sys.path` manipulation instead of try/except (fragile, hard to debug)
+
+---
