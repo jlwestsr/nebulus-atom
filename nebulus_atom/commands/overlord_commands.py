@@ -657,6 +657,77 @@ def _render_memory_entries(entries: list) -> None:
     console.print(table)
 
 
+@overlord_app.command("worker")
+def show_worker() -> None:
+    """Show Claude Code worker status and configuration."""
+    import shutil
+
+    from nebulus_swarm.overlord.worker_claude import ClaudeWorker, load_worker_config
+
+    registry = _load_registry_or_exit()
+    if registry is None:
+        return
+
+    worker_cfg = load_worker_config(registry.workers)
+
+    if not worker_cfg:
+        console.print(
+            "[dim]No Claude worker configured.[/dim]\n"
+            "Add a 'workers.claude' section to ~/.atom/overlord.yml to enable."
+        )
+        return
+
+    # Status table
+    table = Table(title="Claude Code Worker")
+    table.add_column("Setting", style="bold")
+    table.add_column("Value")
+
+    table.add_row(
+        "Enabled", "[green]yes[/green]" if worker_cfg.enabled else "[dim]no[/dim]"
+    )
+    table.add_row("Binary path", worker_cfg.binary_path)
+
+    binary_found = shutil.which(worker_cfg.binary_path)
+    if binary_found:
+        table.add_row("Binary resolved", f"[green]{binary_found}[/green]")
+    else:
+        table.add_row("Binary resolved", "[red]NOT FOUND[/red]")
+
+    table.add_row("Default model", worker_cfg.default_model)
+    table.add_row("Timeout", f"{worker_cfg.timeout}s")
+
+    if worker_cfg.model_overrides:
+        overrides = ", ".join(
+            f"{k}={v}" for k, v in sorted(worker_cfg.model_overrides.items())
+        )
+        table.add_row("Model overrides", overrides)
+    else:
+        table.add_row("Model overrides", "[dim](none)[/dim]")
+
+    console.print(table)
+
+    if not worker_cfg.enabled:
+        console.print(
+            "\n[yellow]Worker is disabled. Set enabled: true to activate.[/yellow]"
+        )
+        return
+
+    if not binary_found:
+        console.print(
+            "\n[red]Claude binary not found.[/red] "
+            "Install Claude Code or update binary_path in config."
+        )
+        return
+
+    # Quick connectivity test
+    console.print("\n[cyan]Running quick test...[/cyan]")
+    worker = ClaudeWorker(worker_cfg)
+    if worker.available:
+        console.print("[green]Worker is ready.[/green]")
+    else:
+        console.print("[red]Worker initialization failed.[/red]")
+
+
 @overlord_app.command()
 def dispatch(
     task: str = typer.Argument(
@@ -850,17 +921,91 @@ def release(
 
 @overlord_app.command()
 def daemon(
-    action: str = typer.Argument("start", help="Action: start, status"),
+    action: str = typer.Argument("start", help="Action: start, status, stop, restart"),
 ) -> None:
-    """Run the Overlord background daemon."""
+    """Manage the Overlord background daemon."""
     import asyncio
 
-    registry = _load_registry_or_exit()
-    if registry is None:
+    from nebulus_swarm.overlord.overlord_daemon import OverlordDaemon
+
+    if action == "status":
+        pid = OverlordDaemon.read_pid()
+        if pid is not None and OverlordDaemon.check_running():
+            console.print(f"[bold green]Daemon is running[/bold green] (PID {pid})")
+        elif pid is not None:
+            console.print(f"[yellow]Stale PID file[/yellow] (PID {pid} is not running)")
+        else:
+            console.print("[dim]Daemon is not running.[/dim]")
         return
 
+    if action == "stop":
+        if not OverlordDaemon.check_running():
+            console.print("[dim]Daemon is not running.[/dim]")
+            return
+        pid = OverlordDaemon.read_pid()
+        console.print(f"[yellow]Stopping daemon (PID {pid})...[/yellow]")
+        if OverlordDaemon.stop_daemon():
+            console.print("[green]Daemon stopped.[/green]")
+        else:
+            console.print("[red]Failed to stop daemon within timeout.[/red]")
+            raise typer.Exit(1)
+        return
+
+    if action == "restart":
+        if OverlordDaemon.check_running():
+            pid = OverlordDaemon.read_pid()
+            console.print(f"[yellow]Stopping daemon (PID {pid})...[/yellow]")
+            if not OverlordDaemon.stop_daemon():
+                console.print("[red]Failed to stop daemon within timeout.[/red]")
+                raise typer.Exit(1)
+            console.print("[green]Daemon stopped.[/green]")
+        # Fall through to start
+        action = "start"
+
     if action == "start":
-        from nebulus_swarm.overlord.overlord_daemon import OverlordDaemon
+        import os
+
+        from dotenv import load_dotenv
+
+        from nebulus_swarm.logging import configure_logging
+
+        if OverlordDaemon.check_running():
+            pid = OverlordDaemon.read_pid()
+            console.print(
+                f"[yellow]Daemon is already running[/yellow] (PID {pid}). "
+                "Use 'overlord daemon restart' to restart."
+            )
+            return
+
+        # Auto-load .env from current working directory
+        env_path = os.path.join(os.getcwd(), ".env")
+        loaded = load_dotenv(env_path)
+        if loaded:
+            console.print(f"[green]Loaded .env from {env_path}[/green]")
+        else:
+            console.print(f"[yellow]No .env found at {env_path}[/yellow]")
+
+        # Show env var detection status
+        slack_bot = "yes" if os.environ.get("SLACK_BOT_TOKEN") else "no"
+        slack_app = "yes" if os.environ.get("SLACK_APP_TOKEN") else "no"
+        slack_channel = "yes" if os.environ.get("SLACK_CHANNEL_ID") else "no"
+        console.print(
+            f"[dim]SLACK_BOT_TOKEN: {slack_bot} | "
+            f"SLACK_APP_TOKEN: {slack_app} | "
+            f"SLACK_CHANNEL_ID: {slack_channel}[/dim]"
+        )
+
+        # Configure logging for daemon mode
+        log_dir = os.path.expanduser("~/.atom/overlord")
+        os.makedirs(log_dir, exist_ok=True)
+        log_file = os.path.join(log_dir, "daemon.log")
+        log_level = os.environ.get("LOG_LEVEL", "INFO")
+        configure_logging(level=log_level, log_file=log_file)
+        console.print(f"[dim]Logging to {log_file} (level={log_level})[/dim]")
+
+        registry = _load_registry_or_exit()
+        if registry is None:
+            return
 
         console.print("[bold cyan]Starting Overlord daemon...[/bold cyan]")
 
@@ -878,21 +1023,18 @@ def daemon(
                 )
             console.print(table)
         else:
-            console.print("[dim]Using default schedule[/dim]")
+            console.print(
+                "[dim]No scheduled tasks configured — scheduler will idle[/dim]"
+            )
 
         d = OverlordDaemon(registry)
         try:
             asyncio.run(d.run())
         except KeyboardInterrupt:
             console.print("\n[yellow]Daemon stopped.[/yellow]")
-
-    elif action == "status":
-        console.print("[dim]Daemon status check not yet implemented.[/dim]")
-        console.print("Use 'overlord daemon start' to launch the daemon.")
-
     else:
         console.print(f"[red]Unknown daemon action: {action}[/red]")
-        console.print("Valid actions: start, status")
+        console.print("Valid actions: start, status, stop, restart")
 
 
 def _render_scope(scope: ActionScope, verdict: ScopeVerdict, autonomy: str) -> None:

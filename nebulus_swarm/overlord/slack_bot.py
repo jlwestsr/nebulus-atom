@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import re
 from typing import Awaitable, Callable, Optional, Union
 
 from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
@@ -37,7 +38,7 @@ class SlackBot:
             app_token: Slack app-level token for Socket Mode (xapp-...).
             channel_id: Channel ID to monitor and post to.
             message_handler: Callback for processing messages (sync or async).
-                            Takes (user_id, message_text, channel_id) and returns response.
+                            Takes (message_text, user_id, channel_id) and returns response.
             thread_reply_handler: Callback for thread replies.
                                  Takes (thread_ts, reply_text).
         """
@@ -73,6 +74,10 @@ class SlackBot:
             if not text:
                 return
 
+            # Skip messages with bot mentions — handle_mention handles those
+            if re.search(r"<@[A-Z0-9]+>", text):
+                return
+
             # Check if this is a thread reply (has thread_ts different from ts)
             thread_ts = event.get("thread_ts")
             if thread_ts and thread_ts != event.get("ts"):
@@ -97,9 +102,9 @@ class SlackBot:
                     channel = event.get("channel", "")
                     # Support both sync and async handlers
                     if asyncio.iscoroutinefunction(self.message_handler):
-                        response = await self.message_handler(user, text, channel)
+                        response = await self.message_handler(text, user, channel)
                     else:
-                        response = self.message_handler(user, text, channel)
+                        response = self.message_handler(text, user, channel)
                     if response:
                         await say(response)
                 except Exception as e:
@@ -116,10 +121,12 @@ class SlackBot:
             user = event.get("user", "unknown")
             text = event.get("text", "").strip()
 
-            # Remove the mention from the text
-            # Format is usually "<@BOT_ID> message"
-            if " " in text:
-                text = text.split(" ", 1)[1].strip()
+            # Remove all <@USER_ID> mentions from the text
+            text = re.sub(r"<@[A-Z0-9]+>", "", text).strip()
+
+            if not text:
+                await say("👋 I'm here! Type `help` to see available commands.")
+                return
 
             logger.info(f"Mentioned by {user}: {text}")
 
@@ -128,9 +135,9 @@ class SlackBot:
                     channel = event.get("channel", "")
                     # Support both sync and async handlers
                     if asyncio.iscoroutinefunction(self.message_handler):
-                        response = await self.message_handler(user, text, channel)
+                        response = await self.message_handler(text, user, channel)
                     else:
-                        response = self.message_handler(user, text, channel)
+                        response = self.message_handler(text, user, channel)
                     if response:
                         await say(response)
                 except Exception as e:
@@ -224,6 +231,34 @@ class SlackBot:
             message += f"\n> {details}"
 
         await self.post_message(message)
+
+    async def get_thread_history(self, thread_ts: str) -> list[dict[str, str]]:
+        """Fetch human replies from a Slack thread.
+
+        Args:
+            thread_ts: Thread timestamp to read replies from.
+
+        Returns:
+            List of dicts with 'user', 'text', and 'ts' keys,
+            filtered to human-only messages (no bot replies).
+        """
+        try:
+            response = await self.app.client.conversations_replies(
+                channel=self.channel_id, ts=thread_ts
+            )
+            messages = response.get("messages", [])
+            return [
+                {
+                    "user": msg.get("user", "unknown"),
+                    "text": msg.get("text", ""),
+                    "ts": msg.get("ts", ""),
+                }
+                for msg in messages
+                if not msg.get("bot_id")
+            ]
+        except Exception as e:
+            logger.warning("Failed to fetch thread history for %s: %s", thread_ts, e)
+            return []
 
 
 async def test_connection(bot_token: str, app_token: str) -> bool:

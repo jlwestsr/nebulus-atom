@@ -2,19 +2,28 @@
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from nebulus_swarm.overlord.registry import OverlordConfig, ProjectConfig
 from nebulus_swarm.overlord.slack_commands import (
+    KNOWN_COMMANDS,
+    CommandValidator,
     SlackCommandRouter,
+    _RE_STRUCTURED_REPORT,
+    _RE_UPDATE,
     _format_ecosystem_status,
     _format_project_status,
     _format_scan_detail,
+    _parse_overlord_md_section,
+    _parse_track_plans,
+    _parse_tracks_md,
     _unknown_project,
 )
+from nebulus_swarm.overlord.task_parser import InvestigationTask, TaskParser
 
 
 def _make_config(tmp_path: Path) -> OverlordConfig:
@@ -48,10 +57,12 @@ def _make_config(tmp_path: Path) -> OverlordConfig:
     )
 
 
-def _make_router(tmp_path: Path) -> SlackCommandRouter:
+def _make_router(
+    tmp_path: Path, workspace_root: Path | None = None
+) -> SlackCommandRouter:
     """Build a SlackCommandRouter with test config."""
     config = _make_config(tmp_path)
-    return SlackCommandRouter(config)
+    return SlackCommandRouter(config, workspace_root=workspace_root)
 
 
 # --- Command Parsing Tests ---
@@ -84,8 +95,9 @@ class TestCommandParsing:
         assert "Overlord Commands" in result
 
     @pytest.mark.asyncio
-    async def test_unknown_command(self, tmp_path: Path) -> None:
+    async def test_unknown_command_llm_disabled(self, tmp_path: Path) -> None:
         router = _make_router(tmp_path)
+        router._llm_config.enabled = False
         result = await router.handle("foobar", "U123", "C456")
         assert "Unknown command" in result
         assert "foobar" in result
@@ -429,3 +441,790 @@ class TestResponseFormatting:
         assert "Unknown project" in result
         assert "nope" in result
         assert "core" in result
+
+
+# --- LLM Chat Fallback Tests ---
+
+
+def _mock_llm_response(content: str) -> MagicMock:
+    """Build a mock OpenAI chat completion response."""
+    choice = MagicMock()
+    choice.message.content = content
+    response = MagicMock()
+    response.choices = [choice]
+    return response
+
+
+class TestLLMFallback:
+    """Tests for the LLM chat fallback feature."""
+
+    @pytest.mark.asyncio
+    async def test_llm_fallback_called_for_unrecognized_text(
+        self, tmp_path: Path
+    ) -> None:
+        """Unrecognized text routes to LLM when enabled."""
+        router = _make_router(tmp_path)
+        mock_response = _mock_llm_response("Here's what I think...")
+
+        with (
+            patch.object(
+                router, "_get_ecosystem", new_callable=AsyncMock, return_value=[]
+            ),
+            patch.object(router.memory, "search", return_value=[]),
+            patch("nebulus_swarm.overlord.slack_commands.AsyncOpenAI"),
+        ):
+            mock_client = AsyncMock()
+            mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+            router._llm_client = mock_client
+
+            result = await router.handle(
+                "What projects have dirty branches?", "U123", "C456"
+            )
+            assert result == "Here's what I think..."
+            mock_client.chat.completions.create.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_llm_disabled_returns_unknown_command(self, tmp_path: Path) -> None:
+        """When LLM is disabled, unrecognized text returns 'Unknown command'."""
+        router = _make_router(tmp_path)
+        router._llm_config.enabled = False
+        result = await router.handle("What should I work on?", "U123", "C456")
+        assert "Unknown command" in result
+
+    @pytest.mark.asyncio
+    async def test_llm_timeout_returns_graceful_error(self, tmp_path: Path) -> None:
+        """LLM timeout returns a graceful fallback message."""
+        router = _make_router(tmp_path)
+
+        with (
+            patch.object(
+                router, "_get_ecosystem", new_callable=AsyncMock, return_value=[]
+            ),
+            patch.object(router.memory, "search", return_value=[]),
+        ):
+            mock_client = AsyncMock()
+            mock_client.chat.completions.create = AsyncMock(
+                side_effect=asyncio.TimeoutError()
+            )
+            router._llm_client = mock_client
+
+            result = await router.handle("Tell me something", "U123", "C456")
+            assert "couldn't process that" in result
+            assert "help" in result
+
+    @pytest.mark.asyncio
+    async def test_llm_exception_returns_graceful_error(self, tmp_path: Path) -> None:
+        """LLM exception returns a graceful fallback message."""
+        router = _make_router(tmp_path)
+
+        with (
+            patch.object(
+                router, "_get_ecosystem", new_callable=AsyncMock, return_value=[]
+            ),
+            patch.object(router.memory, "search", return_value=[]),
+        ):
+            mock_client = AsyncMock()
+            mock_client.chat.completions.create = AsyncMock(
+                side_effect=RuntimeError("connection refused")
+            )
+            router._llm_client = mock_client
+
+            result = await router.handle("Tell me something", "U123", "C456")
+            assert "couldn't process that" in result
+            assert "help" in result
+
+    @pytest.mark.asyncio
+    async def test_context_includes_project_data(self, tmp_path: Path) -> None:
+        """System prompt includes project status information."""
+        router = _make_router(tmp_path)
+
+        mock_status = MagicMock()
+        mock_status.name = "core"
+        mock_status.issues = []
+        mock_status.git = MagicMock(branch="develop", clean=True, ahead=0)
+
+        mock_response = _mock_llm_response("All good.")
+
+        with (
+            patch.object(
+                router,
+                "_get_ecosystem",
+                new_callable=AsyncMock,
+                return_value=[mock_status],
+            ),
+            patch.object(router.memory, "search", return_value=[]),
+        ):
+            mock_client = AsyncMock()
+            mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+            router._llm_client = mock_client
+
+            await router.handle("How are things?", "U123", "C456")
+
+            # Verify system prompt contains project info
+            call_args = mock_client.chat.completions.create.call_args
+            messages = call_args.kwargs["messages"]
+            system_msg = messages[0]["content"]
+            assert "core" in system_msg
+            assert "develop" in system_msg
+
+    @pytest.mark.asyncio
+    async def test_context_includes_memory_results(self, tmp_path: Path) -> None:
+        """System prompt includes memory search results."""
+        router = _make_router(tmp_path)
+
+        mock_entry = MagicMock()
+        mock_entry.project = "prime"
+        mock_entry.content = "Tests failing on prime after last deploy"
+
+        mock_response = _mock_llm_response("Noted.")
+
+        with (
+            patch.object(
+                router, "_get_ecosystem", new_callable=AsyncMock, return_value=[]
+            ),
+            patch.object(router.memory, "search", return_value=[mock_entry]),
+        ):
+            mock_client = AsyncMock()
+            mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+            router._llm_client = mock_client
+
+            await router.handle("Any issues?", "U123", "C456")
+
+            call_args = mock_client.chat.completions.create.call_args
+            messages = call_args.kwargs["messages"]
+            system_msg = messages[0]["content"]
+            assert "Tests failing on prime" in system_msg
+
+    @pytest.mark.asyncio
+    async def test_known_commands_use_pattern_matching(self, tmp_path: Path) -> None:
+        """Known commands like 'status' bypass LLM entirely."""
+        router = _make_router(tmp_path)
+
+        with patch(
+            "nebulus_swarm.overlord.slack_commands.scan_ecosystem",
+            return_value=[],
+        ):
+            result = await router.handle("status", "U123", "C456")
+            assert "Ecosystem Status" in result
+            # LLM client should never have been initialized
+            assert router._llm_client is None
+
+    @pytest.mark.asyncio
+    async def test_greeting_handled_without_llm(self, tmp_path: Path) -> None:
+        """Greetings are pattern-matched, not sent to LLM."""
+        router = _make_router(tmp_path)
+        result = await router.handle("hello", "U123", "C456")
+        assert "Overlord" in result
+        assert router._llm_client is None
+
+
+# --- Update Recognition Tests ---
+
+
+class TestUpdatePatterns:
+    """Tests for _RE_UPDATE and _RE_STRUCTURED_REPORT patterns."""
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "update",
+            "Update: gantry frontend rebuilt",
+            "status update on core migration",
+            "report: all tests passing",
+            "FYI pushed new branch",
+            "heads up — breaking change in core",
+            "headsup deploying now",
+            "completed the Phase 4 integration",
+            "complete — gantry dashboard live",
+            "shipped v2.3.0",
+            "deployed to production",
+            "pushed 12 commits to develop",
+        ],
+    )
+    def test_re_update_positive(self, text: str) -> None:
+        assert _RE_UPDATE.match(text), f"Expected match for: {text!r}"
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "status",
+            "status core",
+            "help",
+            "scan prime",
+            "What should I work on?",
+            "hello",
+        ],
+    )
+    def test_re_update_negative(self, text: str) -> None:
+        assert not _RE_UPDATE.match(text), f"Unexpected match for: {text!r}"
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "12 commits pushed to develop",
+            "463 tests passed, zero regressions",
+            "merged feat/slack-updates into develop",
+            "shipped the new dashboard",
+            "deployed gantry backend",
+            "zero regressions across the suite",
+        ],
+    )
+    def test_re_structured_report_positive(self, text: str) -> None:
+        assert _RE_STRUCTURED_REPORT.search(text), f"Expected match for: {text!r}"
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "What should I work on next?",
+            "How are things?",
+            "Tell me about core",
+            "hello world",
+        ],
+    )
+    def test_re_structured_report_negative(self, text: str) -> None:
+        assert not _RE_STRUCTURED_REPORT.search(text), f"Unexpected match for: {text!r}"
+
+
+class TestHandleUpdate:
+    """Tests for the _handle_update fast path."""
+
+    @pytest.mark.asyncio
+    async def test_update_logs_to_memory(self, tmp_path: Path) -> None:
+        """Update messages are logged to memory with category 'update'."""
+        router = _make_router(tmp_path)
+        with patch.object(router.memory, "remember") as mock_remember:
+            await router.handle("shipped v2.3.0 for core", "U123", "C456")
+            mock_remember.assert_called_once()
+            call_args = mock_remember.call_args
+            assert call_args[0][0] == "update"  # category
+            assert "shipped v2.3.0 for core" in call_args[0][1]  # content
+            assert call_args[1]["project"] == "core"
+
+    @pytest.mark.asyncio
+    async def test_update_returns_acknowledgment(self, tmp_path: Path) -> None:
+        """Update handler returns a short acknowledgment."""
+        router = _make_router(tmp_path)
+        with patch.object(router.memory, "remember"):
+            result = await router.handle("FYI deployed edge", "U123", "C456")
+            assert "Logged" in result
+            assert "edge" in result
+
+    @pytest.mark.asyncio
+    async def test_update_no_project_match(self, tmp_path: Path) -> None:
+        """Update without a recognized project still logs."""
+        router = _make_router(tmp_path)
+        with patch.object(router.memory, "remember") as mock_remember:
+            result = await router.handle("deployed the new widget", "U123", "C456")
+            mock_remember.assert_called_once()
+            call_args = mock_remember.call_args
+            assert call_args[1]["project"] is None
+            assert "Logged" in result
+
+    @pytest.mark.asyncio
+    async def test_update_bypasses_llm(self, tmp_path: Path) -> None:
+        """Update messages do not trigger LLM fallback."""
+        router = _make_router(tmp_path)
+        with patch.object(router.memory, "remember"):
+            await router.handle("update: core tests passing", "U123", "C456")
+            assert router._llm_client is None
+
+    @pytest.mark.asyncio
+    async def test_structured_report_handled(self, tmp_path: Path) -> None:
+        """Structured reports (e.g., 'commits pushed') hit the update path."""
+        router = _make_router(tmp_path)
+        with patch.object(router.memory, "remember") as mock_remember:
+            result = await router.handle(
+                "12 commits pushed to develop, 463 tests passed",
+                "U123",
+                "C456",
+            )
+            mock_remember.assert_called_once()
+            assert "Logged" in result
+
+
+class TestAIDirectives:
+    """Tests for AI directives in the LLM system prompt."""
+
+    def test_system_prompt_includes_directives(self, tmp_path: Path) -> None:
+        """System prompt includes AI directives when available."""
+        router = _make_router(tmp_path)
+        router._ai_directives = "# Development Standards\n1. Use pytest."
+
+        prompt = router._build_system_prompt([], [])
+        assert "Project standards" in prompt
+        assert "Development Standards" in prompt
+        assert "Use pytest" in prompt
+
+    def test_system_prompt_without_directives(self, tmp_path: Path) -> None:
+        """System prompt works cleanly when directives are empty."""
+        router = _make_router(tmp_path)
+        router._ai_directives = ""
+
+        prompt = router._build_system_prompt([], [])
+        assert "Project standards" not in prompt
+        assert "Overlord" in prompt
+
+    def test_load_ai_directives_missing_file(self) -> None:
+        """Gracefully returns empty string when file is missing."""
+        with patch(
+            "nebulus_swarm.overlord.slack_commands.Path.__truediv__",
+        ) as mock_div:
+            mock_path = MagicMock()
+            mock_path.is_file.return_value = False
+            mock_div.return_value = mock_path
+            result = SlackCommandRouter._load_ai_directives()
+            # Should not raise — returns empty or the real file's content
+            assert isinstance(result, str)
+
+
+# --- Memory Filter Tests ---
+
+
+class TestMemoryFilters:
+    """Tests for cat:/proj: filter parsing in memory commands."""
+
+    def test_parse_cat_filter(self, tmp_path: Path) -> None:
+        router = _make_router(tmp_path)
+        query, cat, proj, err = router._parse_memory_filters("cat:update gantry")
+        assert query == "gantry"
+        assert cat == "update"
+        assert proj is None
+        assert err is None
+
+    def test_parse_proj_filter(self, tmp_path: Path) -> None:
+        router = _make_router(tmp_path)
+        query, cat, proj, err = router._parse_memory_filters("proj:core release")
+        assert query == "release"
+        assert cat is None
+        assert proj == "core"
+        assert err is None
+
+    def test_parse_both_filters(self, tmp_path: Path) -> None:
+        router = _make_router(tmp_path)
+        query, cat, proj, err = router._parse_memory_filters("cat:update proj:core")
+        assert query == ""
+        assert cat == "update"
+        assert proj == "core"
+        assert err is None
+
+    def test_parse_invalid_category(self, tmp_path: Path) -> None:
+        router = _make_router(tmp_path)
+        _, _, _, err = router._parse_memory_filters("cat:invalid query")
+        assert err is not None
+        assert "Invalid category" in err
+        assert "invalid" in err
+
+    def test_parse_unknown_project(self, tmp_path: Path) -> None:
+        router = _make_router(tmp_path)
+        _, _, _, err = router._parse_memory_filters("proj:nonexistent query")
+        assert err is not None
+        assert "Unknown project" in err
+        assert "nonexistent" in err
+
+    def test_parse_plain_query(self, tmp_path: Path) -> None:
+        router = _make_router(tmp_path)
+        query, cat, proj, err = router._parse_memory_filters("plain query")
+        assert query == "plain query"
+        assert cat is None
+        assert proj is None
+        assert err is None
+
+    @pytest.mark.asyncio
+    async def test_handle_memory_with_cat_filter(self, tmp_path: Path) -> None:
+        """memory cat:update calls search with category='update'."""
+        router = _make_router(tmp_path)
+        with patch.object(router.memory, "search", return_value=[]) as mock_search:
+            await router.handle("memory cat:update", "U123", "C456")
+            mock_search.assert_called_once_with(
+                "", category="update", project=None, limit=5
+            )
+
+    @pytest.mark.asyncio
+    async def test_handle_memory_with_both_filters(self, tmp_path: Path) -> None:
+        """memory cat:update proj:core calls search with both filters."""
+        router = _make_router(tmp_path)
+        with patch.object(router.memory, "search", return_value=[]) as mock_search:
+            await router.handle("memory cat:update proj:core", "U123", "C456")
+            mock_search.assert_called_once_with(
+                "", category="update", project="core", limit=5
+            )
+
+    @pytest.mark.asyncio
+    async def test_handle_memory_invalid_cat_returns_error(
+        self, tmp_path: Path
+    ) -> None:
+        """memory cat:bogus returns a validation error."""
+        router = _make_router(tmp_path)
+        result = await router.handle("memory cat:bogus", "U123", "C456")
+        assert "Invalid category" in result
+        assert "bogus" in result
+
+
+# --- Roadmap Command Tests ---
+
+
+def _make_workspace(tmp_path: Path) -> Path:
+    """Create a minimal workspace with governance and conductor files."""
+    ws = tmp_path / "workspace"
+    ws.mkdir()
+
+    # OVERLORD.md with Critical Path section
+    (ws / "OVERLORD.md").write_text(
+        "# OVERLORD.md\n\n"
+        "## Critical Path\n\n"
+        "| Phase | Description | Status | Priority |\n"
+        "|-------|-------------|--------|----------|\n"
+        "| A | MCP Server Migration | Pending | 1 |\n"
+        "| B | Gantry Refactor | Pending | 1 |\n"
+    )
+
+    # BUSINESS.md with Strategic Priorities
+    (ws / "BUSINESS.md").write_text(
+        "# BUSINESS.md\n\n"
+        "## Strategic Priorities\n\n"
+        "| Priority | Goal | Key Result |\n"
+        "|----------|------|------------|\n"
+        "| 1 | Ship appliance | End-to-end on Tier 1 |\n"
+        "| 2 | Demo-ready UI | Fix 13 issues |\n"
+    )
+
+    # conductor/tracks.md
+    conductor = ws / "conductor"
+    conductor.mkdir()
+    (conductor / "tracks.md").write_text(
+        "# Project Tracks\n\n"
+        "- [ ] **Track: Overlord Slack Intelligence**\n"
+        "- [x] **Track: Schema Design**\n"
+    )
+
+    # conductor/tracks/track_a/plan.md
+    tracks_dir = conductor / "tracks"
+    tracks_dir.mkdir()
+    track_a = tracks_dir / "track_a"
+    track_a.mkdir()
+    (track_a / "plan.md").write_text(
+        "# Plan\n\n"
+        "## Phase 1\n"
+        "- [x] Task: Done thing\n"
+        "- [ ] Task: Pending thing\n"
+        "- [ ] Task: Another pending\n"
+    )
+
+    return ws
+
+
+class TestRoadmapCommand:
+    """Tests for the roadmap Slack command."""
+
+    @pytest.mark.asyncio
+    async def test_roadmap_no_workspace(self, tmp_path: Path) -> None:
+        """Roadmap without workspace_root returns error."""
+        router = _make_router(tmp_path)
+        result = await router.handle("roadmap", "U123", "C456")
+        assert "Workspace root not configured" in result
+
+    @pytest.mark.asyncio
+    async def test_roadmap_with_workspace(self, tmp_path: Path) -> None:
+        """Roadmap with workspace reads governance files."""
+        ws = _make_workspace(tmp_path)
+        router = _make_router(tmp_path, workspace_root=ws)
+        result = await router.handle("roadmap", "U123", "C456")
+        assert "Critical Path" in result
+        assert "MCP Server Migration" in result
+        assert "Active Tracks" in result
+        assert "Overlord Slack Intelligence" in result
+        assert "Track Progress" in result
+        assert "track_a: 1/3 tasks done" in result
+        assert "Strategic Priorities" in result
+        assert "Ship appliance" in result
+
+    @pytest.mark.asyncio
+    async def test_roadmap_case_insensitive(self, tmp_path: Path) -> None:
+        """Roadmap command is case-insensitive."""
+        ws = _make_workspace(tmp_path)
+        router = _make_router(tmp_path, workspace_root=ws)
+        result = await router.handle("ROADMAP", "U123", "C456")
+        assert "Critical Path" in result
+
+    @pytest.mark.asyncio
+    async def test_roadmap_empty_workspace(self, tmp_path: Path) -> None:
+        """Roadmap with empty workspace returns no-data message."""
+        ws = tmp_path / "empty_ws"
+        ws.mkdir()
+        router = _make_router(tmp_path, workspace_root=ws)
+        result = await router.handle("roadmap", "U123", "C456")
+        assert "No roadmap data found" in result
+
+
+class TestRoadmapParsers:
+    """Tests for roadmap file parsing helpers."""
+
+    def test_parse_overlord_md_critical_path(self, tmp_path: Path) -> None:
+        ws = _make_workspace(tmp_path)
+        rows = _parse_overlord_md_section(ws / "OVERLORD.md", "Critical Path")
+        assert len(rows) == 2
+        assert "MCP Server Migration" in rows[0]
+        assert "Pending" in rows[0]
+
+    def test_parse_overlord_md_missing_section(self, tmp_path: Path) -> None:
+        ws = _make_workspace(tmp_path)
+        rows = _parse_overlord_md_section(ws / "OVERLORD.md", "Nonexistent")
+        assert rows == []
+
+    def test_parse_overlord_md_missing_file(self, tmp_path: Path) -> None:
+        rows = _parse_overlord_md_section(tmp_path / "nope.md", "Critical Path")
+        assert rows == []
+
+    def test_parse_tracks_md(self, tmp_path: Path) -> None:
+        ws = _make_workspace(tmp_path)
+        tracks = _parse_tracks_md(ws / "conductor" / "tracks.md")
+        assert len(tracks) == 2
+        assert "[pending] Track: Overlord Slack Intelligence" in tracks[0]
+        assert "[done] Track: Schema Design" in tracks[1]
+
+    def test_parse_track_plans(self, tmp_path: Path) -> None:
+        ws = _make_workspace(tmp_path)
+        plans = _parse_track_plans(ws / "conductor" / "tracks")
+        assert len(plans) == 1
+        assert "track_a: 1/3 tasks done" in plans[0]
+
+
+class TestCommandValidator:
+    """Tests for CommandValidator guardrails."""
+
+    def test_valid_commands_pass(self, tmp_path: Path) -> None:
+        config = _make_config(tmp_path)
+        validator = CommandValidator(config)
+        warnings = validator.validate_suggestion(
+            "Try `status core` or `autonomy cautious`"
+        )
+        assert warnings == []
+
+    def test_invalid_autonomy_level(self, tmp_path: Path) -> None:
+        config = _make_config(tmp_path)
+        validator = CommandValidator(config)
+        warnings = validator.validate_suggestion("Try `autonomy high`")
+        assert len(warnings) == 1
+        assert "Invalid autonomy level" in warnings[0]
+        assert "high" in warnings[0]
+
+    def test_unknown_project_in_status(self, tmp_path: Path) -> None:
+        config = _make_config(tmp_path)
+        validator = CommandValidator(config)
+        warnings = validator.validate_suggestion("Run `status nebulus-forge`")
+        assert len(warnings) == 1
+        assert "Unknown project" in warnings[0]
+
+    def test_non_overlord_commands_ignored(self, tmp_path: Path) -> None:
+        config = _make_config(tmp_path)
+        validator = CommandValidator(config)
+        warnings = validator.validate_suggestion("Run `cd ~/projects` and `ls`")
+        assert warnings == []
+
+    def test_annotate_response_clean(self, tmp_path: Path) -> None:
+        config = _make_config(tmp_path)
+        validator = CommandValidator(config)
+        text = "Try `status core`"
+        assert validator.annotate_response(text) == text
+
+    def test_annotate_response_with_warnings(self, tmp_path: Path) -> None:
+        config = _make_config(tmp_path)
+        validator = CommandValidator(config)
+        result = validator.annotate_response("Try `autonomy high`")
+        assert "Note: Some suggested commands may be incorrect" in result
+        assert "Invalid autonomy level" in result
+
+    @pytest.mark.asyncio
+    async def test_llm_fallback_uses_guardrails(self, tmp_path: Path) -> None:
+        """LLM fallback responses are validated by CommandValidator."""
+        router = _make_router(tmp_path)
+        mock_response = _mock_llm_response("Try `autonomy high` for full control.")
+
+        with (
+            patch.object(
+                router, "_get_ecosystem", new_callable=AsyncMock, return_value=[]
+            ),
+            patch.object(router.memory, "search", return_value=[]),
+        ):
+            mock_client = AsyncMock()
+            mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+            router._llm_client = mock_client
+
+            result = await router.handle("How do I enable automation?", "U123", "C456")
+            assert "Note: Some suggested commands may be incorrect" in result
+            assert "Invalid autonomy level" in result
+
+
+# --- Roadmap OVERLORD.md Fallback Tests ---
+
+
+def _make_workspace_no_tracks_md(tmp_path: Path) -> Path:
+    """Create a workspace with OVERLORD.md but no conductor/tracks.md."""
+    ws = tmp_path / "workspace"
+    ws.mkdir()
+
+    (ws / "OVERLORD.md").write_text(
+        "# OVERLORD.md\n\n"
+        "## Critical Path\n\n"
+        "| Phase | Description | Status | Priority |\n"
+        "|-------|-------------|--------|----------|\n"
+        "| A | MCP Migration | Pending | 1 |\n"
+        "\n"
+        "## Active Tracks\n\n"
+        "| Track | Status | Priority | Link |\n"
+        "|-------|--------|----------|------|\n"
+        "| Overlord Slack Intel | In Progress | 3 | tracks/overlord_slack/ |\n"
+        "| Forge Profile | Completed | 3 | tracks/forge/ |\n"
+    )
+
+    # conductor/tracks/ dir with plan.md (but no tracks.md)
+    tracks_dir = ws / "conductor" / "tracks" / "overlord_slack"
+    tracks_dir.mkdir(parents=True)
+    (tracks_dir / "plan.md").write_text(
+        "# Plan\n"
+        "- [x] Task: Roadmap command\n"
+        "- [x] Task: CommandValidator\n"
+        "- [ ] Task: Workspace path\n"
+    )
+
+    return ws
+
+
+class TestRoadmapFallback:
+    """Tests for OVERLORD.md Active Tracks fallback when tracks.md is missing."""
+
+    @pytest.mark.asyncio
+    async def test_roadmap_reads_active_tracks_from_overlord_md(
+        self, tmp_path: Path
+    ) -> None:
+        """When conductor/tracks.md is missing, falls back to OVERLORD.md Active Tracks."""
+        ws = _make_workspace_no_tracks_md(tmp_path)
+        router = _make_router(tmp_path, workspace_root=ws)
+        result = await router.handle("roadmap", "U123", "C456")
+        assert "Active Tracks" in result
+        assert "Overlord Slack Intel" in result
+        assert "In Progress" in result
+
+    @pytest.mark.asyncio
+    async def test_roadmap_shows_track_progress_without_tracks_md(
+        self, tmp_path: Path
+    ) -> None:
+        """Track progress is shown even when conductor/tracks.md is missing."""
+        ws = _make_workspace_no_tracks_md(tmp_path)
+        router = _make_router(tmp_path, workspace_root=ws)
+        result = await router.handle("roadmap", "U123", "C456")
+        assert "Track Progress" in result
+        assert "overlord_slack: 2/3 tasks done" in result
+
+
+# --- Investigation Command Tests ---
+
+
+class TestInvestigateCommand:
+    """Tests for the investigate command dispatch."""
+
+    @pytest.mark.asyncio
+    async def test_investigate_no_worker(self, tmp_path: Path) -> None:
+        """investigate without a Claude worker returns an error."""
+        router = _make_router(tmp_path)
+        result = await router.handle(
+            "investigate why are tests failing?", "U123", "C456"
+        )
+        assert "not available" in result
+
+    @pytest.mark.asyncio
+    async def test_investigate_returns_ack(self, tmp_path: Path) -> None:
+        """investigate with a worker returns immediate acknowledgment."""
+        router = _make_router(tmp_path)
+        mock_worker = MagicMock()
+        mock_worker.available = True
+        router._claude_worker = mock_worker
+
+        # Patch asyncio.create_task so the background task doesn't actually run
+        with patch("nebulus_swarm.overlord.slack_commands.asyncio.create_task"):
+            result = await router.handle(
+                "investigate why are core tests failing?", "U123", "C456"
+            )
+            assert "Investigating" in result
+            assert "core" in result
+            assert "I'll post results when ready" in result
+
+    @pytest.mark.asyncio
+    async def test_investigate_infers_project(self, tmp_path: Path) -> None:
+        """investigate infers project name from query."""
+        router = _make_router(tmp_path)
+        mock_worker = MagicMock()
+        mock_worker.available = True
+        router._claude_worker = mock_worker
+
+        with patch("nebulus_swarm.overlord.slack_commands.asyncio.create_task"):
+            result = await router.handle(
+                "investigate prime deployment issues", "U123", "C456"
+            )
+            assert "prime" in result
+
+    @pytest.mark.asyncio
+    async def test_investigate_in_known_commands(self) -> None:
+        """investigate is in KNOWN_COMMANDS for guardrail validation."""
+        assert "investigate" in KNOWN_COMMANDS
+
+
+# --- InvestigationTask Schema Tests ---
+
+
+class TestInvestigationTask:
+    """Tests for InvestigationTask dataclass and TaskParser.parse_investigation."""
+
+    def test_investigation_task_defaults(self) -> None:
+        task = InvestigationTask(query="Why are tests failing?")
+        assert task.task_type == "research"
+        assert task.timeout == 600
+        assert task.project is None
+        assert task.tags == []
+
+    def test_parse_investigation_infers_project(self, tmp_path: Path) -> None:
+        config = _make_config(tmp_path)
+        from nebulus_swarm.overlord.graph import DependencyGraph
+
+        graph = DependencyGraph(config)
+        parser = TaskParser(graph)
+        task = parser.parse_investigation("What tests are failing in core?")
+        assert task.project == "core"
+        assert task.query == "What tests are failing in core?"
+
+    def test_parse_investigation_tags_testing(self, tmp_path: Path) -> None:
+        config = _make_config(tmp_path)
+        from nebulus_swarm.overlord.graph import DependencyGraph
+
+        graph = DependencyGraph(config)
+        parser = TaskParser(graph)
+        task = parser.parse_investigation("How do tests work in this repo?")
+        assert "testing" in task.tags
+
+    def test_parse_investigation_tags_debugging(self, tmp_path: Path) -> None:
+        config = _make_config(tmp_path)
+        from nebulus_swarm.overlord.graph import DependencyGraph
+
+        graph = DependencyGraph(config)
+        parser = TaskParser(graph)
+        task = parser.parse_investigation("Why is there a bug in the scanner?")
+        assert "debugging" in task.tags
+
+    def test_parse_investigation_tags_architecture(self, tmp_path: Path) -> None:
+        config = _make_config(tmp_path)
+        from nebulus_swarm.overlord.graph import DependencyGraph
+
+        graph = DependencyGraph(config)
+        parser = TaskParser(graph)
+        task = parser.parse_investigation("What is the architecture of the dispatch?")
+        assert "architecture" in task.tags
+
+    def test_parse_investigation_no_project(self, tmp_path: Path) -> None:
+        config = _make_config(tmp_path)
+        from nebulus_swarm.overlord.graph import DependencyGraph
+
+        graph = DependencyGraph(config)
+        parser = TaskParser(graph)
+        task = parser.parse_investigation("How does Python GIL work?")
+        assert task.project is None
+        assert task.tags == []

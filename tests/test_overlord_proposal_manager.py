@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -16,6 +16,7 @@ from nebulus_swarm.overlord.proposal_manager import (
     ProposalStore,
     _format_proposal_message,
 )
+from nebulus_swarm.overlord.slack_bot import SlackBot
 
 
 # --- Store Tests ---
@@ -483,3 +484,166 @@ class TestProposalDataclass:
             state=ProposalState.APPROVED,
         )
         assert p.is_pending is False
+
+
+# --- Reconciliation Tests ---
+
+
+class TestProposalReconciliation:
+    """Tests for reconciling pending proposals after daemon restart."""
+
+    def _make_manager_with_slack(
+        self, tmp_path: Path
+    ) -> tuple[ProposalManager, MagicMock]:
+        store = ProposalStore(str(tmp_path / "proposals.db"))
+        dispatch = MagicMock()
+        mock_bot = MagicMock(spec=SlackBot)
+        mock_bot.get_thread_history = AsyncMock(return_value=[])
+        mock_bot.post_message = AsyncMock()
+        mgr = ProposalManager(store=store, dispatch=dispatch, slack_bot=mock_bot)
+        return mgr, mock_bot
+
+    def _make_pending_proposal(
+        self, pid: str, thread_ts: str = "1234.5678"
+    ) -> Proposal:
+        return Proposal(
+            id=pid,
+            task=f"task-{pid}",
+            scope_projects=["core"],
+            scope_impact="low",
+            affects_remote=False,
+            reason="test",
+            state=ProposalState.PENDING,
+            thread_ts=thread_ts,
+            created_at="2026-02-09T00:00:00+00:00",
+        )
+
+    @pytest.mark.asyncio
+    async def test_reconcile_approves_from_thread(self, tmp_path: Path) -> None:
+        mgr, mock_bot = self._make_manager_with_slack(tmp_path)
+        p = self._make_pending_proposal("rec1")
+        mgr.store.save(p)
+
+        mock_bot.get_thread_history.return_value = [
+            {"user": "U123", "text": "approve", "ts": "1234.6000"},
+        ]
+
+        result = await mgr.reconcile_pending_proposals()
+        assert result["approved"] == 1
+        assert mgr.store.get("rec1").state == ProposalState.APPROVED
+        mock_bot.post_message.assert_called_once()
+        call_text = mock_bot.post_message.call_args[0][0]
+        assert "Approved while daemon was offline" in call_text
+
+    @pytest.mark.asyncio
+    async def test_reconcile_denies_from_thread(self, tmp_path: Path) -> None:
+        mgr, mock_bot = self._make_manager_with_slack(tmp_path)
+        p = self._make_pending_proposal("rec2")
+        mgr.store.save(p)
+
+        mock_bot.get_thread_history.return_value = [
+            {"user": "U123", "text": "deny", "ts": "1234.6000"},
+        ]
+
+        result = await mgr.reconcile_pending_proposals()
+        assert result["denied"] == 1
+        assert mgr.store.get("rec2").state == ProposalState.DENIED
+
+    @pytest.mark.asyncio
+    async def test_reconcile_latest_reply_wins(self, tmp_path: Path) -> None:
+        mgr, mock_bot = self._make_manager_with_slack(tmp_path)
+        p = self._make_pending_proposal("rec3")
+        mgr.store.save(p)
+
+        mock_bot.get_thread_history.return_value = [
+            {"user": "U123", "text": "approve", "ts": "1234.6000"},
+            {"user": "U123", "text": "deny", "ts": "1234.7000"},
+        ]
+
+        result = await mgr.reconcile_pending_proposals()
+        assert result["denied"] == 1
+        assert result["approved"] == 0
+        assert mgr.store.get("rec3").state == ProposalState.DENIED
+
+    @pytest.mark.asyncio
+    async def test_reconcile_no_matching_replies(self, tmp_path: Path) -> None:
+        mgr, mock_bot = self._make_manager_with_slack(tmp_path)
+        p = self._make_pending_proposal("rec4")
+        mgr.store.save(p)
+
+        mock_bot.get_thread_history.return_value = [
+            {"user": "U123", "text": "what is this about?", "ts": "1234.6000"},
+        ]
+
+        result = await mgr.reconcile_pending_proposals()
+        assert result["skipped"] == 1
+        assert mgr.store.get("rec4").state == ProposalState.PENDING
+
+    @pytest.mark.asyncio
+    async def test_reconcile_skips_without_slack(self, tmp_path: Path) -> None:
+        store = ProposalStore(str(tmp_path / "proposals.db"))
+        dispatch = MagicMock()
+        mgr = ProposalManager(store=store, dispatch=dispatch, slack_bot=None)
+
+        result = await mgr.reconcile_pending_proposals()
+        assert result == {"scanned": 0, "approved": 0, "denied": 0, "skipped": 0}
+
+    @pytest.mark.asyncio
+    async def test_reconcile_skips_no_thread_ts(self, tmp_path: Path) -> None:
+        mgr, mock_bot = self._make_manager_with_slack(tmp_path)
+        # Proposal without thread_ts
+        p = Proposal(
+            id="rec5",
+            task="task-rec5",
+            scope_projects=["core"],
+            scope_impact="low",
+            affects_remote=False,
+            reason="test",
+            state=ProposalState.PENDING,
+            thread_ts=None,
+            created_at="2026-02-09T00:00:00+00:00",
+        )
+        mgr.store.save(p)
+
+        result = await mgr.reconcile_pending_proposals()
+        assert result["scanned"] == 0
+        assert mgr.store.get("rec5").state == ProposalState.PENDING
+
+    @pytest.mark.asyncio
+    async def test_reconcile_batching(self, tmp_path: Path) -> None:
+        mgr, mock_bot = self._make_manager_with_slack(tmp_path)
+
+        # Create 12 pending proposals with thread_ts
+        for i in range(12):
+            p = self._make_pending_proposal(f"batch{i}", f"thread.{i}")
+            mgr.store.save(p)
+
+        with patch(
+            "nebulus_swarm.overlord.proposal_manager.asyncio.sleep"
+        ) as mock_sleep:
+            mock_sleep.return_value = None
+            result = await mgr.reconcile_pending_proposals(batch_size=5)
+            # Batches: [0-4], [5-9], [10-11] → sleep called at index 5 and 10
+            assert mock_sleep.call_count == 2
+            assert result["scanned"] == 12
+
+    @pytest.mark.asyncio
+    async def test_reconcile_api_error_continues(self, tmp_path: Path) -> None:
+        mgr, mock_bot = self._make_manager_with_slack(tmp_path)
+
+        p1 = self._make_pending_proposal("err1", "thread.err1")
+        p2 = self._make_pending_proposal("ok1", "thread.ok1")
+        mgr.store.save(p1)
+        mgr.store.save(p2)
+
+        # First call raises, second returns approve
+        mock_bot.get_thread_history.side_effect = [
+            RuntimeError("API error"),
+            [{"user": "U123", "text": "approve", "ts": "1234.6000"}],
+        ]
+
+        result = await mgr.reconcile_pending_proposals()
+        assert result["skipped"] == 1
+        assert result["approved"] == 1
+        assert mgr.store.get("err1").state == ProposalState.PENDING
+        assert mgr.store.get("ok1").state == ProposalState.APPROVED

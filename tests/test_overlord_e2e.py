@@ -119,7 +119,7 @@ class TestCautiousMode:
         )
         plan = DispatchPlan(
             task="run tests",
-            steps=[DispatchStep(id="s1", action="test", project="core")],
+            steps=[DispatchStep(id="s1", action="verify setup", project="core")],
             scope=scope,
             estimated_duration=300,
             requires_approval=True,
@@ -137,7 +137,7 @@ class TestCautiousMode:
         scope = ActionScope(projects=["core"], estimated_impact="low")
         plan = DispatchPlan(
             task="run tests",
-            steps=[DispatchStep(id="s1", action="test", project="core")],
+            steps=[DispatchStep(id="s1", action="verify setup", project="core")],
             scope=scope,
             estimated_duration=300,
             requires_approval=True,
@@ -164,7 +164,7 @@ class TestProactiveMode:
         )
         plan = DispatchPlan(
             task="run tests",
-            steps=[DispatchStep(id="s1", action="test", project="core")],
+            steps=[DispatchStep(id="s1", action="verify setup", project="core")],
             scope=scope,
             estimated_duration=300,
             requires_approval=True,
@@ -234,7 +234,7 @@ class TestScheduledMode:
         scope = ActionScope(projects=["core"], estimated_impact="low")
         plan = DispatchPlan(
             task="run tests",
-            steps=[DispatchStep(id="s1", action="run tests", project="core")],
+            steps=[DispatchStep(id="s1", action="verify tests", project="core")],
             scope=scope,
             estimated_duration=300,
             requires_approval=True,

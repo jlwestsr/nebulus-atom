@@ -3,13 +3,30 @@
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Optional
 
 from nebulus_swarm.overlord.action_scope import ActionScope, scope_for_merge
 from nebulus_swarm.overlord.dispatch import DispatchPlan, DispatchStep
 
 if TYPE_CHECKING:
     from nebulus_swarm.overlord.graph import DependencyGraph
+
+
+@dataclass
+class InvestigationTask:
+    """A freeform natural language research task for delegation.
+
+    Investigation tasks are dispatched to the Claude worker for
+    research rather than direct execution. They are read-only
+    and never affect remote state.
+    """
+
+    query: str
+    project: Optional[str] = None
+    task_type: str = "research"
+    timeout: int = 600
+    tags: list[str] = field(default_factory=list)
 
 
 class TaskParser:
@@ -52,6 +69,44 @@ class TaskParser:
 
         # Fallback: generic single-step plan
         return self._parse_generic(task_clean)
+
+    def parse_investigation(self, query: str) -> InvestigationTask:
+        """Parse a freeform query into an InvestigationTask.
+
+        Args:
+            query: Natural language research question.
+
+        Returns:
+            InvestigationTask ready for worker dispatch.
+        """
+        query_clean = query.strip()
+
+        # Infer project from query text
+        project: Optional[str] = None
+        query_lower = query_clean.lower()
+        for name in self.graph.config.projects:
+            if name.lower() in query_lower:
+                project = name
+                break
+
+        # Infer tags from content
+        tags: list[str] = []
+        if re.search(r"\b(test|tests|testing)\b", query_clean, re.IGNORECASE):
+            tags.append("testing")
+        if re.search(r"\b(bug|error|fail|broken)\b", query_clean, re.IGNORECASE):
+            tags.append("debugging")
+        if re.search(r"\b(architecture|design|pattern)\b", query_clean, re.IGNORECASE):
+            tags.append("architecture")
+        if re.search(
+            r"\b(perf|performance|slow|optimize)\b", query_clean, re.IGNORECASE
+        ):
+            tags.append("performance")
+
+        return InvestigationTask(
+            query=query_clean,
+            project=project,
+            tags=tags,
+        )
 
     def _parse_merge(self, task: str) -> DispatchPlan | None:
         """Parse merge tasks.

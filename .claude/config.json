@@ -1,0 +1,71 @@
+{
+  "project": "nebulus-atom",
+  "description": "Autonomous AI engineer CLI — Swarm multi-agent orchestration, GitHub issue processing",
+  "mcpServers": {
+    "pyright-lsp": {
+      "disabled": false,
+      "priority": "high",
+      "reason": "Type checking for multi-agent code"
+    },
+    "serena": {
+      "disabled": false,
+      "priority": "high",
+      "reason": "Navigate complex multi-agent codebase"
+    },
+    "context7": {
+      "disabled": false,
+      "priority": "high",
+      "reason": "Docs for OpenAI Swarm, mcp, streamlit, textual, PyGithub"
+    },
+    "superpowers": {
+      "disabled": false,
+      "priority": "high",
+      "reason": "Debug multi-agent workflows and orchestration"
+    },
+    "pr-review-toolkit": {
+      "disabled": false,
+      "priority": "medium",
+      "reason": "Code quality checks"
+    },
+    "commit-commands": {
+      "disabled": false,
+      "priority": "medium",
+      "reason": "Git workflow automation"
+    },
+    "feature-dev": {
+      "disabled": false,
+      "priority": "high",
+      "reason": "Complex feature development for agent workflows"
+    },
+    "github": {
+      "disabled": false,
+      "priority": "high",
+      "reason": "GitHub issue integration and automation"
+    },
+    "playwright": {
+      "disabled": false,
+      "priority": "low",
+      "reason": "Textual UI testing (future capability)"
+    },
+    "typescript-lsp": {
+      "disabled": true,
+      "reason": "No TypeScript"
+    },
+    "supabase": {
+      "disabled": true,
+      "reason": "Not using Supabase"
+    },
+    "ralph-loop": {
+      "disabled": true,
+      "reason": "No automation loops"
+    }
+  },
+  "projectSettings": {
+    "language": "Python",
+    "version": "3.12",
+    "type": "multi-agent-cli",
+    "architecture": "Swarm orchestration",
+    "lsp": "pyright",
+    "testFramework": "pytest"
+  }
+}

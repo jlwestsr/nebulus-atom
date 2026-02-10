@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 from nebulus_swarm.overlord.action_scope import ActionScope
 from nebulus_swarm.overlord.autonomy import AutonomyEngine
@@ -37,6 +38,7 @@ def _make_config(tmp_path: Path) -> OverlordConfig:
                 "tier": "local",
             }
         },
+        workers={},
     )
 
 
@@ -164,11 +166,11 @@ class TestTopologicalOrder:
 class TestExecuteStep:
     """Tests for single step execution."""
 
-    def test_execute_direct_step(self, tmp_path: Path) -> None:
+    def test_execute_direct_step_unmapped(self, tmp_path: Path) -> None:
         config = _make_config(tmp_path)
         engine = _make_engine(config)
         step = DispatchStep(
-            id="s1", action="test action", project="core", model_tier=None
+            id="s1", action="custom unmapped action", project="core", model_tier=None
         )
         result = engine._execute_step(step)
         assert result.step_id == "s1"
@@ -195,8 +197,10 @@ class TestExecutePlan:
         engine = _make_engine(config)
         scope = ActionScope(projects=["core"], estimated_impact="low")
         plan = DispatchPlan(
-            task="test",
-            steps=[DispatchStep(id="s1", action="test", project="core")],
+            task="custom task",
+            steps=[
+                DispatchStep(id="s1", action="custom unmapped action", project="core")
+            ],
             scope=scope,
             estimated_duration=300,
             requires_approval=False,
@@ -325,6 +329,134 @@ class TestInferTaskType:
         config = _make_config(tmp_path)
         engine = _make_engine(config)
         assert engine._infer_task_type("unknown action") == "feature"
+
+
+class TestActionToCommand:
+    """Tests for _action_to_command static method."""
+
+    def test_maps_run_tests(self, tmp_path: Path) -> None:
+        config = _make_config(tmp_path)
+        engine = _make_engine(config)
+        assert engine._action_to_command("run tests") == "pytest -v"
+
+    def test_maps_run_test_singular(self, tmp_path: Path) -> None:
+        config = _make_config(tmp_path)
+        engine = _make_engine(config)
+        assert engine._action_to_command("run test suite") == "pytest -v"
+
+    def test_maps_lint(self, tmp_path: Path) -> None:
+        config = _make_config(tmp_path)
+        engine = _make_engine(config)
+        assert engine._action_to_command("lint") == "ruff check ."
+
+    def test_maps_format_code(self, tmp_path: Path) -> None:
+        config = _make_config(tmp_path)
+        engine = _make_engine(config)
+        assert engine._action_to_command("format code") == "ruff format ."
+
+    def test_bare_test_does_not_match(self, tmp_path: Path) -> None:
+        config = _make_config(tmp_path)
+        engine = _make_engine(config)
+        assert engine._action_to_command("test") is None
+
+    def test_validate_tests_does_not_match(self, tmp_path: Path) -> None:
+        config = _make_config(tmp_path)
+        engine = _make_engine(config)
+        assert engine._action_to_command("validate tests") is None
+
+    def test_maps_merge_to(self, tmp_path: Path) -> None:
+        config = _make_config(tmp_path)
+        engine = _make_engine(config)
+        cmd = engine._action_to_command("merge develop to main")
+        assert cmd == "git checkout main && git merge --no-ff develop"
+
+    def test_maps_merge_into(self, tmp_path: Path) -> None:
+        config = _make_config(tmp_path)
+        engine = _make_engine(config)
+        cmd = engine._action_to_command("merge feature/x into develop")
+        assert cmd == "git checkout develop && git merge --no-ff feature/x"
+
+    def test_maps_checkout(self, tmp_path: Path) -> None:
+        config = _make_config(tmp_path)
+        engine = _make_engine(config)
+        assert engine._action_to_command("checkout develop") == "git checkout develop"
+
+    def test_returns_none_for_unknown(self, tmp_path: Path) -> None:
+        config = _make_config(tmp_path)
+        engine = _make_engine(config)
+        assert engine._action_to_command("do something custom") is None
+
+
+class TestExecuteDirectMapped:
+    """Tests for _execute_direct with mapped commands."""
+
+    def test_execute_mapped_command_success(self, tmp_path: Path) -> None:
+        config = _make_config(tmp_path)
+        # Create pyproject.toml so _can_execute_in passes for pytest
+        (tmp_path / "core" / "pyproject.toml").write_text("[project]\nname='core'\n")
+        engine = _make_engine(config)
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(
+                returncode=0, stdout="all tests passed", stderr=""
+            )
+            step = DispatchStep(
+                id="s1", action="run tests", project="core", model_tier=None
+            )
+            result = engine._execute_direct(step)
+            assert result["success"] is True
+            assert result["output"] == "all tests passed"
+
+    def test_execute_mapped_command_failure(self, tmp_path: Path) -> None:
+        config = _make_config(tmp_path)
+        # Create pyproject.toml so _can_execute_in passes for pytest
+        (tmp_path / "core" / "pyproject.toml").write_text("[project]\nname='core'\n")
+        engine = _make_engine(config)
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(
+                returncode=1, stdout="", stderr="2 tests failed"
+            )
+            step = DispatchStep(
+                id="s1", action="run tests", project="core", model_tier=None
+            )
+            result = engine._execute_direct(step)
+            assert result["success"] is False
+            assert "2 tests failed" in result["error"]
+
+
+class TestWorkerInitialization:
+    """Tests for worker initialization in DispatchEngine."""
+
+    def test_no_workers_config(self, tmp_path: Path) -> None:
+        config = _make_config(tmp_path)
+        engine = _make_engine(config)
+        assert engine.claude_worker is None
+
+    def test_worker_disabled_by_default(self, tmp_path: Path) -> None:
+        config = _make_config(tmp_path)
+        config.workers = {"claude": {"enabled": False}}
+        engine = _make_engine(config)
+        assert engine.claude_worker is None
+
+    def test_worker_enabled_binary_found(self, tmp_path: Path) -> None:
+        config = _make_config(tmp_path)
+        config.workers = {
+            "claude": {
+                "enabled": True,
+                "binary_path": "claude",
+                "default_model": "sonnet",
+            }
+        }
+        with patch("shutil.which", return_value="/usr/bin/claude"):
+            engine = _make_engine(config)
+        assert engine.claude_worker is not None
+
+    def test_worker_enabled_binary_missing(self, tmp_path: Path) -> None:
+        config = _make_config(tmp_path)
+        config.workers = {"claude": {"enabled": True, "binary_path": "nonexistent"}}
+        engine = _make_engine(config)
+        assert engine.claude_worker is None
 
 
 class TestBuildSimplePlan:

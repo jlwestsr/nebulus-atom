@@ -12,6 +12,7 @@ import logging
 import os
 import signal
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
 from croniter import croniter
@@ -37,6 +38,9 @@ logger = logging.getLogger(__name__)
 
 # Default DB path for proposals
 DEFAULT_PROPOSALS_DB = os.path.expanduser("~/.atom/overlord/proposals.db")
+
+# PID file for daemon lifecycle management
+DEFAULT_PID_FILE = os.path.expanduser("~/.atom/overlord/daemon.pid")
 
 
 class OverlordDaemon:
@@ -68,7 +72,9 @@ class OverlordDaemon:
             memory=self.memory,
         )
         self.command_router = SlackCommandRouter(
-            config, proposal_manager=self.proposal_manager
+            config,
+            proposal_manager=self.proposal_manager,
+            workspace_root=config.workspace_root,
         )
         self.detection_engine = DetectionEngine(config, self.graph, self.autonomy)
         notif_config = config.notifications
@@ -86,7 +92,27 @@ class OverlordDaemon:
     async def run(self) -> None:
         """Start the daemon: Slack bot + scheduler loop."""
         self._running = True
-        logger.info("Overlord daemon starting...")
+
+        # Startup banner
+        bot_token = os.environ.get("SLACK_BOT_TOKEN")
+        app_token = os.environ.get("SLACK_APP_TOKEN")
+        channel_id = os.environ.get("SLACK_CHANNEL_ID")
+        project_count = len(self.config.projects)
+        task_count = sum(1 for t in self.schedule.tasks if t.enabled and t.cron)
+        schedule_summary = f"{task_count} task(s)" if task_count else "idle"
+
+        logger.info(
+            "Overlord daemon starting — workspace=%s, projects=%d, "
+            "slack_bot_token=%s, slack_app_token=%s, schedule=%s",
+            self.config.workspace_root or "(not set)",
+            project_count,
+            "set" if bot_token else "MISSING",
+            "set" if app_token else "MISSING",
+            schedule_summary,
+        )
+
+        # Write PID file
+        self._write_pid_file()
 
         # Set up signal handlers
         loop = asyncio.get_running_loop()
@@ -96,10 +122,6 @@ class OverlordDaemon:
         tasks: list[asyncio.Task] = []
 
         # Start Slack bot if tokens are available
-        bot_token = os.environ.get("SLACK_BOT_TOKEN")
-        app_token = os.environ.get("SLACK_APP_TOKEN")
-        channel_id = os.environ.get("SLACK_CHANNEL_ID")
-
         if bot_token and app_token and channel_id:
             self.slack_bot = SlackBot(
                 bot_token=bot_token,
@@ -112,6 +134,19 @@ class OverlordDaemon:
             self.notifications.slack_bot = self.slack_bot
             tasks.append(asyncio.create_task(self._run_slack()))
             logger.info("Slack bot configured for channel %s", channel_id)
+
+            # Wait for Socket Mode to connect before reconciling
+            await asyncio.sleep(2)
+
+            # Reconcile any proposals that were approved/denied while offline
+            reconcile_result = await self.proposal_manager.reconcile_pending_proposals()
+            if reconcile_result["approved"] or reconcile_result["denied"]:
+                logger.info(
+                    "Startup reconciliation: %d approved, %d denied, %d skipped",
+                    reconcile_result["approved"],
+                    reconcile_result["denied"],
+                    reconcile_result["skipped"],
+                )
         else:
             logger.warning("Slack tokens not set — running without Slack integration")
 
@@ -303,8 +338,9 @@ class OverlordDaemon:
             pass
 
     async def shutdown(self) -> None:
-        """Graceful shutdown: stop Slack, close connections."""
+        """Graceful shutdown: stop Slack, close connections, remove PID file."""
         self._running = False
+        self._remove_pid_file()
         if self.slack_bot:
             await self.slack_bot.stop()
         logger.info("Daemon shutdown complete")
@@ -313,6 +349,96 @@ class OverlordDaemon:
         """Handle SIGINT/SIGTERM."""
         logger.info("Received shutdown signal")
         self._shutdown_event.set()
+
+    def _write_pid_file(self) -> None:
+        """Write the current process PID to the PID file."""
+        pid_path = Path(DEFAULT_PID_FILE)
+        pid_path.parent.mkdir(parents=True, exist_ok=True)
+        pid_path.write_text(str(os.getpid()))
+        logger.info("PID file written: %s (pid=%d)", DEFAULT_PID_FILE, os.getpid())
+
+    def _remove_pid_file(self) -> None:
+        """Remove the PID file if it exists."""
+        pid_path = Path(DEFAULT_PID_FILE)
+        if pid_path.exists():
+            pid_path.unlink()
+            logger.info("PID file removed: %s", DEFAULT_PID_FILE)
+
+    @staticmethod
+    def read_pid() -> int | None:
+        """Read the daemon PID from the PID file.
+
+        Returns:
+            The PID as an integer, or None if the file is missing or invalid.
+        """
+        pid_path = Path(DEFAULT_PID_FILE)
+        if not pid_path.exists():
+            return None
+        try:
+            return int(pid_path.read_text().strip())
+        except (ValueError, OSError):
+            return None
+
+    @staticmethod
+    def check_running() -> bool:
+        """Check if the daemon process is alive.
+
+        Returns:
+            True if a daemon process is running with the PID from the PID file.
+        """
+        pid = OverlordDaemon.read_pid()
+        if pid is None:
+            return False
+        try:
+            os.kill(pid, 0)
+            return True
+        except (ProcessLookupError, PermissionError):
+            return False
+
+    @staticmethod
+    def stop_daemon(timeout: float = 5.0) -> bool:
+        """Send SIGTERM to the running daemon and wait for it to exit.
+
+        Args:
+            timeout: Maximum seconds to wait for the process to exit.
+
+        Returns:
+            True if the daemon was stopped (or wasn't running), False on timeout.
+        """
+        import time
+
+        pid = OverlordDaemon.read_pid()
+        if pid is None:
+            return True
+
+        try:
+            os.kill(pid, 0)
+        except (ProcessLookupError, PermissionError):
+            # Process already gone, clean up stale PID file
+            Path(DEFAULT_PID_FILE).unlink(missing_ok=True)
+            return True
+
+        # Send SIGTERM
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except (ProcessLookupError, PermissionError):
+            Path(DEFAULT_PID_FILE).unlink(missing_ok=True)
+            return True
+
+        # Wait for exit
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            try:
+                os.kill(pid, 0)
+            except ProcessLookupError:
+                # Process exited — PID file should be cleaned by shutdown()
+                Path(DEFAULT_PID_FILE).unlink(missing_ok=True)
+                return True
+            except PermissionError:
+                return False
+            time.sleep(0.2)
+
+        return False
 
     @property
     def is_running(self) -> bool:
