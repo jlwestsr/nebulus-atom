@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import subprocess
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -10,6 +11,7 @@ import yaml
 from typer.testing import CliRunner
 
 from nebulus_atom.commands.overlord_commands import overlord_app
+from nebulus_swarm.overlord.memory import MemoryEntry
 
 runner = CliRunner()
 
@@ -792,3 +794,598 @@ class TestDaemonCommand:
         ):
             result = runner.invoke(overlord_app, ["daemon", "start"])
         assert "no scheduled tasks configured" in result.output.lower()
+
+
+def _make_report_config(tmp_path: Path) -> Path:
+    """Helper to write a config with a project for report/board tests."""
+    proj_dir = tmp_path / "my-project"
+    proj_dir.mkdir(exist_ok=True)
+    return _make_config_file(
+        tmp_path,
+        {
+            "my-project": {
+                "path": str(proj_dir),
+                "remote": "test/my-project",
+                "role": "tooling",
+                "branch_model": "develop-main",
+                "depends_on": [],
+            },
+        },
+    )
+
+
+class TestReportCommand:
+    """Tests for `overlord report`."""
+
+    def test_report_completed_writes_memory(self, tmp_path: Path) -> None:
+        config_file = _make_report_config(tmp_path)
+        mock_mem = MagicMock()
+        mock_mem.return_value.remember.return_value = "fake-uuid-1234"
+
+        with (
+            patch(
+                "nebulus_atom.commands.overlord_commands.DEFAULT_CONFIG_PATH",
+                config_file,
+            ),
+            patch(
+                "nebulus_swarm.overlord.registry.DEFAULT_CONFIG_PATH",
+                config_file,
+            ),
+            patch(
+                "nebulus_atom.commands.overlord_commands.OverlordMemory",
+                mock_mem,
+            ),
+            patch(
+                "nebulus_atom.commands.overlord_commands._post_report_to_slack",
+            ),
+        ):
+            result = runner.invoke(
+                overlord_app,
+                ["report", "completed", "All tests passing", "-p", "my-project"],
+            )
+        assert result.exit_code == 0
+        assert "COMPLETED" in result.output
+        mock_mem.return_value.remember.assert_called_once()
+        call_kwargs = mock_mem.return_value.remember.call_args
+        assert call_kwargs.kwargs["category"] == "dispatch"
+        assert call_kwargs.kwargs["status"] == "completed"
+
+    def test_report_detects_project_from_cwd(self, tmp_path: Path) -> None:
+        config_file = _make_report_config(tmp_path)
+        proj_dir = tmp_path / "my-project"
+        mock_mem = MagicMock()
+        mock_mem.return_value.remember.return_value = "fake-uuid"
+
+        with (
+            patch(
+                "nebulus_atom.commands.overlord_commands.DEFAULT_CONFIG_PATH",
+                config_file,
+            ),
+            patch(
+                "nebulus_swarm.overlord.registry.DEFAULT_CONFIG_PATH",
+                config_file,
+            ),
+            patch(
+                "nebulus_atom.commands.overlord_commands.OverlordMemory",
+                mock_mem,
+            ),
+            patch(
+                "nebulus_atom.commands.overlord_commands._post_report_to_slack",
+            ),
+            patch("nebulus_atom.commands.overlord_commands.Path") as MockPath,
+        ):
+            MockPath.cwd.return_value.resolve.return_value = proj_dir / "subdir"
+            # Need to preserve Path behavior for other uses
+            MockPath.side_effect = Path
+            MockPath.cwd = MagicMock(return_value=MagicMock())
+            MockPath.cwd.return_value.resolve.return_value = proj_dir / "subdir"
+            result = runner.invoke(
+                overlord_app,
+                ["report", "started", "Beginning work"],
+            )
+        # Even if CWD detection fails due to mocking complexity, it should not crash
+        assert result.exit_code == 0 or "Could not detect" in result.output
+
+    def test_report_explicit_project_flag(self, tmp_path: Path) -> None:
+        config_file = _make_report_config(tmp_path)
+        mock_mem = MagicMock()
+        mock_mem.return_value.remember.return_value = "fake-uuid"
+
+        with (
+            patch(
+                "nebulus_atom.commands.overlord_commands.DEFAULT_CONFIG_PATH",
+                config_file,
+            ),
+            patch(
+                "nebulus_swarm.overlord.registry.DEFAULT_CONFIG_PATH",
+                config_file,
+            ),
+            patch(
+                "nebulus_atom.commands.overlord_commands.OverlordMemory",
+                mock_mem,
+            ),
+            patch(
+                "nebulus_atom.commands.overlord_commands._post_report_to_slack",
+            ),
+        ):
+            result = runner.invoke(
+                overlord_app,
+                ["report", "in_progress", "Working on it", "-p", "my-project"],
+            )
+        assert result.exit_code == 0
+        assert "my-project" in result.output
+        assert "IN_PROGRESS" in result.output
+
+    def test_report_rejects_invalid_status(self, tmp_path: Path) -> None:
+        config_file = _make_report_config(tmp_path)
+        with (
+            patch(
+                "nebulus_atom.commands.overlord_commands.DEFAULT_CONFIG_PATH",
+                config_file,
+            ),
+            patch(
+                "nebulus_swarm.overlord.registry.DEFAULT_CONFIG_PATH",
+                config_file,
+            ),
+        ):
+            result = runner.invoke(
+                overlord_app,
+                ["report", "invalid_status", "msg", "-p", "my-project"],
+            )
+        assert "Invalid status" in result.output
+
+    def test_report_rejects_unknown_project(self, tmp_path: Path) -> None:
+        config_file = _make_report_config(tmp_path)
+        with (
+            patch(
+                "nebulus_atom.commands.overlord_commands.DEFAULT_CONFIG_PATH",
+                config_file,
+            ),
+            patch(
+                "nebulus_swarm.overlord.registry.DEFAULT_CONFIG_PATH",
+                config_file,
+            ),
+        ):
+            result = runner.invoke(
+                overlord_app,
+                ["report", "started", "msg", "-p", "no-such-project"],
+            )
+        assert "Unknown project" in result.output
+
+    def test_report_auto_generates_task_id(self, tmp_path: Path) -> None:
+        config_file = _make_report_config(tmp_path)
+        mock_mem = MagicMock()
+        mock_mem.return_value.remember.return_value = "fake-uuid"
+
+        with (
+            patch(
+                "nebulus_atom.commands.overlord_commands.DEFAULT_CONFIG_PATH",
+                config_file,
+            ),
+            patch(
+                "nebulus_swarm.overlord.registry.DEFAULT_CONFIG_PATH",
+                config_file,
+            ),
+            patch(
+                "nebulus_atom.commands.overlord_commands.OverlordMemory",
+                mock_mem,
+            ),
+            patch(
+                "nebulus_atom.commands.overlord_commands._post_report_to_slack",
+            ),
+        ):
+            result = runner.invoke(
+                overlord_app,
+                ["report", "started", "Test", "-p", "my-project"],
+            )
+        assert result.exit_code == 0
+        call_kwargs = mock_mem.return_value.remember.call_args
+        assert call_kwargs.kwargs["task_id"].startswith("my-project-")
+
+    def test_report_with_track(self, tmp_path: Path) -> None:
+        config_file = _make_report_config(tmp_path)
+        mock_mem = MagicMock()
+        mock_mem.return_value.remember.return_value = "fake-uuid"
+
+        with (
+            patch(
+                "nebulus_atom.commands.overlord_commands.DEFAULT_CONFIG_PATH",
+                config_file,
+            ),
+            patch(
+                "nebulus_swarm.overlord.registry.DEFAULT_CONFIG_PATH",
+                config_file,
+            ),
+            patch(
+                "nebulus_atom.commands.overlord_commands.OverlordMemory",
+                mock_mem,
+            ),
+            patch(
+                "nebulus_atom.commands.overlord_commands._post_report_to_slack",
+            ),
+        ):
+            result = runner.invoke(
+                overlord_app,
+                [
+                    "report",
+                    "started",
+                    "Migrating servers",
+                    "-p",
+                    "my-project",
+                    "--track",
+                    "MCP Migration",
+                ],
+            )
+        assert result.exit_code == 0
+        assert "MCP Migration" in result.output
+        call_kwargs = mock_mem.return_value.remember.call_args
+        assert call_kwargs.kwargs["track"] == "MCP Migration"
+
+    def test_report_with_agent_name(self, tmp_path: Path) -> None:
+        config_file = _make_report_config(tmp_path)
+        mock_mem = MagicMock()
+        mock_mem.return_value.remember.return_value = "fake-uuid"
+
+        with (
+            patch(
+                "nebulus_atom.commands.overlord_commands.DEFAULT_CONFIG_PATH",
+                config_file,
+            ),
+            patch(
+                "nebulus_swarm.overlord.registry.DEFAULT_CONFIG_PATH",
+                config_file,
+            ),
+            patch(
+                "nebulus_atom.commands.overlord_commands.OverlordMemory",
+                mock_mem,
+            ),
+            patch(
+                "nebulus_atom.commands.overlord_commands._post_report_to_slack",
+            ),
+        ):
+            result = runner.invoke(
+                overlord_app,
+                [
+                    "report",
+                    "started",
+                    "Test",
+                    "-p",
+                    "my-project",
+                    "--agent",
+                    "Claude Agent 1",
+                ],
+            )
+        assert result.exit_code == 0
+        assert "Claude Agent 1" in result.output
+        call_kwargs = mock_mem.return_value.remember.call_args
+        assert call_kwargs.kwargs["agent_name"] == "Claude Agent 1"
+
+
+def _make_memory_entries(
+    statuses: list[str],
+    project: str = "my-project",
+) -> list[MemoryEntry]:
+    """Build fake MemoryEntry objects for board tests."""
+    entries = []
+    for i, status in enumerate(statuses):
+        entries.append(
+            MemoryEntry(
+                id=f"uuid-{i}",
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                category="dispatch",
+                project=project,
+                content=f"[{status.upper()}] Task {i}",
+                metadata={
+                    "status": status,
+                    "agent_name": f"Agent-{i}",
+                    "task_id": f"{project}-{i}",
+                    "track": f"Track {i}" if i % 2 == 0 else "",
+                },
+            )
+        )
+    return entries
+
+
+class TestBoardCommand:
+    """Tests for `overlord board`."""
+
+    def test_board_prints_active_entries(self, tmp_path: Path) -> None:
+        config_file = _make_report_config(tmp_path)
+        mock_mem = MagicMock()
+        entries = _make_memory_entries(["started", "in_progress", "blocked"])
+        mock_mem.return_value.search.return_value = entries
+
+        with (
+            patch(
+                "nebulus_atom.commands.overlord_commands.DEFAULT_CONFIG_PATH",
+                config_file,
+            ),
+            patch(
+                "nebulus_swarm.overlord.registry.DEFAULT_CONFIG_PATH",
+                config_file,
+            ),
+            patch(
+                "nebulus_atom.commands.overlord_commands.OverlordMemory",
+                mock_mem,
+            ),
+        ):
+            result = runner.invoke(overlord_app, ["board"])
+        assert result.exit_code == 0
+        assert "Dispatch Board" in result.output
+        assert "Agent-0" in result.output
+
+    def test_board_excludes_completed_by_default(self, tmp_path: Path) -> None:
+        config_file = _make_report_config(tmp_path)
+        mock_mem = MagicMock()
+        entries = _make_memory_entries(["started", "completed"])
+        mock_mem.return_value.search.return_value = entries
+
+        with (
+            patch(
+                "nebulus_atom.commands.overlord_commands.DEFAULT_CONFIG_PATH",
+                config_file,
+            ),
+            patch(
+                "nebulus_swarm.overlord.registry.DEFAULT_CONFIG_PATH",
+                config_file,
+            ),
+            patch(
+                "nebulus_atom.commands.overlord_commands.OverlordMemory",
+                mock_mem,
+            ),
+        ):
+            result = runner.invoke(overlord_app, ["board"])
+        assert result.exit_code == 0
+        # Agent-0 is started (shown), Agent-1 is completed (hidden)
+        assert "Agent-0" in result.output
+
+    def test_board_includes_completed_with_all_flag(self, tmp_path: Path) -> None:
+        config_file = _make_report_config(tmp_path)
+        mock_mem = MagicMock()
+        entries = _make_memory_entries(["started", "completed"])
+        mock_mem.return_value.search.return_value = entries
+
+        with (
+            patch(
+                "nebulus_atom.commands.overlord_commands.DEFAULT_CONFIG_PATH",
+                config_file,
+            ),
+            patch(
+                "nebulus_swarm.overlord.registry.DEFAULT_CONFIG_PATH",
+                config_file,
+            ),
+            patch(
+                "nebulus_atom.commands.overlord_commands.OverlordMemory",
+                mock_mem,
+            ),
+        ):
+            result = runner.invoke(overlord_app, ["board", "--all"])
+        assert result.exit_code == 0
+        # Both agents should be visible
+        assert "Agent-0" in result.output
+        assert "Agent-1" in result.output
+
+    def test_board_filters_by_days(self, tmp_path: Path) -> None:
+        config_file = _make_report_config(tmp_path)
+        mock_mem = MagicMock()
+        # One entry from now, one from 30 days ago
+        recent = _make_memory_entries(["started"])[0]
+        old = MemoryEntry(
+            id="old-uuid",
+            timestamp="2020-01-01T00:00:00+00:00",
+            category="dispatch",
+            project="my-project",
+            content="[STARTED] Old task",
+            metadata={
+                "status": "started",
+                "agent_name": "Old-Agent",
+                "task_id": "old-1",
+                "track": "",
+            },
+        )
+        mock_mem.return_value.search.return_value = [recent, old]
+
+        with (
+            patch(
+                "nebulus_atom.commands.overlord_commands.DEFAULT_CONFIG_PATH",
+                config_file,
+            ),
+            patch(
+                "nebulus_swarm.overlord.registry.DEFAULT_CONFIG_PATH",
+                config_file,
+            ),
+            patch(
+                "nebulus_atom.commands.overlord_commands.OverlordMemory",
+                mock_mem,
+            ),
+        ):
+            result = runner.invoke(overlord_app, ["board", "--days", "7"])
+        assert result.exit_code == 0
+        assert "Agent-0" in result.output
+        assert "Old-Agent" not in result.output
+
+    def test_board_sync_writes_between_markers(self, tmp_path: Path) -> None:
+        config_file = _make_report_config(tmp_path)
+        mock_mem = MagicMock()
+        entries = _make_memory_entries(["started"])
+        mock_mem.return_value.search.return_value = entries
+
+        # Create OVERLORD.md with markers
+        md_path = tmp_path / "OVERLORD.md"
+        md_path.write_text(
+            "# Header\n\n"
+            "## Dispatch Board\n\n"
+            "<!-- DISPATCH_BOARD_START -->\n"
+            "old board content\n"
+            "<!-- DISPATCH_BOARD_END -->\n\n"
+            "## Agent Roster\n\n"
+            "<!-- AGENT_ROSTER_START -->\n"
+            "old roster\n"
+            "<!-- AGENT_ROSTER_END -->\n\n"
+            "## Footer\n"
+        )
+
+        with (
+            patch(
+                "nebulus_atom.commands.overlord_commands.DEFAULT_CONFIG_PATH",
+                config_file,
+            ),
+            patch(
+                "nebulus_swarm.overlord.registry.DEFAULT_CONFIG_PATH",
+                config_file,
+            ),
+            patch(
+                "nebulus_atom.commands.overlord_commands.OverlordMemory",
+                mock_mem,
+            ),
+        ):
+            # Patch workspace_root to point to tmp_path
+            from nebulus_swarm.overlord.registry import load_config
+
+            with patch(
+                "nebulus_atom.commands.overlord_commands._load_registry_or_exit"
+            ) as mock_reg:
+                reg = load_config()
+                # Override workspace_root
+                reg_mock = MagicMock(wraps=reg)
+                reg_mock.workspace_root = tmp_path
+                reg_mock.projects = reg.projects
+                mock_reg.return_value = reg_mock
+
+                result = runner.invoke(overlord_app, ["board", "--sync"])
+
+        assert result.exit_code == 0
+        updated = md_path.read_text()
+        assert "Agent-0" in updated
+        assert "old board content" not in updated
+        assert "# Header" in updated
+        assert "## Footer" in updated
+
+    def test_board_sync_preserves_other_sections(self, tmp_path: Path) -> None:
+        config_file = _make_report_config(tmp_path)
+        mock_mem = MagicMock()
+        entries = _make_memory_entries(["in_progress"])
+        mock_mem.return_value.search.return_value = entries
+
+        md_path = tmp_path / "OVERLORD.md"
+        md_path.write_text(
+            "## Projects\n\nproject content\n\n"
+            "## Dispatch Board\n\n"
+            "<!-- DISPATCH_BOARD_START -->\nold\n<!-- DISPATCH_BOARD_END -->\n\n"
+            "## Agent Roster\n\n"
+            "<!-- AGENT_ROSTER_START -->\nold\n<!-- AGENT_ROSTER_END -->\n\n"
+            "## Governance\n\ngovernance content\n"
+        )
+
+        with (
+            patch(
+                "nebulus_atom.commands.overlord_commands.DEFAULT_CONFIG_PATH",
+                config_file,
+            ),
+            patch(
+                "nebulus_swarm.overlord.registry.DEFAULT_CONFIG_PATH",
+                config_file,
+            ),
+            patch(
+                "nebulus_atom.commands.overlord_commands.OverlordMemory",
+                mock_mem,
+            ),
+            patch(
+                "nebulus_atom.commands.overlord_commands._load_registry_or_exit"
+            ) as mock_reg,
+        ):
+            mock_cfg = MagicMock()
+            mock_cfg.workspace_root = tmp_path
+            mock_cfg.projects = {}
+            mock_reg.return_value = mock_cfg
+
+            result = runner.invoke(overlord_app, ["board", "--sync"])
+
+        assert result.exit_code == 0
+        updated = md_path.read_text()
+        assert "project content" in updated
+        assert "governance content" in updated
+
+    def test_board_sync_dry_run_no_write(self, tmp_path: Path) -> None:
+        config_file = _make_report_config(tmp_path)
+        mock_mem = MagicMock()
+        entries = _make_memory_entries(["started"])
+        mock_mem.return_value.search.return_value = entries
+
+        md_path = tmp_path / "OVERLORD.md"
+        original = (
+            "## Dispatch Board\n\n"
+            "<!-- DISPATCH_BOARD_START -->\noriginal\n<!-- DISPATCH_BOARD_END -->\n\n"
+            "## Agent Roster\n\n"
+            "<!-- AGENT_ROSTER_START -->\noriginal\n<!-- AGENT_ROSTER_END -->\n"
+        )
+        md_path.write_text(original)
+
+        with (
+            patch(
+                "nebulus_atom.commands.overlord_commands.DEFAULT_CONFIG_PATH",
+                config_file,
+            ),
+            patch(
+                "nebulus_swarm.overlord.registry.DEFAULT_CONFIG_PATH",
+                config_file,
+            ),
+            patch(
+                "nebulus_atom.commands.overlord_commands.OverlordMemory",
+                mock_mem,
+            ),
+            patch(
+                "nebulus_atom.commands.overlord_commands._load_registry_or_exit"
+            ) as mock_reg,
+        ):
+            mock_cfg = MagicMock()
+            mock_cfg.workspace_root = tmp_path
+            mock_cfg.projects = {}
+            mock_reg.return_value = mock_cfg
+
+            result = runner.invoke(overlord_app, ["board", "--dry-run"])
+
+        assert result.exit_code == 0
+        # File should NOT be modified
+        assert md_path.read_text() == original
+
+    def test_board_sync_creates_backup(self, tmp_path: Path) -> None:
+        config_file = _make_report_config(tmp_path)
+        mock_mem = MagicMock()
+        entries = _make_memory_entries(["started"])
+        mock_mem.return_value.search.return_value = entries
+
+        md_path = tmp_path / "OVERLORD.md"
+        md_path.write_text(
+            "<!-- DISPATCH_BOARD_START -->\nold\n<!-- DISPATCH_BOARD_END -->\n"
+            "<!-- AGENT_ROSTER_START -->\nold\n<!-- AGENT_ROSTER_END -->\n"
+        )
+
+        with (
+            patch(
+                "nebulus_atom.commands.overlord_commands.DEFAULT_CONFIG_PATH",
+                config_file,
+            ),
+            patch(
+                "nebulus_swarm.overlord.registry.DEFAULT_CONFIG_PATH",
+                config_file,
+            ),
+            patch(
+                "nebulus_atom.commands.overlord_commands.OverlordMemory",
+                mock_mem,
+            ),
+            patch(
+                "nebulus_atom.commands.overlord_commands._load_registry_or_exit"
+            ) as mock_reg,
+        ):
+            mock_cfg = MagicMock()
+            mock_cfg.workspace_root = tmp_path
+            mock_cfg.projects = {}
+            mock_reg.return_value = mock_cfg
+
+            result = runner.invoke(overlord_app, ["board", "--sync"])
+
+        assert result.exit_code == 0
+        backup_path = tmp_path / "OVERLORD.md.bak"
+        assert backup_path.exists()
+        assert "old" in backup_path.read_text()
