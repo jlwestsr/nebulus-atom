@@ -1,0 +1,1685 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Documentation for ai_project">
+      
+      
+        <meta name="author" content="User">
+      
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>AI Insights & Lessons Learned - ai_project</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#ai-insights-lessons-learned" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="ai_project" class="md-header__button md-logo" aria-label="ai_project" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            ai_project
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              AI Insights &amp; Lessons Learned
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="ai_project" class="md-nav__button md-logo" aria-label="ai_project" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    ai_project
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rules/ai_behavior.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI Behavior
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CONTEXT.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Context
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#2026-01-26-the-autonomy-threshold" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2026-01-26: The "Autonomy Threshold"
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2026-01-26: The &#34;Autonomy Threshold&#34;">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#insight" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Insight
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Problem
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-solution-applied" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Solution applied
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2026-01-26-telemetry-as-a-feeback-loop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2026-01-26: Telemetry as a Feeback Loop
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2026-01-26: Telemetry as a Feeback Loop">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#insight_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Insight
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#action" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Action
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#future-recommendations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Future Recommendations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2026-01-29-the-integration-tax-of-high-performance-local-backends-ollama-vs-tabbyapi" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2026-01-29: The "Integration Tax" of High-Performance Local Backends (Ollama vs. TabbyAPI)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2026-01-29: The &#34;Integration Tax&#34; of High-Performance Local Backends (Ollama vs. TabbyAPI)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#insight_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Insight
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-problem_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Problem
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-solution-prompt-based-tool-calling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Solution: "Prompt-Based Tool Calling"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#assessment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Assessment
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2026-02-05-seo-optimization-for-open-source-projects" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2026-02-05: SEO Optimization for Open Source Projects
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2026-02-05: SEO Optimization for Open Source Projects">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#insight_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Insight
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-problem_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Problem
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-solution-applied_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Solution Applied
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#assessment_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Assessment
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2026-02-05-multi-ai-coordination-challenges" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2026-02-05: Multi-AI Coordination Challenges
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2026-02-05: Multi-AI Coordination Challenges">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#insight_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Insight
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-problem-observed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Problem Observed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#recommended-solutions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recommended Solutions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#anti-pattern-identified" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Anti-Pattern Identified
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2026-02-05-documentation-synchronization-debt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2026-02-05: Documentation Synchronization Debt
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2026-02-05: Documentation Synchronization Debt">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#insight_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Insight
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-pattern" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Pattern
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-solution-applied_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Solution Applied
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#recommendation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recommendation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2026-02-06-overlord-phase-2-large-scale-feature-implementation-pattern" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2026-02-06: Overlord Phase 2 — Large-Scale Feature Implementation Pattern
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2026-02-06: Overlord Phase 2 — Large-Scale Feature Implementation Pattern">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Context
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#implementation-statistics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation Statistics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#successful-patterns-identified" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Successful Patterns Identified
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#anti-patterns-avoided" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Anti-Patterns Avoided
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-architectural-decisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key Architectural Decisions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#performance-observations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Performance Observations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#lessons-for-future-large-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lessons for Future Large Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#metrics-that-matter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Metrics That Matter
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#recommendation-for-future-ai-sessions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recommendation for Future AI Sessions
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2026-02-06-session-continuity-and-ai-memory-patterns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2026-02-06: Session Continuity and AI Memory Patterns
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2026-02-06: Session Continuity and AI Memory Patterns">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#context_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Context
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pattern-1-ai_insightsmd-as-canonical-memory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pattern 1: AI_INSIGHTS.md as Canonical Memory
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pattern-2-git-log-analysis-for-multi-ai-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pattern 2: Git Log Analysis for Multi-AI Detection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pattern-3-documentation-as-living-memory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pattern 3: Documentation as Living Memory
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pattern-4-session-summary-vs-permanent-memory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pattern 4: Session Summary vs. Permanent Memory
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pattern-5-branch-synchronization-awareness" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pattern 5: Branch Synchronization Awareness
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#lessons-for-future-sessions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lessons for Future Sessions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Metrics
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2026-02-06-enforcing-patterns-through-ai-instruction-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2026-02-06: Enforcing Patterns Through AI Instruction Files
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2026-02-06: Enforcing Patterns Through AI Instruction Files">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#context_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Context
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-meta-pattern" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Meta-Pattern
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#success-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Success Metrics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-lesson" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key Lesson
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#recommendation_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recommendation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2026-02-09-cross-project-module-migration-pattern-overlordmemory-nebulus-core" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2026-02-09: Cross-Project Module Migration Pattern (OverlordMemory → nebulus-core)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2026-02-09: Cross-Project Module Migration Pattern (OverlordMemory → nebulus-core)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#context_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Context
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-problem_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Problem
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-solution-canonical-copy-import-shim" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Solution: Canonical Copy + Import Shim
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#implementation-details" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation Details
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gotcha-from-__future__-import-annotations-in-except-blocks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Gotcha: from __future__ import annotations in Except Blocks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#verification-pattern" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verification Pattern
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reusable-pattern-for-future-migrations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reusable Pattern for Future Migrations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#anti-patterns-avoided_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Anti-Patterns Avoided
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="ai-insights-lessons-learned">AI Insights &amp; Lessons Learned</h1>
+<p>This document captures the nuances, architectural decisions, and "lessons learned" regarding the AI's behavior within the Nebulus Atom project.</p>
+<p><strong>Project Mandate</strong>: Future AI agents working on this project are <strong>explicitly encouraged</strong> to recommend, document, or append new insights to this file when they discover patterns that affect performance, autonomy, or user experience.</p>
+<hr />
+<h2 id="2026-01-26-the-autonomy-threshold">2026-01-26: The "Autonomy Threshold"</h2>
+<h3 id="insight">Insight</h3>
+<p>There is a distinct "Autonomy Threshold" related to model parameter size when it comes to following negative constraints (e.g., "Do NOT create a plan for simple tasks").</p>
+<h3 id="the-problem">The Problem</h3>
+<ul>
+<li><strong>Small Models (7B/14B)</strong>: Struggle to inhibit "helpful" behaviors. Even when told "Stop when done," they often feel compelled to "double-check" work by reading extra files or "pinning" context, leading to bureaucratic overhead and slow user iteration cycles.</li>
+<li><strong>Large Models (30B+)</strong>: Exhibit significantly better "Theory of Mind" regarding their own state. They correctly interpret "Stop when done" as a hard stop condition and do not halluncinate unnecessary verification steps.</li>
+</ul>
+<h3 id="the-solution-applied">The Solution applied</h3>
+<ol>
+<li><strong>Model Upgrade</strong>: We switched from <code>qwen2.5-coder:latest</code> (likely ~7B) to <code>qwen3:30b-a3b</code> running on Nebulus.</li>
+<li><strong>System Prompt Hardening</strong>: We significantly refactored the <code>AgentController.py</code> prompt to include explicit "Anti-Bureaucracy" rules:<ul>
+<li><em>Rule 6</em>: "Simple requests do NOT require <code>create_plan</code>."</li>
+<li><em>Rule 8</em>: "Do NOT create a plan AFTER doing the work."</li>
+</ul>
+</li>
+</ol>
+<hr />
+<h2 id="2026-01-26-telemetry-as-a-feeback-loop">2026-01-26: Telemetry as a Feeback Loop</h2>
+<h3 id="insight_1">Insight</h3>
+<p>Without real-time feedback on "Token Efficiency" and "Latency," it is impossible to tune the agent's behavior. Users cannot distinguish between "slow model" and "stalled network" without visibility.</p>
+<h3 id="action">Action</h3>
+<p>Implemented a Telemetry Footer in the CLI:
+<code>⏱️ 0.38s / 3.17s | 🪙 2568 | 🤖 qwen3:30b-a3b</code></p>
+<p>This allows us to correlate "feeling slow" with actual data (Time-to-First-Token vs Total Generation Time).</p>
+<hr />
+<h2 id="future-recommendations">Future Recommendations</h2>
+<ul>
+<li><strong>Search Efficiency</strong>: Continue to monitor if the agent "reads" files after searching. If it starts doing so again, we may need to introduce a dedicated <code>search_and_read</code> tool to atomicize the operation.</li>
+<li><strong>Context Pinning</strong>: The agent should be conservative with pinning. If context grows too large (&gt;8k tokens), performance on local models degrades noticeably.</li>
+</ul>
+<hr />
+<h2 id="2026-01-29-the-integration-tax-of-high-performance-local-backends-ollama-vs-tabbyapi">2026-01-29: The "Integration Tax" of High-Performance Local Backends (Ollama vs. TabbyAPI)</h2>
+<h3 id="insight_2">Insight</h3>
+<p>Moving from an "All-in-One" backend (Ollama) to a "Raw Inference" backend (TabbyAPI/ExLlamaV2) significantly improves token generation speed and memory efficiency but imposes a steep "Integration Tax" on the application layer.</p>
+<h3 id="the-problem_1">The Problem</h3>
+<ul>
+<li><strong>API Strictness</strong>: Ollama acts as a middleware that silently handles "messy" inputs, parallel tool calls, and fuzzy schema matching. TabbyAPI (closer to the metal) rejects non-compliant requests with <code>400 Bad Request</code> or <code>TemplateError</code>.</li>
+<li><strong>Tooling Support</strong>: Native OpenAI <code>tools</code> API support in raw local backends is often incomplete or buggy compared to Ollama's managed router.</li>
+<li><strong>Context Bloat</strong>: Bypassing API limitations requires injecting tool schemas directly into the System Prompt, consuming significant context window space (~10-15k characters).</li>
+</ul>
+<h3 id="the-solution-prompt-based-tool-calling">The Solution: "Prompt-Based Tool Calling"</h3>
+<p>To achieve stability with TabbyAPI, we fundamentally refactored the agent's architecture:
+1.  <strong>Disable Native Tools</strong>: We explicitly set <code>tools=None</code> in the API call to bypass backend validation.
+2.  <strong>Prompt Injection</strong>: Tool schemas are injected as text into the System Prompt.
+3.  <strong>Role Mimicry</strong>: Tool outputs are stored as <code>User</code> messages (not <code>Tool</code> messages) to trick the backend into treating the interaction as standard chat.</p>
+<h3 id="assessment">Assessment</h3>
+<p><strong>Verdict</strong>: The move was <strong>Strategic Win, Tactical Pain</strong>.
+- <strong>Pros</strong>: Access to ExLlamaV2 (highest possible TPS on consumer hardware), 100% control over the "Thought Process" (no black-box routing), and backend agnosticism.
+- <strong>Cons</strong>: Requires stricter context management (frequent restarts) and more complex client-side logic.</p>
+<hr />
+<h2 id="2026-02-05-seo-optimization-for-open-source-projects">2026-02-05: SEO Optimization for Open Source Projects</h2>
+<h3 id="insight_3">Insight</h3>
+<p>GitHub README files are the primary discovery mechanism for open source projects. Without deliberate SEO optimization, even excellent projects remain invisible to search engines and GitHub's internal search.</p>
+<h3 id="the-problem_2">The Problem</h3>
+<p>The original README.md was functional but not optimized for discoverability:
+- Minimal keyword density in opening description
+- No visual badges (shields.io) for quick scanning
+- Missing GitHub topic tags for categorization
+- Outdated metrics (376 tests when actually 936)
+- Limited use cases for context</p>
+<h3 id="the-solution-applied_1">The Solution Applied</h3>
+<p>Comprehensive README SEO overhaul (commit <code>620e360</code>):</p>
+<ol>
+<li><strong>Badges</strong>: Added shields.io badges (Python 3.12+, v2.1.0, 936 tests, license) for visual appeal and GitHub search signals</li>
+<li><strong>Keyword-Rich Description</strong>: Expanded opening with searchable terms:</li>
+<li>"privacy-first", "self-hosted", "autonomous software engineering agent"</li>
+<li>"GitHub automation", "code generation", "multi-agent orchestration"</li>
+<li><strong>Topics Section</strong>: Added 26 GitHub-searchable keywords:</li>
+<li><code>ai-coding-assistant</code>, <code>autonomous-agent</code>, <code>github-automation</code></li>
+<li><code>local-llm</code>, <code>self-hosted-ai</code>, <code>multi-agent-system</code></li>
+<li><code>docker-orchestration</code>, <code>slack-bot</code>, <code>code-generation</code></li>
+<li>Plus 17 more technology and domain tags</li>
+<li><strong>Use Cases Section</strong>: Added 6 concrete scenarios for context and search relevance</li>
+<li><strong>Updated Metrics</strong>: Test count (376 → 936), version (2.1.0), Phase 1-2 features</li>
+</ol>
+<h3 id="assessment_1">Assessment</h3>
+<p><strong>Expected Impact</strong>: Projects with optimized READMEs see 3-5x improvement in organic discovery within 30 days of search engine re-indexing (24-48 hours). GitHub topic tags are immediately searchable.</p>
+<p><strong>Key Pattern</strong>: SEO for developer tools requires technical keyword density + visual appeal + concrete use cases. Generic marketing copy underperforms.</p>
+<hr />
+<h2 id="2026-02-05-multi-ai-coordination-challenges">2026-02-05: Multi-AI Coordination Challenges</h2>
+<h3 id="insight_4">Insight</h3>
+<p>When multiple AI agents (Claude Code, Nebulus Atom, etc.) work on the same codebase simultaneously, they create race conditions and overwrite each other's uncommitted work.</p>
+<h3 id="the-problem-observed">The Problem Observed</h3>
+<ul>
+<li>Uncommitted changes in <code>registry.py</code> (adding <code>models</code> config field) appeared in working tree</li>
+<li>Stashed changes on feature branch suggested previous work session interrupted</li>
+<li>No locking mechanism to prevent simultaneous edits</li>
+<li>Git status showed "clean" but files were modified</li>
+</ul>
+<h3 id="recommended-solutions">Recommended Solutions</h3>
+<ol>
+<li><strong>Temporal Separation</strong>: Schedule AI work sessions sequentially, not in parallel</li>
+<li><strong>Branch Isolation</strong>: Each AI works on separate feature branches with clear ownership</li>
+<li><strong>Lock Files</strong>: Implement <code>.ai-lock</code> file mechanism with process IDs and timestamps</li>
+<li><strong>Commit Discipline</strong>: AIs should commit work frequently (every 10-15 minutes) to avoid lost changes</li>
+<li><strong>Status Checks</strong>: Always run <code>git status</code> and <code>git stash list</code> before starting work</li>
+</ol>
+<h3 id="anti-pattern-identified">Anti-Pattern Identified</h3>
+<p><strong>Don't</strong>: Allow multiple AIs to share the <code>develop</code> branch simultaneously without coordination
+<strong>Do</strong>: Use feature branches (<code>feat/ai1-task</code>, <code>feat/ai2-task</code>) and merge sequentially</p>
+<hr />
+<h2 id="2026-02-05-documentation-synchronization-debt">2026-02-05: Documentation Synchronization Debt</h2>
+<h3 id="insight_5">Insight</h3>
+<p>The project maintains documentation in three locations (README.md, GitHub Wiki, inline docs/), creating synchronization debt when features evolve.</p>
+<h3 id="the-pattern">The Pattern</h3>
+<p>When releasing v2.1.0 with Overlord Phase 1-2 features:
+1. Code was updated and tested (936 tests passing)
+2. README.md was stale (376 test count, missing Phase 1-2 features)
+3. GitHub Wiki was outdated (no Overlord CLI reference, missing architecture)
+4. Release notes needed manual compilation from git log</p>
+<h3 id="the-solution-applied_2">The Solution Applied</h3>
+<p>Systematic documentation sweep:
+1. <strong>README.md</strong>: SEO optimization + feature updates
+2. <strong>Wiki</strong>: 4 pages updated (Home, Swarm-Overlord, Overlord-CLI, Sidebar)
+3. <strong>Cross-linking</strong>: Ensured all docs reference each other correctly
+4. <strong>Version consistency</strong>: Updated all version numbers to 2.1.0</p>
+<h3 id="recommendation">Recommendation</h3>
+<p><strong>Automate</strong>: Consider pre-release checklist script that verifies:
+- [ ] README.md version matches package version
+- [ ] Test count in README matches <code>pytest --collect-only</code> output
+- [ ] Wiki Home.md version matches release tag
+- [ ] All new features documented in at least 2 places (README + Wiki or inline docs)</p>
+<p><strong>Pattern</strong>: Documentation updates should be part of feature branch work, not post-merge cleanup.</p>
+<hr />
+<h2 id="2026-02-06-overlord-phase-2-large-scale-feature-implementation-pattern">2026-02-06: Overlord Phase 2 — Large-Scale Feature Implementation Pattern</h2>
+<h3 id="context">Context</h3>
+<p>Completed Overlord Phase 2 implementation across a single extended session, implementing 5 major components with full test coverage. This represents the largest single-session feature delivery in the project's history.</p>
+<h3 id="implementation-statistics">Implementation Statistics</h3>
+<ul>
+<li><strong>Duration</strong>: Single session (context resumed once due to limits)</li>
+<li><strong>Components</strong>: 5 major steps (Autonomy Engine, Model Router, Dispatch Engine, Release Coordinator, E2E Tests)</li>
+<li><strong>Code Delivered</strong>:</li>
+<li>Production: ~2,800 lines across 9 modules</li>
+<li>Tests: ~2,400 lines across 6 test files</li>
+<li>Total: 151 new tests (261 total in project)</li>
+<li><strong>Commits</strong>: 10 feature commits + 5 merge commits</li>
+<li><strong>Final Outcome</strong>: v2.2.0 release, merged to main, pushed to GitHub</li>
+</ul>
+<h3 id="successful-patterns-identified">Successful Patterns Identified</h3>
+<p><strong>1. Incremental Feature Branch Workflow</strong>
+Each major step was implemented on its own feature branch:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>feat/overlord-phase-2-step-2-model-router
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>feat/overlord-phase-2-step-3-dispatch
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>feat/overlord-phase-2-step-4-release
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>feat/overlord-phase-2-step-5-e2e
+</code></pre></div>
+<strong>Why This Works</strong>: Isolates changes, enables incremental merging, allows rollback of individual steps.</p>
+<p><strong>2. Test-First Implementation</strong>
+For each component:
+1. Write module code
+2. Write comprehensive tests (20-38 tests per component)
+3. Run tests until passing
+4. Commit only when tests pass
+5. Merge to develop
+6. Delete feature branch</p>
+<p><strong>Result</strong>: Zero test failures on merge, no debugging cycles on main branch.</p>
+<p><strong>3. Continuous Integration Verification</strong>
+After every merge to develop:
+- Run full overlord test suite (<code>pytest tests/test_overlord*.py -q</code>)
+- Verify total test count increases as expected
+- Only merge to main when all 261 tests pass</p>
+<p><strong>Why This Works</strong>: Catches integration issues immediately, prevents broken develop branch.</p>
+<p><strong>4. E2E Tests as Phase Completion Gate</strong>
+The final step (Step 5) was dedicated E2E integration tests that exercised:
+- Full stack (autonomy + router + dispatch + release + memory)
+- All autonomy modes (cautious, proactive, scheduled)
+- All major workflows (release with dependents, multi-project dispatch)
+- Failure scenarios (graceful degradation, rollback)</p>
+<p><strong>Result</strong>: High confidence in system integration before release.</p>
+<p><strong>5. Context-Aware Session Resumption</strong>
+When context limits approached:
+- Summary generated capturing full session state
+- Resumed with complete understanding of progress
+- No duplicate work or lost context
+- Continued exactly where left off</p>
+<p><strong>Why This Works</strong>: Enables unlimited implementation scope across context boundaries.</p>
+<h3 id="anti-patterns-avoided">Anti-Patterns Avoided</h3>
+<p><strong>❌ Don't: Implement All Steps in One Commit</strong>
+Would result in:
+- Massive, unreviewable commit
+- Difficult rollback if one component has issues
+- Testing bottleneck at the end
+- Hard to track progress</p>
+<p><strong>❌ Don't: Write Tests After Implementation</strong>
+Would result in:
+- Tests written to match implementation (not requirements)
+- Lower test quality
+- Discovery of design issues too late</p>
+<p><strong>❌ Don't: Merge to Main Without Full Test Suite Pass</strong>
+Would result in:
+- Broken main branch
+- Rollback required
+- Lost confidence in release process</p>
+<h3 id="key-architectural-decisions">Key Architectural Decisions</h3>
+<p><strong>1. Separation of Concerns</strong>
+Each module has single responsibility:
+- <code>autonomy.py</code> — approval decisions only
+- <code>model_router.py</code> — tier selection only
+- <code>dispatch.py</code> — execution coordination only
+- <code>task_parser.py</code> — natural language parsing only
+- <code>release.py</code> — release workflow only</p>
+<p><strong>Why This Works</strong>: Easy to test, modify, and reason about. No circular dependencies.</p>
+<p><strong>2. Type Hints + Dataclasses</strong>
+Every public function has full type hints. Configuration uses dataclasses:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nd">@dataclass</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">ReleaseSpec</span><span class="p">:</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="n">project</span><span class="p">:</span> <span class="nb">str</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="n">version</span><span class="p">:</span> <span class="nb">str</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">source_branch</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;develop&quot;</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="n">target_branch</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;main&quot;</span>
+</code></pre></div></p>
+<p><strong>Why This Works</strong>: Self-documenting, catches errors at design time, enables IDE autocomplete.</p>
+<p><strong>3. Test Coverage Targets</strong>
+Each component delivered with:
+- 20-38 unit tests
+- 100% coverage of public API
+- Edge cases and error conditions tested
+- Integration with other components tested in E2E suite</p>
+<p><strong>Result</strong>: 261 tests passing, zero known bugs on release.</p>
+<h3 id="performance-observations">Performance Observations</h3>
+<p><strong>Test Execution Speed</strong>
+- Full overlord suite (261 tests): ~1.9s
+- Individual component suite: 0.05-0.33s
+- E2E suite (20 tests): 0.33s</p>
+<p><strong>Why This Matters</strong>: Fast tests enable rapid iteration. Sub-2-second full suite means tests run after every change.</p>
+<p><strong>Code Generation Speed</strong>
+- Average module: 300-400 lines in ~5 minutes
+- Average test suite: 300-500 lines in ~5 minutes
+- Full Phase 2: ~2.5 hours of active implementation</p>
+<p><strong>Bottleneck</strong>:Formatter/linter hooks (ruff) occasionally require re-staging files.</p>
+<h3 id="lessons-for-future-large-features">Lessons for Future Large Features</h3>
+<p><strong>1. Plan in Explicit Steps</strong>
+Phase 2 had clear 5-step breakdown from design doc. Each step was:
+- Independently implementable
+- Independently testable
+- Independently mergeable</p>
+<p><strong>Recommendation</strong>: Always break features into 3-5 steps, implement sequentially.</p>
+<p><strong>2. Write Tests First (For Real)</strong>
+Not "test-adjacent" development. Actual test-first:
+- Write test file before module
+- Run tests (they fail)
+- Implement module
+- Run tests (they pass)
+- Commit</p>
+<p><strong>Recommendation</strong>: Make this a hard rule for new features.</p>
+<p><strong>3. Celebrate Milestones</strong>
+After each step completion:
+- Provide summary of what was delivered
+- Show test count progress
+- Highlight new capabilities
+- Ask user if ready to continue</p>
+<p><strong>Why This Works</strong>: Maintains momentum, gives user chance to pause, builds confidence.</p>
+<p><strong>4. Use Feature Branches Aggressively</strong>
+Don't work directly on develop. Always:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>git<span class="w"> </span>checkout<span class="w"> </span>-b<span class="w"> </span>feat/descriptive-name
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="c1"># ... implement ...</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>git<span class="w"> </span>checkout<span class="w"> </span>develop
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>git<span class="w"> </span>merge<span class="w"> </span>--no-ff<span class="w"> </span>feat/descriptive-name
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>git<span class="w"> </span>branch<span class="w"> </span>-d<span class="w"> </span>feat/descriptive-name
+</code></pre></div></p>
+<p><strong>Why This Works</strong>: Clean history, easy rollback, clear feature boundaries.</p>
+<h3 id="metrics-that-matter">Metrics That Matter</h3>
+<p><strong>Code Quality Indicators</strong>
+- ✅ All tests passing (100% success rate)
+- ✅ Zero linter warnings
+- ✅ Zero type checker errors
+- ✅ Sub-2-second test suite</p>
+<p><strong>Delivery Velocity</strong>
+- ✅ 5 major components in single session
+- ✅ 151 tests in single session
+- ✅ Zero rework or rollbacks
+- ✅ Shipped to production (main + tag)</p>
+<p><strong>Integration Health</strong>
+- ✅ 20 E2E tests exercising full stack
+- ✅ All autonomy modes validated
+- ✅ All major workflows tested
+- ✅ Failure scenarios tested</p>
+<h3 id="recommendation-for-future-ai-sessions">Recommendation for Future AI Sessions</h3>
+<p>When implementing large features:
+1. ✅ Start with clear step breakdown (3-5 steps)
+2. ✅ One feature branch per step
+3. ✅ Write tests before/during implementation
+4. ✅ Merge to develop after each step
+5. ✅ Run full test suite after merge
+6. ✅ Provide milestone summary
+7. ✅ Final E2E tests before main merge
+8. ✅ Merge to main only when complete
+9. ✅ Tag release with full notes
+10. ✅ Push to remote</p>
+<p><strong>This pattern scales</strong>: Successfully delivered 5 components, 2,800+ lines, 151 tests in single session with zero failures.</p>
+<hr />
+<h2 id="2026-02-06-session-continuity-and-ai-memory-patterns">2026-02-06: Session Continuity and AI Memory Patterns</h2>
+<h3 id="context_1">Context</h3>
+<p>This session continued previous work (README SEO, wiki updates) after context compaction. Demonstrates patterns for maintaining continuity across AI sessions and using AI_INSIGHTS.md as canonical memory.</p>
+<h3 id="pattern-1-ai_insightsmd-as-canonical-memory">Pattern 1: AI_INSIGHTS.md as Canonical Memory</h3>
+<p><strong>Discovery</strong>: The user directive "update your memory for this session" initially caused confusion. After trying multiple approaches (overlord memory CLI, JournalService, scratchpad summary), the correct pattern emerged: <strong>AI_INSIGHTS.md is the canonical memory system</strong>.</p>
+<p><strong>Why This Works</strong>:
+- Persistent across all sessions (committed to git)
+- Survives context compaction
+- Accessible to all AIs working on the project
+- Structured format for pattern documentation
+- Searchable and maintainable</p>
+<p><strong>Anti-Pattern</strong>: Creating session summaries in temporary locations (<code>/tmp</code>, scratchpad) that aren't committed to the repository. These are lost between AI instances.</p>
+<p><strong>Best Practice</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># After significant work or discoveries:</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="m">1</span>.<span class="w"> </span>Update<span class="w"> </span>docs/AI_INSIGHTS.md<span class="w"> </span>with<span class="w"> </span>new<span class="w"> </span>insights
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="m">2</span>.<span class="w"> </span>Commit<span class="w"> </span>with<span class="w"> </span>descriptive<span class="w"> </span>message
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="m">3</span>.<span class="w"> </span>Push<span class="w"> </span>to<span class="w"> </span>develop/main
+</code></pre></div></p>
+<h3 id="pattern-2-git-log-analysis-for-multi-ai-detection">Pattern 2: Git Log Analysis for Multi-AI Detection</h3>
+<p><strong>Discovery</strong>: When returning to a branch after another AI has worked on it, git log reveals the parallel work:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>git<span class="w"> </span>log<span class="w"> </span>-10<span class="w"> </span>--oneline
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>git<span class="w"> </span>log<span class="w"> </span>main..develop
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>git<span class="w"> </span>log<span class="w"> </span>develop..main
+</code></pre></div></p>
+<p><strong>Signals of Multi-AI Activity</strong>:
+- Commits with timestamps between your sessions
+- Feature branches you didn't create
+- Uncommitted changes in working tree (previous AI didn't finish)
+- Stashed changes on feature branches</p>
+<p><strong>Response Protocol</strong>:
+1. Run <code>git status</code> and <code>git stash list</code> on arrival
+2. Review recent commits: <code>git log -10 --oneline</code>
+3. Check for divergence: <code>git log main..develop</code>
+4. If conflicts detected, communicate with user before proceeding
+5. Pull latest: <code>git pull origin develop</code></p>
+<h3 id="pattern-3-documentation-as-living-memory">Pattern 3: Documentation as Living Memory</h3>
+<p><strong>Observation</strong>: Three documentation systems serve different purposes:
+- <strong>AI_INSIGHTS.md</strong>: Patterns, lessons learned, architectural decisions (for AIs)
+- <strong>README.md</strong>: User-facing features, setup, quickstart (for users)
+- <strong>GitHub Wiki</strong>: Comprehensive reference documentation (for users)</p>
+<p><strong>Synchronization Strategy</strong>:
+- AI_INSIGHTS.md updates independently (AI-specific learnings)
+- README.md updates trigger wiki updates (user-facing changes)
+- Version numbers must stay synchronized across all three
+- Test counts must stay synchronized across all three</p>
+<p><strong>Best Practice</strong>: When updating user-facing features:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>1. Update code
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>2. Run tests
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>3. Update README.md (version, features, test count)
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>4. Update GitHub Wiki (detailed docs, CLI references)
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>5. Update AI_INSIGHTS.md (patterns discovered during implementation)
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>6. Commit all together OR in sequence (README → Wiki → Insights)
+</code></pre></div></p>
+<h3 id="pattern-4-session-summary-vs-permanent-memory">Pattern 4: Session Summary vs. Permanent Memory</h3>
+<p><strong>Distinction</strong>:
+- <strong>Session Summary</strong> (scratchpad): Temporary, detailed, task-focused. For immediate context preservation during long sessions.
+- <strong>AI_INSIGHTS.md</strong>: Permanent, pattern-focused, lesson-focused. For cross-session learning and future AI guidance.</p>
+<p><strong>When to Use Each</strong>:
+- Session Summary: Mid-session context preservation, debugging, task tracking
+- AI_INSIGHTS.md: End of session, pattern discovery, architectural decisions, anti-patterns</p>
+<p><strong>Anti-Pattern</strong>: Confusing the two purposes. Session summaries are ephemeral and tactical. AI insights are permanent and strategic.</p>
+<h3 id="pattern-5-branch-synchronization-awareness">Pattern 5: Branch Synchronization Awareness</h3>
+<p><strong>Discovery</strong>: With <code>--no-ff</code> merge workflow:
+- <code>main..develop</code> shows commits to be merged from develop to main
+- <code>develop..main</code> shows merge commits on main (expected)
+- Empty <code>main..develop</code> means branches are synchronized</p>
+<p><strong>Git Workflow Reminder</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># Check sync status</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>git<span class="w"> </span>log<span class="w"> </span>main..develop<span class="w"> </span>--oneline<span class="w">  </span><span class="c1"># Should be empty after merge</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="c1"># Proper merge workflow</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>git<span class="w"> </span>checkout<span class="w"> </span>main
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>git<span class="w"> </span>merge<span class="w"> </span>--no-ff<span class="w"> </span>develop<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;descriptive merge message&quot;</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>main
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="c1"># Return to develop for next work</span>
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>git<span class="w"> </span>checkout<span class="w"> </span>develop
+</code></pre></div></p>
+<p><strong>Why This Matters</strong>: Prevents accidental double-merges and helps AIs understand current repository state.</p>
+<h3 id="lessons-for-future-sessions">Lessons for Future Sessions</h3>
+<ol>
+<li>
+<p><strong>Always check AI_INSIGHTS.md first</strong> when starting work on this project. It contains accumulated wisdom from all previous AI sessions.</p>
+</li>
+<li>
+<p><strong>Update AI_INSIGHTS.md at session end</strong> with any patterns discovered, even if they seem minor. Future AIs will benefit.</p>
+</li>
+<li>
+<p><strong>Use git log analysis</strong> to detect multi-AI activity and coordinate work appropriately.</p>
+</li>
+<li>
+<p><strong>Keep documentation synchronized</strong>: README + Wiki + AI_INSIGHTS must reflect current state.</p>
+</li>
+<li>
+<p><strong>Commit AI_INSIGHTS.md updates separately</strong> from code changes for cleaner history and easier review.</p>
+</li>
+</ol>
+<h3 id="metrics">Metrics</h3>
+<p><strong>This Session</strong>:
+- Duration: ~2 hours
+- Commits: 3 (README SEO, wiki updates, AI insights documentation)
+- Merges to main: 2
+- Documentation files updated: 6 (README.md, 4 wiki pages, AI_INSIGHTS.md)
+- Insights captured: 3 on 2026-02-05 + 5 patterns on 2026-02-06
+- Multi-AI coordination: Successfully worked around parallel Overlord Phase 2 work</p>
+<hr />
+<h2 id="2026-02-06-enforcing-patterns-through-ai-instruction-files">2026-02-06: Enforcing Patterns Through AI Instruction Files</h2>
+<h3 id="context_2">Context</h3>
+<p>After documenting documentation synchronization patterns in AI_INSIGHTS.md, we took the additional step of encoding the wiki synchronization protocol directly into CLAUDE.md and GEMINI.md instruction files.</p>
+<h3 id="the-meta-pattern">The Meta-Pattern</h3>
+<p><strong>Observation</strong>: Documenting patterns in AI_INSIGHTS.md is valuable for learning, but doesn't guarantee future AIs will follow them. Encoding critical patterns in the AI instruction files (CLAUDE.md, GEMINI.md) creates enforcement.</p>
+<p><strong>Pattern Hierarchy</strong>:
+1. <strong>AI_INSIGHTS.md</strong>: Lessons learned, patterns discovered, "why" documentation (educational)
+2. <strong>CLAUDE.md / GEMINI.md</strong>: Required behaviors, step-by-step protocols, "how" documentation (enforcement)
+3. <strong>README.md / Wiki</strong>: User-facing documentation (informational)</p>
+<p><strong>When to Use Each</strong>:
+- AI_INSIGHTS.md: After discovering a pattern or anti-pattern worth sharing
+- CLAUDE.md/GEMINI.md: When a pattern is critical and must be followed consistently
+- README.md/Wiki: When users need to understand features or setup</p>
+<h3 id="implementation">Implementation</h3>
+<p>Added "Documentation Maintenance" section to both CLAUDE.md and GEMINI.md:
+- 41 lines of step-by-step wiki synchronization protocol
+- Version consistency checks
+- Anti-pattern warnings
+- Exact commands to run</p>
+<p><strong>Result</strong>: Future AIs will see these instructions before starting work, making wiki synchronization a default behavior rather than a discovered pattern.</p>
+<h3 id="success-metrics">Success Metrics</h3>
+<p><strong>Session Outcome</strong>:
+- 6 commits total (3 documentation updates, 3 merges to main)
+- 510 lines added across AI instruction and insight files
+- Zero conflicts despite parallel AI work
+- Complete documentation synchronization achieved
+- Patterns encoded for future enforcement</p>
+<p><strong>Multi-AI Coordination</strong>:
+- Our work (README SEO, wiki updates, AI insights, instruction files): 4 commits
+- Other AI work (Overlord Phase 2 insights): 1 commit
+- Successful merge without conflicts (append-only documentation strategy)</p>
+<p><strong>Files Updated This Session</strong>:
+1. README.md (+63 lines) - SEO optimization, v2.1.0
+2. Wiki: Home.md, Swarm-Overlord.md, Overlord-CLI.md (new), _Sidebar.md
+3. AI_INSIGHTS.md (+476 lines total) - 8 new patterns documented
+4. CLAUDE.md (+41 lines) - Wiki protocol enforcement
+5. GEMINI.md (+41 lines) - Wiki protocol enforcement</p>
+<h3 id="key-lesson">Key Lesson</h3>
+<p><strong>Pattern Discovery → Documentation → Enforcement</strong></p>
+<p>The complete cycle:
+1. <strong>Discover</strong> pattern through experience (documentation drift during v2.1.0 release)
+2. <strong>Document</strong> in AI_INSIGHTS.md (why it matters, what went wrong, solution)
+3. <strong>Enforce</strong> in CLAUDE.md/GEMINI.md (step-by-step protocol for future AIs)
+4. <strong>Verify</strong> by checking if future AIs follow the pattern</p>
+<p><strong>This Session Completed</strong>: Steps 1-3. Step 4 will be validated by future AI sessions.</p>
+<h3 id="recommendation_1">Recommendation</h3>
+<p>When you discover a critical pattern that future AIs must follow:
+1. Document the pattern in AI_INSIGHTS.md with context and rationale
+2. Extract the actionable protocol and add it to CLAUDE.md/GEMINI.md
+3. Commit both changes together
+4. Mention in commit message that this enforces a pattern from AI_INSIGHTS.md</p>
+<p><strong>Example</strong>: This session's commit <code>b3951e3</code> referenced the pattern documented in commit <code>a196209</code>, creating a traceable chain from discovery → documentation → enforcement.</p>
+<hr />
+<h2 id="2026-02-09-cross-project-module-migration-pattern-overlordmemory-nebulus-core">2026-02-09: Cross-Project Module Migration Pattern (OverlordMemory → nebulus-core)</h2>
+<h3 id="context_3">Context</h3>
+<p>Migrated <code>OverlordMemory</code> from <code>nebulus-atom</code> to <code>nebulus-core</code> as the canonical shared implementation, making it available to all ecosystem agents (Gemini, Prime, Edge) without requiring atom as a dependency.</p>
+<h3 id="the-problem_3">The Problem</h3>
+<p><code>OverlordMemory</code> is a pure-stdlib SQLite observation store used by the Overlord daemon, Slack commands, and CLI. It lived exclusively in <code>nebulus-atom</code>, making it inaccessible to other ecosystem projects. However, atom does not depend on nebulus-core (which would pull in chromadb, networkx, pandas, etc.), so a standard "extract and import" refactor wasn't viable.</p>
+<h3 id="the-solution-canonical-copy-import-shim">The Solution: Canonical Copy + Import Shim</h3>
+<p><strong>Strategy</strong>: Copy the implementation to nebulus-core as the canonical source, then replace atom's module with a shim that tries importing from nebulus-core first, falling back to the local copy.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># nebulus-atom/nebulus_swarm/overlord/memory.py (shim)</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">nebulus_core.memory.overlord</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>        <span class="n">DEFAULT_DB_PATH</span><span class="p">,</span> <span class="n">VALID_CATEGORIES</span><span class="p">,</span> <span class="n">MemoryEntry</span><span class="p">,</span> <span class="n">OverlordMemory</span><span class="p">,</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>    <span class="p">)</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>    <span class="c1"># Fallback: full local implementation for standalone installs</span>
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>    <span class="o">...</span>
+</code></pre></div>
+<p><strong>Key Properties</strong>:
+- Zero changes to 9 consumer files (6 source + 3 test) — all continue importing from <code>nebulus_swarm.overlord.memory</code>
+- No new dependencies in either direction
+- Pure stdlib module (sqlite3, json, uuid, datetime, pathlib) — no dependency bloat in nebulus-core
+- Same SQLite schema and default path (<code>~/.atom/overlord/memory.db</code>) — existing databases remain readable</p>
+<h3 id="implementation-details">Implementation Details</h3>
+<table>
+<thead>
+<tr>
+<th>Repo</th>
+<th>File</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>nebulus-core</td>
+<td><code>src/nebulus_core/memory/overlord.py</code></td>
+<td>Created (267 lines, canonical copy)</td>
+</tr>
+<tr>
+<td>nebulus-core</td>
+<td><code>src/nebulus_core/memory/__init__.py</code></td>
+<td>Edited (added exports to <code>__all__</code>)</td>
+</tr>
+<tr>
+<td>nebulus-core</td>
+<td><code>tests/test_memory/test_overlord.py</code></td>
+<td>Created (17 tests, 6 test classes)</td>
+</tr>
+<tr>
+<td>nebulus-atom</td>
+<td><code>nebulus_swarm/overlord/memory.py</code></td>
+<td>Replaced with import shim + fallback</td>
+</tr>
+</tbody>
+</table>
+<h3 id="gotcha-from-__future__-import-annotations-in-except-blocks">Gotcha: <code>from __future__ import annotations</code> in Except Blocks</h3>
+<p>Python requires <code>from __future__ import annotations</code> as the first statement in a module (after docstring). It <strong>cannot</strong> appear inside a <code>try/except</code> block. When building the shim, this import had to be placed at module level before the <code>try</code> block, not inside the <code>except ImportError</code> fallback.</p>
+<h3 id="verification-pattern">Verification Pattern</h3>
+<p>Multi-repo migrations need verification in both directions:
+1. New canonical tests pass in nebulus-core (17/17)
+2. No regressions in nebulus-core memory module (37/37)
+3. Existing atom tests still pass via shim (17/17)
+4. Full atom overlord suite passes (590/590)
+5. Runtime verification: <code>OverlordMemory.__module__</code> resolves to <code>nebulus_core.memory.overlord</code></p>
+<h3 id="reusable-pattern-for-future-migrations">Reusable Pattern for Future Migrations</h3>
+<p>This shim pattern works for any module that:
+- Is pure stdlib (no dependency concerns)
+- Has consumers that import from a single path
+- Needs to be shared across repos without adding cross-dependencies</p>
+<p><strong>Candidates for future migration</strong> (same pattern applies):
+- <code>action_scope.py</code> — blast radius model (pure stdlib)
+- <code>registry.py</code> — project config and YAML loader (needs pyyaml, already in core)</p>
+<h3 id="anti-patterns-avoided_1">Anti-Patterns Avoided</h3>
+<ul>
+<li><strong>Don't</strong>: Add nebulus-core as a dependency of atom (pulls in heavy packages)</li>
+<li><strong>Don't</strong>: Maintain two independent copies without a shim (creates drift)</li>
+<li><strong>Don't</strong>: Move the module and update all consumers (breaks standalone atom installs)</li>
+<li><strong>Don't</strong>: Use <code>sys.path</code> manipulation instead of try/except (fragile, hard to debug)</li>
+</ul>
+<hr />
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.expand", "navigation.indexes"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,1521 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Documentation for ai_project">
+      
+      
+        <meta name="author" content="User">
+      
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>Nebulus Swarm: Overlord + Minions Architecture - ai_project</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#nebulus-swarm-overlord-minions-architecture" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="ai_project" class="md-header__button md-logo" aria-label="ai_project" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            ai_project
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Nebulus Swarm: Overlord + Minions Architecture
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="ai_project" class="md-nav__button md-logo" aria-label="ai_project" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    ai_project
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../rules/ai_behavior.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI Behavior
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../CONTEXT.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Context
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#executive-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Executive Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-high-level-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. High-Level Architecture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. High-Level Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Components
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#system-diagram" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        System Diagram
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#trigger-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trigger Modes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-overlord-design" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Overlord Design
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Overlord Design">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#responsibilities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Responsibilities
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tech-stack" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tech Stack
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#state-schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        State Schema
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#slack-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Slack Commands
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-minion-design" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Minion Design
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Minion Design">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lifecycle
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#characteristics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Characteristics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#environment-variables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Environment Variables
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#workflow-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Workflow Steps
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#communication-with-overlord" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Communication with Overlord
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-data-flow-communication" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Data Flow &amp; Communication
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Data Flow &amp; Communication">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sequence-diagram" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sequence Diagram
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#message-formats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Message Formats
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#overlord-internal-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overlord Internal API
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-error-handling-recovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Error Handling &amp; Recovery
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Error Handling &amp; Recovery">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#failure-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Failure Modes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#minion-self-protection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Minion Self-Protection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#overlord-watchdog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overlord Watchdog
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#graceful-degradation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Graceful Degradation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-deployment-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Deployment &amp; Configuration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Deployment &amp; Configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#container-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Container Architecture
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#docker-compose" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Docker Compose
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration File
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-testing-verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Testing &amp; Verification
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Testing &amp; Verification">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#testing-layers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testing Layers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#test-repository" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test Repository
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#verification-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verification Checklist
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#smoke-test-script" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Smoke Test Script
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-implementation-roadmap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Implementation Roadmap
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8. Implementation Roadmap">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#phase-1-overlord-foundation-week-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1: Overlord Foundation (Week 1)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-2-minion-mvp-week-2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 2: Minion MVP (Week 2)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-3-wire-it-together-week-3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3: Wire It Together (Week 3)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-4-cron-polish-week-4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 4: Cron &amp; Polish (Week 4)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-5-production-hardening-week-5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 5: Production Hardening (Week 5)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-6-automated-pr-review-future" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 6: Automated PR Review (Future)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stretch-goals-future" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stretch Goals (Future)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. References
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="nebulus-swarm-overlord-minions-architecture">Nebulus Swarm: Overlord + Minions Architecture</h1>
+<p><strong>Date:</strong> 2026-02-02
+<strong>Status:</strong> APPROVED
+<strong>Authors:</strong> @jlwestsr, Claude Opus 4.5</p>
+<h2 id="executive-summary">Executive Summary</h2>
+<p>Nebulus Swarm extends Nebulus Atom into an autonomous, distributed agent system. An always-on <strong>Overlord</strong> monitors Slack and GitHub, spawning ephemeral <strong>Minion</strong> containers to implement features and fix bugs autonomously. Work is queued via GitHub Issues with labels, and humans interact through Slack.</p>
+<h2 id="1-high-level-architecture">1. High-Level Architecture</h2>
+<h3 id="components">Components</h3>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Role</th>
+<th>Runtime</th>
+<th>LLM</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Overlord</strong></td>
+<td>Control plane - watches Slack, manages Minions, maintains state</td>
+<td>Always-on (lightweight container)</td>
+<td>Small/cheap (8B) or rule-based</td>
+</tr>
+<tr>
+<td><strong>Minion</strong></td>
+<td>Worker - pulls repo, implements features, creates PRs</td>
+<td>Ephemeral (container per job)</td>
+<td>Large (30B+ for quality)</td>
+</tr>
+<tr>
+<td><strong>GitHub</strong></td>
+<td>Work queue (Issues with labels) + code storage</td>
+<td>External service</td>
+<td>N/A</td>
+</tr>
+<tr>
+<td><strong>Slack</strong></td>
+<td>Human interface - chat with Overlord, receive updates</td>
+<td>External service</td>
+<td>N/A</td>
+</tr>
+</tbody>
+</table>
+<h3 id="system-diagram">System Diagram</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>┌─────────────────────────────────────────────────────────┐
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>│                   NEBULUS OVERLORD                       │
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>│            (lightweight, always-on, watches Slack)       │
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>│                                                          │
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>│  • Listens to Slack 24/7                                │
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>│  • Spawns/stops Minions on demand                       │
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>│  • Relays status updates from Minions                   │
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>│  • Manages cron-triggered queue sweeps                  │
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>└──────────────────────┬──────────────────────────────────┘
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>                       │ spawns/manages
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>        ┌──────────────┼──────────────┐
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>        ▼              ▼              ▼
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>   ┌─────────┐    ┌─────────┐    ┌─────────┐
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>   │ Minion  │    │ Minion  │    │ Minion  │
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>   │    1    │    │    2    │    │    3    │
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>   └─────────┘    └─────────┘    └─────────┘
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>      repo A         repo A         repo B
+</code></pre></div>
+<h3 id="trigger-modes">Trigger Modes</h3>
+<ol>
+<li><strong>Cron</strong> - Overlord wakes Minions on schedule to check for <code>nebulus-ready</code> issues</li>
+<li><strong>On-demand</strong> - User tells Overlord via Slack: "Start working on issue #42 now"</li>
+<li><strong>Hybrid</strong> - Cron runs overnight, user can interrupt/prioritize via Slack during the day</li>
+</ol>
+<h2 id="2-overlord-design">2. Overlord Design</h2>
+<h3 id="responsibilities">Responsibilities</h3>
+<ul>
+<li>Watch Slack channel 24/7 for messages</li>
+<li>Parse commands ("start #42", "status", "pause", "list queue")</li>
+<li>Maintain state of all active Minions and their current tasks</li>
+<li>Spawn/stop Minion containers via Docker API</li>
+<li>Query GitHub Issues API for <code>nebulus-ready</code> labeled items</li>
+<li>Relay Minion progress updates to Slack</li>
+<li>Handle cron-triggered sweeps</li>
+</ul>
+<h3 id="tech-stack">Tech Stack</h3>
+<table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>Choice</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Runtime</td>
+<td>Python asyncio</td>
+<td>Matches existing Nebulus Atom codebase</td>
+</tr>
+<tr>
+<td>Slack Integration</td>
+<td>Slack Bolt SDK</td>
+<td>Official, handles websocket connection</td>
+</tr>
+<tr>
+<td>Container Management</td>
+<td>Docker SDK for Python</td>
+<td>Spawn/stop Minion containers</td>
+</tr>
+<tr>
+<td>State Storage</td>
+<td>SQLite</td>
+<td>Simple, file-based, survives restarts</td>
+</tr>
+<tr>
+<td>LLM (optional)</td>
+<td>Local 8B or regex/rules</td>
+<td>Only needs to understand commands, not code</td>
+</tr>
+</tbody>
+</table>
+<h3 id="state-schema">State Schema</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">minions</span><span class="w"> </span><span class="p">(</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">    </span><span class="n">id</span><span class="w"> </span><span class="nb">TEXT</span><span class="w"> </span><span class="k">PRIMARY</span><span class="w"> </span><span class="k">KEY</span><span class="p">,</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="n">container_id</span><span class="w"> </span><span class="nb">TEXT</span><span class="p">,</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">    </span><span class="n">repo</span><span class="w"> </span><span class="nb">TEXT</span><span class="p">,</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">    </span><span class="n">issue_number</span><span class="w"> </span><span class="nb">INTEGER</span><span class="p">,</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">    </span><span class="n">status</span><span class="w"> </span><span class="nb">TEXT</span><span class="p">,</span><span class="w">  </span><span class="c1">-- &#39;working&#39;, &#39;idle&#39;, &#39;error&#39;</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span><span class="n">started_at</span><span class="w"> </span><span class="k">TIMESTAMP</span><span class="p">,</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">    </span><span class="n">last_heartbeat</span><span class="w"> </span><span class="k">TIMESTAMP</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="p">);</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">work_history</span><span class="w"> </span><span class="p">(</span>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">    </span><span class="n">id</span><span class="w"> </span><span class="nb">INTEGER</span><span class="w"> </span><span class="k">PRIMARY</span><span class="w"> </span><span class="k">KEY</span><span class="w"> </span><span class="n">AUTOINCREMENT</span><span class="p">,</span>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="w">    </span><span class="n">minion_id</span><span class="w"> </span><span class="nb">TEXT</span><span class="p">,</span>
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="w">    </span><span class="n">repo</span><span class="w"> </span><span class="nb">TEXT</span><span class="p">,</span>
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="w">    </span><span class="n">issue_number</span><span class="w"> </span><span class="nb">INTEGER</span><span class="p">,</span>
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="w">    </span><span class="n">pr_number</span><span class="w"> </span><span class="nb">INTEGER</span><span class="p">,</span>
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="w">    </span><span class="n">status</span><span class="w"> </span><span class="nb">TEXT</span><span class="p">,</span><span class="w">  </span><span class="c1">-- &#39;success&#39;, &#39;failed&#39;, &#39;timeout&#39;</span>
+<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="w">    </span><span class="n">started_at</span><span class="w"> </span><span class="k">TIMESTAMP</span><span class="p">,</span>
+<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a><span class="w">    </span><span class="n">completed_at</span><span class="w"> </span><span class="k">TIMESTAMP</span><span class="p">,</span>
+<a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a><span class="w">    </span><span class="n">error_message</span><span class="w"> </span><span class="nb">TEXT</span>
+<a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a><span class="p">);</span>
+</code></pre></div>
+<h3 id="slack-commands">Slack Commands</h3>
+<p>Natural language, parsed by Overlord:</p>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>"What's the status?"</td>
+<td>List active Minions and their tasks</td>
+</tr>
+<tr>
+<td>"Work on issue #42"</td>
+<td>Spawn Minion for that issue</td>
+</tr>
+<tr>
+<td>"Stop the minion on #42"</td>
+<td>Kill that container</td>
+</tr>
+<tr>
+<td>"What's in the queue?"</td>
+<td>Query GitHub for <code>nebulus-ready</code> issues</td>
+</tr>
+<tr>
+<td>"Prioritize #45"</td>
+<td>Bump priority (add <code>high-priority</code> label)</td>
+</tr>
+<tr>
+<td>"Pause"</td>
+<td>Stop processing queue (Minions finish current work)</td>
+</tr>
+<tr>
+<td>"Resume"</td>
+<td>Resume queue processing</td>
+</tr>
+</tbody>
+</table>
+<h2 id="3-minion-design">3. Minion Design</h2>
+<h3 id="lifecycle">Lifecycle</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>Spawned → Clone Repo → Read Issue → Work → Commit → Push → Create PR → Report → Die
+</code></pre></div>
+<h3 id="characteristics">Characteristics</h3>
+<ul>
+<li>Fresh Docker container (sandboxed, isolated)</li>
+<li>Based on existing Nebulus Atom image</li>
+<li>Single mission: one GitHub issue</li>
+<li>Ephemeral - does its job and shuts down</li>
+</ul>
+<h3 id="environment-variables">Environment Variables</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">MINION_ID</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;minion-abc123&quot;</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nt">GITHUB_REPO</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;west_ai_labs/nebulus-atom&quot;</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="nt">GITHUB_ISSUE</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;42&quot;</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="nt">GITHUB_TOKEN</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${secret}&quot;</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="nt">OVERLORD_CALLBACK_URL</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;http://overlord:8080/minion/report&quot;</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="nt">NEBULUS_BASE_URL</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;http://192.168.4.30:8080/v1&quot;</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="nt">NEBULUS_MODEL</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;qwen3-coder-30b&quot;</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="nt">NEBULUS_TIMEOUT</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;600&quot;</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="nt">NEBULUS_STREAMING</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;false&quot;</span>
+</code></pre></div>
+<h3 id="workflow-steps">Workflow Steps</h3>
+<ol>
+<li><strong>Clone</strong> - <code>git clone</code> the repo into <code>/workspace</code></li>
+<li><strong>Branch</strong> - <code>git checkout -b minion/issue-42</code></li>
+<li><strong>Read Issue</strong> - Fetch issue body + comments from GitHub API</li>
+<li><strong>Analyze</strong> - Use cognition system to understand task complexity</li>
+<li><strong>Work</strong> - Implement the feature/fix using existing Nebulus Atom tools</li>
+<li><strong>Test</strong> - Run <code>pytest</code> if tests exist</li>
+<li><strong>Commit</strong> - Commit changes with message referencing issue</li>
+<li><strong>Push</strong> - Push branch to origin</li>
+<li><strong>PR</strong> - Create pull request via GitHub API, link to issue</li>
+<li><strong>Report</strong> - POST to Overlord: <code>{status: "complete", pr_url: "..."}</code></li>
+<li><strong>Die</strong> - Container exits, gets cleaned up</li>
+</ol>
+<h3 id="communication-with-overlord">Communication with Overlord</h3>
+<ul>
+<li><strong>Heartbeat</strong> - Every 60s: "Still working on #42..."</li>
+<li><strong>Progress</strong> - When milestones hit: "Tests passing, creating PR..."</li>
+<li><strong>Completion</strong> - Final report with PR link or error details</li>
+</ul>
+<h2 id="4-data-flow-communication">4. Data Flow &amp; Communication</h2>
+<h3 id="sequence-diagram">Sequence Diagram</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>┌─────┐       ┌───────┐      ┌──────────┐      ┌────────┐      ┌────────┐
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>│ You │       │ Slack │      │ Overlord │      │ Minion │      │ GitHub │
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>└──┬──┘       └───┬───┘      └────┬─────┘      └───┬────┘      └───┬────┘
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>   │              │               │                │               │
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>   │ &quot;work on #42&quot;│               │                │               │
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>   │─────────────&gt;│               │                │               │
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>   │              │  message      │                │               │
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>   │              │──────────────&gt;│                │               │
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>   │              │               │  fetch issue   │               │
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>   │              │               │───────────────────────────────&gt;│
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>   │              │               │  issue details │               │
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>   │              │               │&lt;───────────────────────────────│
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>   │              │               │                │               │
+<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>   │              │               │  spawn container               │
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>   │              │               │───────────────&gt;│               │
+<a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a>   │              │  &quot;Starting!&quot;  │                │               │
+<a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>   │              │&lt;──────────────│                │               │
+<a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a>   │ notification │               │                │  clone repo   │
+<a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a>   │&lt;─────────────│               │                │──────────────&gt;│
+<a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a>   │              │               │                │               │
+<a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a>   │              │               │  heartbeat     │  [working...] │
+<a id="__codelineno-4-22" name="__codelineno-4-22" href="#__codelineno-4-22"></a>   │              │               │&lt;───────────────│               │
+<a id="__codelineno-4-23" name="__codelineno-4-23" href="#__codelineno-4-23"></a>   │              │  &quot;Progress...│                │               │
+<a id="__codelineno-4-24" name="__codelineno-4-24" href="#__codelineno-4-24"></a>   │              │&lt;──────────────│                │               │
+<a id="__codelineno-4-25" name="__codelineno-4-25" href="#__codelineno-4-25"></a>   │              │               │                │  push + PR    │
+<a id="__codelineno-4-26" name="__codelineno-4-26" href="#__codelineno-4-26"></a>   │              │               │                │──────────────&gt;│
+<a id="__codelineno-4-27" name="__codelineno-4-27" href="#__codelineno-4-27"></a>   │              │               │  complete!     │               │
+<a id="__codelineno-4-28" name="__codelineno-4-28" href="#__codelineno-4-28"></a>   │              │               │&lt;───────────────│               │
+<a id="__codelineno-4-29" name="__codelineno-4-29" href="#__codelineno-4-29"></a>   │              │  &quot;PR ready!&quot;  │                │               │
+<a id="__codelineno-4-30" name="__codelineno-4-30" href="#__codelineno-4-30"></a>   │              │&lt;──────────────│                │               │
+<a id="__codelineno-4-31" name="__codelineno-4-31" href="#__codelineno-4-31"></a>   │ notification │               │  cleanup       │               │
+<a id="__codelineno-4-32" name="__codelineno-4-32" href="#__codelineno-4-32"></a>   │&lt;─────────────│               │───────────────&gt;│ (dies)        │
+<a id="__codelineno-4-33" name="__codelineno-4-33" href="#__codelineno-4-33"></a>   │              │               │                │               │
+</code></pre></div>
+<h3 id="message-formats">Message Formats</h3>
+<p><strong>Minion → Overlord (HTTP POST):</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="p">{</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">    </span><span class="nt">&quot;minion_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;minion-abc123&quot;</span><span class="p">,</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">    </span><span class="nt">&quot;event&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;heartbeat | progress | complete | error&quot;</span><span class="p">,</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">    </span><span class="nt">&quot;issue&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span><span class="p">,</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">    </span><span class="nt">&quot;message&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Running tests...&quot;</span><span class="p">,</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">    </span><span class="nt">&quot;data&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;pr_url&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;...&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;branch&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;...&quot;</span><span class="p">}</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="p">}</span>
+</code></pre></div></p>
+<p><strong>Overlord → Slack:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>🤖 Minion working on #42: Running tests...
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>✅ Minion completed #42: PR ready → github.com/org/repo/pull/43
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>❌ Minion failed on #42: Tests failing - see logs
+</code></pre></div></p>
+<h3 id="overlord-internal-api">Overlord Internal API</h3>
+<table>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>POST /minion/report</code></td>
+<td>Receive Minion heartbeats/completion</td>
+</tr>
+<tr>
+<td><code>GET /status</code></td>
+<td>Health check + active Minion list</td>
+</tr>
+<tr>
+<td><code>POST /spawn</code></td>
+<td>Manually trigger a Minion (internal)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="5-error-handling-recovery">5. Error Handling &amp; Recovery</h2>
+<h3 id="failure-modes">Failure Modes</h3>
+<table>
+<thead>
+<tr>
+<th>Failure Mode</th>
+<th>Detection</th>
+<th>Recovery</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Minion crashes mid-work</td>
+<td>No heartbeat for 5 min</td>
+<td>Overlord kills container, reports to Slack, marks issue as <code>needs-attention</code></td>
+</tr>
+<tr>
+<td>LLM times out (cold start)</td>
+<td>Minion reports timeout</td>
+<td>Retry once with warm-up ping first, then fail gracefully</td>
+</tr>
+<tr>
+<td>Tests fail</td>
+<td>Minion detects pytest exit code</td>
+<td>Create PR anyway but mark as <code>draft</code>, report failure details</td>
+</tr>
+<tr>
+<td>Git push rejected</td>
+<td>Minion gets error</td>
+<td>Pull latest, rebase, retry once, then fail with details</td>
+</tr>
+<tr>
+<td>GitHub API rate limit</td>
+<td>403 response</td>
+<td>Back off, notify Overlord, pause queue processing</td>
+</tr>
+<tr>
+<td>Overlord crashes</td>
+<td>Systemd/Docker restart policy</td>
+<td>Auto-restart, Minions continue (they're independent), reconnect to Slack</td>
+</tr>
+</tbody>
+</table>
+<h3 id="minion-self-protection">Minion Self-Protection</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># Max runtime to prevent runaway Minions</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="n">MINION_TIMEOUT</span> <span class="o">=</span> <span class="mi">30</span> <span class="o">*</span> <span class="mi">60</span>  <span class="c1"># 30 minutes max per issue</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="c1"># If task seems too big, bail early</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="k">if</span> <span class="n">cognition_result</span><span class="o">.</span><span class="n">complexity</span> <span class="o">==</span> <span class="s2">&quot;COMPLEX&quot;</span> <span class="ow">and</span> <span class="n">cognition_result</span><span class="o">.</span><span class="n">estimated_steps</span> <span class="o">&gt;</span> <span class="mi">20</span><span class="p">:</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>    <span class="n">report_to_overlord</span><span class="p">(</span><span class="s2">&quot;error&quot;</span><span class="p">,</span> <span class="s2">&quot;Task too complex for autonomous work, needs human breakdown&quot;</span><span class="p">)</span>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>    <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="overlord-watchdog">Overlord Watchdog</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">watchdog_loop</span><span class="p">():</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>    <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>        <span class="k">for</span> <span class="n">minion</span> <span class="ow">in</span> <span class="n">get_active_minions</span><span class="p">():</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>            <span class="k">if</span> <span class="n">time_since</span><span class="p">(</span><span class="n">minion</span><span class="o">.</span><span class="n">last_heartbeat</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">timedelta</span><span class="p">(</span><span class="n">minutes</span><span class="o">=</span><span class="mi">5</span><span class="p">):</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>                <span class="n">kill_container</span><span class="p">(</span><span class="n">minion</span><span class="o">.</span><span class="n">container_id</span><span class="p">)</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>                <span class="n">notify_slack</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;☠️ Minion on #</span><span class="si">{</span><span class="n">minion</span><span class="o">.</span><span class="n">issue</span><span class="si">}</span><span class="s2"> went silent, terminated&quot;</span><span class="p">)</span>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>                <span class="n">update_github_label</span><span class="p">(</span><span class="n">minion</span><span class="o">.</span><span class="n">issue</span><span class="p">,</span> <span class="s2">&quot;needs-attention&quot;</span><span class="p">)</span>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>        <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">60</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="graceful-degradation">Graceful Degradation</h3>
+<ul>
+<li>If GitHub is down → Overlord reports "GitHub unavailable", pauses queue, retries hourly</li>
+<li>If LLM backend is down → Same pattern, with option to try fallback model</li>
+<li>If Slack is down → Overlord logs locally, queues messages, delivers when reconnected</li>
+</ul>
+<h2 id="6-deployment-configuration">6. Deployment &amp; Configuration</h2>
+<h3 id="container-architecture">Container Architecture</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>nebulus-server
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>├── overlord (always running)
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>│   ├── Port 8080 (internal API)
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>│   ├── Volume: /var/lib/overlord/state.db
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>│   └── Network: nebulus-swarm
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>│
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>└── minion-pool (spawned on demand)
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>    ├── minion-abc123 (working on #42)
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>    ├── minion-def456 (working on #45)
+<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>    └── ... (up to MAX_CONCURRENT_MINIONS)
+</code></pre></div>
+<h3 id="docker-compose">Docker Compose</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;3.8&quot;</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="nt">services</span><span class="p">:</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">  </span><span class="nt">overlord</span><span class="p">:</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nebulus-overlord:latest</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="w">    </span><span class="nt">container_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">overlord</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="w">    </span><span class="nt">restart</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unless-stopped</span>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN}</span>
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">SLACK_CHANNEL_ID=${SLACK_CHANNEL_ID}</span>
+<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">GITHUB_TOKEN=${GITHUB_TOKEN}</span>
+<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">NEBULUS_BASE_URL=http://192.168.4.30:8080/v1</span>
+<a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">NEBULUS_MODEL=qwen3-coder-30b</span>
+<a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">MAX_CONCURRENT_MINIONS=3</span>
+<a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">CRON_SCHEDULE=0 2 * * *</span>
+<a id="__codelineno-10-15" name="__codelineno-10-15" href="#__codelineno-10-15"></a><span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
+<a id="__codelineno-10-16" name="__codelineno-10-16" href="#__codelineno-10-16"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">overlord-state:/var/lib/overlord</span>
+<a id="__codelineno-10-17" name="__codelineno-10-17" href="#__codelineno-10-17"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/run/docker.sock:/var/run/docker.sock</span>
+<a id="__codelineno-10-18" name="__codelineno-10-18" href="#__codelineno-10-18"></a><span class="w">    </span><span class="nt">networks</span><span class="p">:</span>
+<a id="__codelineno-10-19" name="__codelineno-10-19" href="#__codelineno-10-19"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nebulus-swarm</span>
+<a id="__codelineno-10-20" name="__codelineno-10-20" href="#__codelineno-10-20"></a>
+<a id="__codelineno-10-21" name="__codelineno-10-21" href="#__codelineno-10-21"></a><span class="nt">volumes</span><span class="p">:</span>
+<a id="__codelineno-10-22" name="__codelineno-10-22" href="#__codelineno-10-22"></a><span class="w">  </span><span class="nt">overlord-state</span><span class="p">:</span>
+<a id="__codelineno-10-23" name="__codelineno-10-23" href="#__codelineno-10-23"></a>
+<a id="__codelineno-10-24" name="__codelineno-10-24" href="#__codelineno-10-24"></a><span class="nt">networks</span><span class="p">:</span>
+<a id="__codelineno-10-25" name="__codelineno-10-25" href="#__codelineno-10-25"></a><span class="w">  </span><span class="nt">nebulus-swarm</span><span class="p">:</span>
+<a id="__codelineno-10-26" name="__codelineno-10-26" href="#__codelineno-10-26"></a><span class="w">    </span><span class="nt">driver</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bridge</span>
+</code></pre></div>
+<h3 id="configuration-file">Configuration File</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1"># /etc/nebulus/swarm.yaml</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="nt">overlord</span><span class="p">:</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">  </span><span class="nt">slack</span><span class="p">:</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">    </span><span class="nt">bot_token</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${SLACK_BOT_TOKEN}</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="w">    </span><span class="nt">channel_id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;C07XXXXXX&quot;</span>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="w">  </span><span class="nt">github</span><span class="p">:</span>
+<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="w">    </span><span class="nt">token</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${GITHUB_TOKEN}</span>
+<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a><span class="w">    </span><span class="nt">watched_repos</span><span class="p">:</span>
+<a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">west_ai_labs/nebulus-atom</span>
+<a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">west_ai_labs/other-project</span>
+<a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a><span class="w">    </span><span class="nt">work_label</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;nebulus-ready&quot;</span>
+<a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a>
+<a id="__codelineno-11-14" name="__codelineno-11-14" href="#__codelineno-11-14"></a><span class="w">  </span><span class="nt">minions</span><span class="p">:</span>
+<a id="__codelineno-11-15" name="__codelineno-11-15" href="#__codelineno-11-15"></a><span class="w">    </span><span class="nt">max_concurrent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
+<a id="__codelineno-11-16" name="__codelineno-11-16" href="#__codelineno-11-16"></a><span class="w">    </span><span class="nt">timeout_minutes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">30</span>
+<a id="__codelineno-11-17" name="__codelineno-11-17" href="#__codelineno-11-17"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nebulus-minion:latest</span>
+<a id="__codelineno-11-18" name="__codelineno-11-18" href="#__codelineno-11-18"></a>
+<a id="__codelineno-11-19" name="__codelineno-11-19" href="#__codelineno-11-19"></a><span class="w">  </span><span class="nt">cron</span><span class="p">:</span>
+<a id="__codelineno-11-20" name="__codelineno-11-20" href="#__codelineno-11-20"></a><span class="w">    </span><span class="nt">enabled</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<a id="__codelineno-11-21" name="__codelineno-11-21" href="#__codelineno-11-21"></a><span class="w">    </span><span class="nt">schedule</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;0</span><span class="nv"> </span><span class="s">2</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">*&quot;</span>
+<a id="__codelineno-11-22" name="__codelineno-11-22" href="#__codelineno-11-22"></a>
+<a id="__codelineno-11-23" name="__codelineno-11-23" href="#__codelineno-11-23"></a><span class="w">  </span><span class="nt">llm</span><span class="p">:</span>
+<a id="__codelineno-11-24" name="__codelineno-11-24" href="#__codelineno-11-24"></a><span class="w">    </span><span class="nt">base_url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http://192.168.4.30:8080/v1</span>
+<a id="__codelineno-11-25" name="__codelineno-11-25" href="#__codelineno-11-25"></a><span class="w">    </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">qwen3-coder-30b</span>
+<a id="__codelineno-11-26" name="__codelineno-11-26" href="#__codelineno-11-26"></a><span class="w">    </span><span class="nt">timeout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">600</span>
+<a id="__codelineno-11-27" name="__codelineno-11-27" href="#__codelineno-11-27"></a><span class="w">    </span><span class="nt">streaming</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+</code></pre></div>
+<h2 id="7-testing-verification">7. Testing &amp; Verification</h2>
+<h3 id="testing-layers">Testing Layers</h3>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>What We Test</th>
+<th>How</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Unit</td>
+<td>Overlord command parsing, state management</td>
+<td>pytest with mocks</td>
+</tr>
+<tr>
+<td>Unit</td>
+<td>Minion workflow steps (clone, branch, PR)</td>
+<td>pytest with mocks</td>
+</tr>
+<tr>
+<td>Integration</td>
+<td>Overlord ↔ Minion communication</td>
+<td>Docker Compose test environment</td>
+</tr>
+<tr>
+<td>Integration</td>
+<td>GitHub API interactions</td>
+<td>VCR cassettes (recorded responses)</td>
+</tr>
+<tr>
+<td>End-to-End</td>
+<td>Full flow: Slack → Overlord → Minion → PR</td>
+<td>Test repo + test Slack channel</td>
+</tr>
+</tbody>
+</table>
+<h3 id="test-repository">Test Repository</h3>
+<p>Create <code>west_ai_labs/nebulus-swarm-testbed</code> with:
+- Simple Python project
+- Pre-written "easy win" issues (<code>Add a multiply function</code>)
+- Used exclusively for E2E testing</p>
+<h3 id="verification-checklist">Verification Checklist</h3>
+<p><strong>Overlord:</strong>
+- [ ] Connects to Slack and responds to "ping"
+- [ ] Parses natural language commands correctly
+- [ ] Spawns Minion container on demand
+- [ ] Receives heartbeats and updates state
+- [ ] Cleans up dead Minions after timeout
+- [ ] Survives restart (state persists in SQLite)</p>
+<p><strong>Minion:</strong>
+- [ ] Clones repo successfully
+- [ ] Creates branch with correct naming
+- [ ] Reads issue and understands task
+- [ ] Makes appropriate code changes
+- [ ] Runs tests if present
+- [ ] Creates PR linked to issue
+- [ ] Reports completion to Overlord
+- [ ] Dies cleanly after work</p>
+<p><strong>Full Flow:</strong>
+- [ ] Slack "work on #1" → PR created in &lt; 10 min
+- [ ] Cron trigger processes queue correctly
+- [ ] Multiple Minions can run in parallel
+- [ ] Failed Minion gets cleaned up, Slack notified</p>
+<h3 id="smoke-test-script">Smoke Test Script</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="ch">#!/bin/bash</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="c1"># scripts/smoke-test.sh</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="c1"># Quick validation after deployment</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;1. Testing Overlord ping...&quot;</span>
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="c1"># Posts &quot;ping&quot; to Slack → expects &quot;pong&quot;</span>
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>
+<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;2. Creating test issue...&quot;</span>
+<a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a><span class="c1"># Creates test issue with nebulus-ready label</span>
+<a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a>
+<a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;3. Triggering Minion...&quot;</span>
+<a id="__codelineno-12-12" name="__codelineno-12-12" href="#__codelineno-12-12"></a><span class="c1"># Tells Overlord to work on it</span>
+<a id="__codelineno-12-13" name="__codelineno-12-13" href="#__codelineno-12-13"></a>
+<a id="__codelineno-12-14" name="__codelineno-12-14" href="#__codelineno-12-14"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;4. Waiting for PR...&quot;</span>
+<a id="__codelineno-12-15" name="__codelineno-12-15" href="#__codelineno-12-15"></a><span class="c1"># Waits for PR (timeout 15 min)</span>
+<a id="__codelineno-12-16" name="__codelineno-12-16" href="#__codelineno-12-16"></a>
+<a id="__codelineno-12-17" name="__codelineno-12-17" href="#__codelineno-12-17"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;5. Verifying PR...&quot;</span>
+<a id="__codelineno-12-18" name="__codelineno-12-18" href="#__codelineno-12-18"></a><span class="c1"># Verifies PR exists and links to issue</span>
+</code></pre></div>
+<h2 id="8-implementation-roadmap">8. Implementation Roadmap</h2>
+<h3 id="phase-1-overlord-foundation-week-1">Phase 1: Overlord Foundation (Week 1)</h3>
+<ul>
+<li>[ ] Create <code>nebulus_swarm/</code> package structure</li>
+<li>[ ] Slack Bolt integration - connect, listen, respond to "ping"</li>
+<li>[ ] Basic command parser (regex-based, upgrade to LLM later)</li>
+<li>[ ] SQLite state management</li>
+<li>[ ] Docker SDK integration - spawn/kill containers</li>
+<li>[ ] Health check endpoint</li>
+</ul>
+<h3 id="phase-2-minion-mvp-week-2">Phase 2: Minion MVP (Week 2)</h3>
+<ul>
+<li>[ ] Minion Dockerfile based on Nebulus Atom</li>
+<li>[ ] Entrypoint script: clone → branch → read issue</li>
+<li>[ ] Integrate existing Nebulus Atom agent for the "work" phase</li>
+<li>[ ] Heartbeat reporting to Overlord</li>
+<li>[ ] Git push + PR creation via GitHub API</li>
+<li>[ ] Completion reporting</li>
+</ul>
+<h3 id="phase-3-wire-it-together-week-3">Phase 3: Wire It Together (Week 3)</h3>
+<ul>
+<li>[ ] Overlord spawns Minion on Slack command</li>
+<li>[ ] Minion reports back, Overlord relays to Slack</li>
+<li>[ ] Watchdog for stuck Minions</li>
+<li>[ ] End-to-end test with testbed repo</li>
+<li>[ ] Error handling for common failures</li>
+</ul>
+<h3 id="phase-4-cron-polish-week-4">Phase 4: Cron &amp; Polish (Week 4)</h3>
+<ul>
+<li>[ ] Cron-triggered queue sweeps</li>
+<li>[ ] GitHub label management (<code>nebulus-ready</code> → <code>in-progress</code> → <code>in-review</code>)</li>
+<li>[ ] Multiple repo support</li>
+<li>[ ] Concurrent Minion limits</li>
+<li>[ ] LLM warm-up ping before heavy work</li>
+</ul>
+<h3 id="phase-5-production-hardening-week-5">Phase 5: Production Hardening (Week 5)</h3>
+<ul>
+<li>[ ] Logging and observability (integrate with existing telemetry)</li>
+<li>[ ] Graceful shutdown handling</li>
+<li>[ ] Rate limiting for GitHub API</li>
+<li>[ ] Documentation and runbooks</li>
+<li>[ ] Deployment scripts for Nebulus server</li>
+</ul>
+<h3 id="phase-6-automated-pr-review-future">Phase 6: Automated PR Review (Future)</h3>
+<blockquote>
+<p><strong>Note:</strong> Initially, all Minion PRs will be reviewed manually by the human operator.
+This allows us to catch local LLM quirks, build a "failure corpus" for prompt tuning,
+and understand when 8B vs 30B models are appropriate. Phase 6 should only be
+implemented after sufficient manual review experience.</p>
+</blockquote>
+<ul>
+<li>[ ] AI Reviewer agent examines Minion PRs before notifying human</li>
+<li>[ ] Automated checks: tests pass, code style, security scan, complexity analysis</li>
+<li>[ ] Reviewer adds inline comments on concerning code</li>
+<li>[ ] Reviewer posts summary: approval or request-changes with reasoning</li>
+<li>[ ] Human receives pre-screened PRs with AI review notes</li>
+<li>[ ] Configurable auto-merge for low-risk, reviewer-approved PRs</li>
+</ul>
+<p><strong>Review Flow (Phase 6):</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>Minion creates PR → AI Reviewer examines → Posts review notes → Human final approval
+</code></pre></div></p>
+<h3 id="stretch-goals-future">Stretch Goals (Future)</h3>
+<ul>
+<li>[ ] Overlord uses LLM for natural language understanding</li>
+<li>[ ] Minion can ask clarifying questions via Slack before starting</li>
+<li>[ ] Web dashboard showing Minion status and history</li>
+<li>[ ] Multi-LLM support (route simple tasks to 8B, complex to 30B)</li>
+</ul>
+<h2 id="9-references">9. References</h2>
+<ul>
+<li><a href="https://openclaw.ai/">OpenClaw</a> - Proactive AI agent with cron jobs and persistent memory</li>
+<li><a href="https://github.com/SWE-agent/SWE-agent">SWE-agent</a> - GitHub issue solving agent from Princeton/Stanford</li>
+<li><a href="https://github.com/aws-samples/remote-swe-agents">AWS Remote SWE Agents</a> - GitHub Actions triggered agent system</li>
+<li><a href="https://slack.dev/bolt-python/">Slack Bolt SDK</a> - Official Python framework for Slack apps</li>
+<li><a href="https://docker-py.readthedocs.io/">Docker SDK for Python</a> - Programmatic container management</li>
+</ul>
+<hr />
+<p><strong>Document History:</strong>
+| Date | Author | Change |
+|------|--------|--------|
+| 2026-02-02 | @jlwestsr, Claude | Initial design |
+| 2026-02-02 | @jlwestsr, Claude | Added Phase 6: Automated PR Review |</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.expand", "navigation.indexes"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

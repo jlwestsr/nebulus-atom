@@ -1,0 +1,877 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Documentation for ai_project">
+      
+      
+        <meta name="author" content="User">
+      
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>Demo & Swarm Infrastructure Setup Guide - ai_project</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#demo-swarm-infrastructure-setup-guide" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="ai_project" class="md-header__button md-logo" aria-label="ai_project" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            ai_project
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Demo &amp; Swarm Infrastructure Setup Guide
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="ai_project" class="md-nav__button md-logo" aria-label="ai_project" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    ai_project
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../rules/ai_behavior.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI Behavior
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../CONTEXT.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Context
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#act-1-core-agent-ready-now" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Act 1: Core Agent (Ready Now)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Act 1: Core Agent (Ready Now)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prerequisites
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#quick-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Start
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#demo-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Demo Flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#act-2-swarm-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Act 2: Swarm Setup
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Act 2: Swarm Setup">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#step-1-create-a-github-personal-access-token" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 1: Create a GitHub Personal Access Token
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-2-create-a-demo-github-repository" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 2: Create a Demo GitHub Repository
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-3-create-a-slack-app" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 3: Create a Slack App
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-4-configure-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 4: Configure Environment
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-5-build-docker-images" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 5: Build Docker Images
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-6-start-the-swarm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 6: Start the Swarm
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-7-demo-commands-in-slack" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 7: Demo Commands in Slack
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#act-3-dashboards" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Act 3: Dashboards
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Act 3: Dashboards">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#flight-recorder-core-agent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Flight Recorder (Core Agent)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#swarm-dashboard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Swarm Dashboard
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="demo-swarm-infrastructure-setup-guide">Demo &amp; Swarm Infrastructure Setup Guide</h1>
+<h2 id="overview">Overview</h2>
+<p>This guide covers everything needed to run the full Nebulus Atom demo:
+- <strong>Act 1</strong>: Core CLI Agent (interactive coding)
+- <strong>Act 2</strong>: Nebulus Swarm (Slack → GitHub → Docker minions → PR)
+- <strong>Act 3</strong>: Dashboards (Flight Recorder + Swarm Monitor)</p>
+<hr />
+<h2 id="act-1-core-agent-ready-now">Act 1: Core Agent (Ready Now)</h2>
+<h3 id="prerequisites">Prerequisites</h3>
+<ul>
+<li>Python 3.12+ with venv at <code>venv/</code></li>
+<li>LLM server running at <code>NEBULUS_BASE_URL</code> (configured in <code>.env</code>)</li>
+</ul>
+<h3 id="quick-start">Quick Start</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nb">cd</span><span class="w"> </span>/home/jlwestsr/projects/west_ai_labs/nebulus-atom
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">source</span><span class="w"> </span>venv/bin/activate
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>python3<span class="w"> </span>-m<span class="w"> </span>nebulus_atom.main<span class="w"> </span>start
+</code></pre></div>
+<h3 id="demo-flow">Demo Flow</h3>
+<ol>
+<li>Agent starts, health-checks the LLM server, shows banner</li>
+<li><strong>Context pinning</strong>: <code>pin_file nebulus_atom/config.py</code> then <code>/context</code></li>
+<li><strong>RAG search</strong>: Ask "index the codebase" first, then "search for how tools are dispatched"</li>
+<li><strong>Skill creation</strong>: Ask "create a skill called word_count that counts words in a file"</li>
+<li><strong>TDD loop</strong>: Ask "start a TDD cycle: implement a function that reverses a string"</li>
+<li><strong>Auto-execution</strong>: <code>create_plan</code>, <code>add_task</code>, <code>execute_plan</code></li>
+</ol>
+<hr />
+<h2 id="act-2-swarm-setup">Act 2: Swarm Setup</h2>
+<h3 id="step-1-create-a-github-personal-access-token">Step 1: Create a GitHub Personal Access Token</h3>
+<ol>
+<li>Go to https://github.com/settings/tokens?type=beta (Fine-grained tokens)</li>
+<li>Click <strong>"Generate new token"</strong></li>
+<li>Settings:</li>
+<li><strong>Token name</strong>: <code>nebulus-swarm-demo</code></li>
+<li><strong>Expiration</strong>: 30 days</li>
+<li><strong>Repository access</strong>: Select "Only select repositories" → pick your demo repo (Step 2)</li>
+<li><strong>Permissions</strong>:<ul>
+<li>Repository permissions:</li>
+<li><strong>Contents</strong>: Read and write</li>
+<li><strong>Issues</strong>: Read and write</li>
+<li><strong>Pull requests</strong>: Read and write</li>
+<li><strong>Metadata</strong>: Read-only (auto-granted)</li>
+</ul>
+</li>
+<li>Click <strong>"Generate token"</strong> and save it — you'll need it for <code>.env.swarm</code></li>
+</ol>
+<h3 id="step-2-create-a-demo-github-repository">Step 2: Create a Demo GitHub Repository</h3>
+<ol>
+<li>Create a new repo: https://github.com/new</li>
+<li><strong>Name</strong>: <code>nebulus-swarm-demo</code> (or similar)</li>
+<li><strong>Visibility</strong>: Public (for demo) or Private</li>
+<li><strong>Initialize with README</strong>: Yes</li>
+<li>Clone it locally:
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>git<span class="w"> </span>clone<span class="w"> </span>git@github.com:&lt;your-username&gt;/nebulus-swarm-demo.git<span class="w"> </span>/tmp/nebulus-swarm-demo
+</code></pre></div></li>
+<li>Seed it with a simple Python project and issues:</li>
+</ol>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nb">cd</span><span class="w"> </span>/tmp/nebulus-swarm-demo
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="c1"># Create a basic project structure</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>mkdir<span class="w"> </span>-p<span class="w"> </span>src<span class="w"> </span>tests
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>cat<span class="w"> </span>&gt;<span class="w"> </span>src/calculator.py<span class="w"> </span><span class="s">&lt;&lt; &#39;PYEOF&#39;</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="s">&quot;&quot;&quot;Simple calculator module.&quot;&quot;&quot;</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="s">def add(a: float, b: float) -&gt; float:</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="s">    &quot;&quot;&quot;Add two numbers.&quot;&quot;&quot;</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="s">    return a + b</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="s">def subtract(a: float, b: float) -&gt; float:</span>
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="s">    &quot;&quot;&quot;Subtract b from a.&quot;&quot;&quot;</span>
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="s">    return a - b</span>
+<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="s">PYEOF</span>
+<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>
+<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>cat<span class="w"> </span>&gt;<span class="w"> </span>tests/test_calculator.py<span class="w"> </span><span class="s">&lt;&lt; &#39;PYEOF&#39;</span>
+<a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a><span class="s">from src.calculator import add, subtract</span>
+<a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a>
+<a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a>
+<a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a><span class="s">def test_add():</span>
+<a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a><span class="s">    assert add(2, 3) == 5</span>
+<a id="__codelineno-2-25" name="__codelineno-2-25" href="#__codelineno-2-25"></a>
+<a id="__codelineno-2-26" name="__codelineno-2-26" href="#__codelineno-2-26"></a>
+<a id="__codelineno-2-27" name="__codelineno-2-27" href="#__codelineno-2-27"></a><span class="s">def test_subtract():</span>
+<a id="__codelineno-2-28" name="__codelineno-2-28" href="#__codelineno-2-28"></a><span class="s">    assert subtract(5, 3) == 2</span>
+<a id="__codelineno-2-29" name="__codelineno-2-29" href="#__codelineno-2-29"></a><span class="s">PYEOF</span>
+<a id="__codelineno-2-30" name="__codelineno-2-30" href="#__codelineno-2-30"></a>
+<a id="__codelineno-2-31" name="__codelineno-2-31" href="#__codelineno-2-31"></a>cat<span class="w"> </span>&gt;<span class="w"> </span>requirements.txt<span class="w"> </span><span class="s">&lt;&lt; &#39;PYEOF&#39;</span>
+<a id="__codelineno-2-32" name="__codelineno-2-32" href="#__codelineno-2-32"></a><span class="s">pytest&gt;=7.0.0</span>
+<a id="__codelineno-2-33" name="__codelineno-2-33" href="#__codelineno-2-33"></a><span class="s">PYEOF</span>
+<a id="__codelineno-2-34" name="__codelineno-2-34" href="#__codelineno-2-34"></a>
+<a id="__codelineno-2-35" name="__codelineno-2-35" href="#__codelineno-2-35"></a>git<span class="w"> </span>add<span class="w"> </span>-A<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;feat: initial calculator project&quot;</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>git<span class="w"> </span>push
+</code></pre></div>
+<ol>
+<li>Create demo issues using the GitHub CLI:
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>gh<span class="w"> </span>issue<span class="w"> </span>create<span class="w"> </span>--repo<span class="w"> </span>&lt;your-username&gt;/nebulus-swarm-demo<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span>--title<span class="w"> </span><span class="s2">&quot;Add multiply function to calculator&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span>--body<span class="w"> </span><span class="s2">&quot;Add a multiply(a, b) function to src/calculator.py that multiplies two numbers. Include a test in tests/test_calculator.py.&quot;</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>gh<span class="w"> </span>issue<span class="w"> </span>create<span class="w"> </span>--repo<span class="w"> </span>&lt;your-username&gt;/nebulus-swarm-demo<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">  </span>--title<span class="w"> </span><span class="s2">&quot;Add divide function with zero-division handling&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">  </span>--body<span class="w"> </span><span class="s2">&quot;Add a divide(a, b) function to src/calculator.py. It should raise ValueError if b is 0. Include tests for both normal division and the error case.&quot;</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>gh<span class="w"> </span>issue<span class="w"> </span>create<span class="w"> </span>--repo<span class="w"> </span>&lt;your-username&gt;/nebulus-swarm-demo<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">  </span>--title<span class="w"> </span><span class="s2">&quot;Add docstring to all test functions&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="w">  </span>--body<span class="w"> </span><span class="s2">&quot;Each test function in tests/test_calculator.py should have a one-line docstring describing what it tests.&quot;</span>
+</code></pre></div></li>
+</ol>
+<h3 id="step-3-create-a-slack-app">Step 3: Create a Slack App</h3>
+<ol>
+<li>Go to https://api.slack.com/apps and click <strong>"Create New App"</strong></li>
+<li>Choose <strong>"From scratch"</strong></li>
+<li><strong>App Name</strong>: <code>Nebulus Swarm</code></li>
+<li><strong>Workspace</strong>: Select your workspace</li>
+<li><strong>Enable Socket Mode</strong>:</li>
+<li>Go to <strong>Socket Mode</strong> in the left sidebar</li>
+<li>Toggle <strong>"Enable Socket Mode"</strong> ON</li>
+<li>Create an app-level token:<ul>
+<li><strong>Token Name</strong>: <code>nebulus-socket</code></li>
+<li><strong>Scope</strong>: <code>connections:write</code></li>
+</ul>
+</li>
+<li>Save the token (starts with <code>xapp-</code>) — this is your <code>SLACK_APP_TOKEN</code></li>
+<li><strong>Add Bot Scopes</strong>:</li>
+<li>Go to <strong>OAuth &amp; Permissions</strong></li>
+<li>Under "Bot Token Scopes", add:<ul>
+<li><code>chat:write</code></li>
+<li><code>channels:history</code></li>
+<li><code>channels:read</code></li>
+<li><code>app_mentions:read</code></li>
+</ul>
+</li>
+<li><strong>Enable Events</strong>:</li>
+<li>Go to <strong>Event Subscriptions</strong></li>
+<li>Toggle <strong>"Enable Events"</strong> ON</li>
+<li>Under "Subscribe to bot events", add:<ul>
+<li><code>message.channels</code></li>
+<li><code>app_mention</code></li>
+</ul>
+</li>
+<li><strong>Install to Workspace</strong>:</li>
+<li>Go to <strong>Install App</strong></li>
+<li>Click <strong>"Install to Workspace"</strong> and authorize</li>
+<li>Copy the <strong>Bot User OAuth Token</strong> (starts with <code>xoxb-</code>) — this is your <code>SLACK_BOT_TOKEN</code></li>
+<li><strong>Get Channel ID</strong>:</li>
+<li>In Slack, right-click the channel → "View channel details"</li>
+<li>The Channel ID is at the bottom (starts with <code>C</code>)</li>
+<li>Invite the bot: <code>/invite @Nebulus Swarm</code></li>
+</ol>
+<h3 id="step-4-configure-environment">Step 4: Configure Environment</h3>
+<p>Create <code>.env.swarm</code> in the project root:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>cat<span class="w"> </span>&gt;<span class="w"> </span>.env.swarm<span class="w"> </span><span class="s">&lt;&lt; &#39;EOF&#39;</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="s"># Slack</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="s">SLACK_BOT_TOKEN=xoxb-your-token-here</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="s">SLACK_APP_TOKEN=xapp-your-token-here</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="s">SLACK_CHANNEL_ID=C0123456789</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="s"># GitHub</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="s">GITHUB_TOKEN=github_pat_your-token-here</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="s">GITHUB_WATCHED_REPOS=your-username/nebulus-swarm-demo</span>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="s"># LLM Backend (same as core agent)</span>
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="s">NEBULUS_BASE_URL=http://192.168.4.30:8080/v1</span>
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="s">NEBULUS_API_KEY=admin</span>
+<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a><span class="s">NEBULUS_MODEL=qwen3-coder-30b</span>
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="s">NEBULUS_TIMEOUT=600</span>
+<a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a><span class="s">NEBULUS_STREAMING=false</span>
+<a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>
+<a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a><span class="s"># Minion Settings</span>
+<a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a><span class="s">MAX_CONCURRENT_MINIONS=2</span>
+<a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a>
+<a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a><span class="s"># Cron (disable for demo — trigger manually via Slack)</span>
+<a id="__codelineno-4-22" name="__codelineno-4-22" href="#__codelineno-4-22"></a><span class="s">CRON_ENABLED=false</span>
+<a id="__codelineno-4-23" name="__codelineno-4-23" href="#__codelineno-4-23"></a>
+<a id="__codelineno-4-24" name="__codelineno-4-24" href="#__codelineno-4-24"></a><span class="s"># Model Routing (optional)</span>
+<a id="__codelineno-4-25" name="__codelineno-4-25" href="#__codelineno-4-25"></a><span class="s">ROUTING_ENABLED=false</span>
+<a id="__codelineno-4-26" name="__codelineno-4-26" href="#__codelineno-4-26"></a>
+<a id="__codelineno-4-27" name="__codelineno-4-27" href="#__codelineno-4-27"></a><span class="s"># PR Reviewer (optional)</span>
+<a id="__codelineno-4-28" name="__codelineno-4-28" href="#__codelineno-4-28"></a><span class="s">REVIEWER_ENABLED=false</span>
+<a id="__codelineno-4-29" name="__codelineno-4-29" href="#__codelineno-4-29"></a><span class="s">EOF</span>
+</code></pre></div>
+<h3 id="step-5-build-docker-images">Step 5: Build Docker Images</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nb">cd</span><span class="w"> </span>/home/jlwestsr/projects/west_ai_labs/nebulus-atom
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="c1"># Build the minion image first (Overlord spawns these)</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>docker<span class="w"> </span>build<span class="w"> </span>-t<span class="w"> </span>nebulus-minion:latest<span class="w"> </span>-f<span class="w"> </span>nebulus_swarm/minion/Dockerfile<span class="w"> </span>.
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="c1"># Build the overlord image</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>docker<span class="w"> </span>build<span class="w"> </span>-t<span class="w"> </span>nebulus-overlord:latest<span class="w"> </span>-f<span class="w"> </span>nebulus_swarm/overlord/Dockerfile<span class="w"> </span>.
+</code></pre></div>
+<h3 id="step-6-start-the-swarm">Step 6: Start the Swarm</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># Start the Overlord</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>docker-compose<span class="w"> </span>-f<span class="w"> </span>docker-compose.swarm.yml<span class="w"> </span>up<span class="w"> </span>-d<span class="w"> </span>overlord
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="c1"># Check it&#39;s running</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>docker<span class="w"> </span>logs<span class="w"> </span>-f<span class="w"> </span>overlord
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="c1"># Verify health</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>curl<span class="w"> </span>http://localhost:8080/health
+</code></pre></div>
+<h3 id="step-7-demo-commands-in-slack">Step 7: Demo Commands in Slack</h3>
+<p><div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>work on your-username/nebulus-swarm-demo#1
+</code></pre></div>
+This will:
+1. Queue the issue
+2. Spawn a minion container
+3. Clone the repo
+4. Read the issue
+5. Write code
+6. Create a PR
+7. Report back in Slack</p>
+<p>Other commands:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>status          # Show active minions
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>queue           # Show pending work
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>history         # Show completed work
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>cancel &lt;id&gt;     # Kill a minion
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>sweep           # Process entire queue
+</code></pre></div></p>
+<hr />
+<h2 id="act-3-dashboards">Act 3: Dashboards</h2>
+<h3 id="flight-recorder-core-agent">Flight Recorder (Core Agent)</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nb">source</span><span class="w"> </span>venv/bin/activate
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>python3<span class="w"> </span>-m<span class="w"> </span>nebulus_atom.main<span class="w"> </span>dashboard
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="c1"># Opens at http://localhost:8501</span>
+</code></pre></div>
+<h3 id="swarm-dashboard">Swarm Dashboard</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nb">source</span><span class="w"> </span>venv/bin/activate
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>streamlit<span class="w"> </span>run<span class="w"> </span>nebulus_swarm/dashboard/app.py
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="c1"># Opens at http://localhost:8502</span>
+</code></pre></div>
+<p>Note: The Swarm Dashboard reads from the Overlord's SQLite state database.
+For local development, you may need to mount or copy the state DB.</p>
+<hr />
+<h2 id="troubleshooting">Troubleshooting</h2>
+<table>
+<thead>
+<tr>
+<th>Issue</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Agent says "Cannot reach LLM server"</td>
+<td>Check that your LLM server is running and <code>NEBULUS_BASE_URL</code> is correct</td>
+</tr>
+<tr>
+<td>Agent shows "Model not found"</td>
+<td>Run <code>curl $NEBULUS_BASE_URL/models</code> and update <code>NEBULUS_MODEL</code> in <code>.env</code></td>
+</tr>
+<tr>
+<td>Slack bot doesn't respond</td>
+<td>Verify Socket Mode is enabled and <code>SLACK_APP_TOKEN</code> starts with <code>xapp-</code></td>
+</tr>
+<tr>
+<td>Minion can't clone repo</td>
+<td>Check <code>GITHUB_TOKEN</code> has Contents read/write permission</td>
+</tr>
+<tr>
+<td>Minion can't create PR</td>
+<td>Check <code>GITHUB_TOKEN</code> has Pull requests read/write permission</td>
+</tr>
+<tr>
+<td>Docker build fails</td>
+<td>Ensure Docker is running: <code>docker info</code></td>
+</tr>
+<tr>
+<td>Dashboard shows no data</td>
+<td>Run the agent first to generate telemetry data</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.expand", "navigation.indexes"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
