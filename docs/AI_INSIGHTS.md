@@ -642,3 +642,72 @@ This shim pattern works for any module that:
 - **Don't**: Use `sys.path` manipulation instead of try/except (fragile, hard to debug)
 
 ---
+
+## 2026-02-10: Overlord Slack Intelligence — Regex Anchoring and Silent Fallback Failures
+
+### Context
+Overlord's Slack bot responded to every agent status update with "I couldn't process that right now." Three root causes were identified and fixed in a single feature branch.
+
+### Problem 1: Regex Anchor Blocking Agent Messages
+
+**Root Cause**: `_RE_UPDATE` used a `^` anchor, requiring update keywords at the start of the message. Agent status updates use Slack formatting (`*Bold Title*`, `_Italic Title_`) which pushed keywords past the anchor.
+
+```python
+# Before (broken): ^anchored, misses formatted messages
+_RE_UPDATE = re.compile(r"^(?:update|status\s+update|...)\b", re.IGNORECASE)
+
+# After (fixed): no anchor, searches anywhere in message
+_RE_UPDATE = re.compile(r"(?:update|status\s+update|...|merged|complete|done|finished)\b", re.IGNORECASE)
+```
+
+**Lesson**: When matching Slack messages, never anchor regexes with `^` unless you're certain the message won't have formatting prefixes. Slack bold (`*text*`), italic (`_text_`), and emoji prefixes are common.
+
+### Problem 2: LLM Fallback Swallowing Errors
+
+**Root Cause**: The `_handle_llm_fallback()` method caught all exceptions and returned a generic "I couldn't process that right now." message with no diagnostic information. When the LLM endpoint (`localhost:5000/v1`) was unreachable, users had no way to know why.
+
+**Fix**: Error messages now include the endpoint URL, error type, and actionable guidance:
+- Timeout: `"LLM timed out (15s). Endpoint: localhost:5000/v1"`
+- Exception: `"LLM unavailable: ConnectionError. Endpoint: localhost:5000/v1"`
+
+**Lesson**: Never swallow exception details in user-facing error messages. At minimum, surface the error type and the resource that failed. This is especially important for infrastructure endpoints where "is it running?" is the first debugging question.
+
+### Problem 3: post_message Parameter Mismatch
+
+**Root Cause**: `slack_commands.py` line 703 called `self.slack_bot.post_message(response, channel=channel_id)`, but `SlackBot.post_message()` signature is `(text, thread_ts=None)` — it doesn't accept a `channel` kwarg. Python silently ignores unexpected kwargs in some calling patterns, so this bug was invisible.
+
+**Lesson**: When calling methods across module boundaries, verify the callee's actual signature. Python won't always raise `TypeError` for unexpected kwargs (e.g., when using `**kwargs` passthrough in the call chain).
+
+### New Capability: Agent Update Pattern Recognition
+
+Added `_RE_AGENT_UPDATE` regex to match agent-formatted messages (`Agent N`, `Track N`, `Phase X`, `GAP-N`). Combined with the anchor-free `_RE_UPDATE`, Overlord now recognizes structured agent status posts and extracts:
+- **Status**: completed / failed / in_progress (from keywords)
+- **Test counts**: parsed from patterns like "10 new tests" or "407 total tests"
+- **Project**: inferred from project name mentions
+- **Response**: emoji-annotated acknowledgment with summary
+
+### New Capability: LLM Health in Status Command
+
+The `status` command (ecosystem-wide) now appends an LLM health line:
+```text
+LLM Fallback: ✅ connected (localhost:5000/v1) | Model: llama-3.1-8b
+LLM Fallback: ❌ unreachable (localhost:5000/v1)
+```
+
+Uses a 3-second timeout `models.list()` probe. Makes LLM connectivity visible without log digging.
+
+### Testing Notes
+
+- **ruff format hook**: First commit attempt failed because ruff-format auto-reformatted 2 files. Re-staged and committed. This is normal and expected with the ruff pre-commit hook — same behavior as black in nebulus-prime.
+- **Existing test updates required**: Adding `_get_llm_health_line()` to the ecosystem status path meant 4 existing tests needed the new method mocked. Changed `_RE_UPDATE.match()` → `.search()` in test assertions.
+- **Pre-existing failures**: 40 test failures existed before this work (verified by stashing changes and running on clean develop). All 40 are in modules unrelated to Slack commands.
+
+### Metrics
+
+- **Files changed**: 2 (`slack_commands.py`, `test_overlord_slack_commands.py`)
+- **Lines added**: +386
+- **New test classes**: 7 (agent patterns, structured parsing, LLM diagnostics, health status, post_message fix)
+- **Total Slack command tests**: 138 passing
+- **Full suite**: 1674 passing (40 pre-existing failures unchanged)
+
+---
