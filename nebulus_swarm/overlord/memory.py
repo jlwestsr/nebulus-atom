@@ -38,6 +38,7 @@ VALID_CATEGORIES = frozenset(
         "failure",
         "release",
         "update",
+        "dispatch",
     }
 )
 
@@ -114,7 +115,7 @@ class OverlordMemory:
         """Store an observation.
 
         Args:
-            category: One of: pattern, preference, relation, decision, failure, release, update.
+            category: One of: decision, dispatch, failure, pattern, preference, relation, release, update.
             content: Human-readable observation text.
             project: Which project this relates to (None = ecosystem-wide).
             **metadata: Arbitrary key-value pairs stored as JSON.

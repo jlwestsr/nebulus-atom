@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import re
+import socket
 import subprocess
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -1035,6 +1038,317 @@ def daemon(
     else:
         console.print(f"[red]Unknown daemon action: {action}[/red]")
         console.print("Valid actions: start, status, stop, restart")
+
+
+VALID_REPORT_STATUSES = ("started", "in_progress", "blocked", "completed")
+
+
+@overlord_app.command("report")
+def report(
+    status: str = typer.Argument(
+        help="Status: started, in_progress, blocked, completed"
+    ),
+    message: str = typer.Argument(help="Status update text"),
+    project: Optional[str] = typer.Option(
+        None, "--project", "-p", help="Project name (auto-detected from CWD)"
+    ),
+    task_id: Optional[str] = typer.Option(None, "--task-id", help="Task identifier"),
+    track: Optional[str] = typer.Option(
+        None, "--track", help="Track name for grouping"
+    ),
+    agent: Optional[str] = typer.Option(
+        None, "--agent", help="Agent name (default: hostname)"
+    ),
+) -> None:
+    """Report agent status to the Dispatch Board."""
+    registry = _load_registry_or_exit()
+    if registry is None:
+        return
+
+    # Validate status
+    if status not in VALID_REPORT_STATUSES:
+        console.print(
+            f"[red]Invalid status: {status}[/red]\n"
+            f"Must be one of: {', '.join(VALID_REPORT_STATUSES)}"
+        )
+        return
+
+    # Auto-detect project from CWD if not provided
+    if not project:
+        cwd = Path.cwd()
+        for name, proj_cfg in registry.projects.items():
+            proj_path = Path(proj_cfg.path).resolve()
+            try:
+                cwd.resolve().relative_to(proj_path)
+                project = name
+                break
+            except ValueError:
+                continue
+
+    if not project:
+        console.print(
+            "[red]Could not detect project from CWD. Use --project to specify.[/red]"
+        )
+        return
+
+    if project not in registry.projects:
+        console.print(f"[red]Unknown project: {project}[/red]")
+        console.print(f"Available: {', '.join(sorted(registry.projects.keys()))}")
+        return
+
+    # Auto-generate task_id and agent name
+    if not task_id:
+        now = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+        task_id = f"{project}-{now}"
+
+    if not agent:
+        agent = socket.gethostname()
+
+    # Write to memory
+    mem = OverlordMemory()
+    entry_id = mem.remember(
+        category="dispatch",
+        content=f"[{status.upper()}] {message}",
+        project=project,
+        status=status,
+        agent_name=agent,
+        task_id=task_id,
+        track=track or "",
+    )
+
+    # Render confirmation
+    lines = [
+        f"[bold]Status:[/bold] {status.upper()}",
+        f"[bold]Project:[/bold] {project}",
+        f"[bold]Agent:[/bold] {agent}",
+        f"[bold]Task ID:[/bold] {task_id}",
+        f"[bold]Message:[/bold] {message}",
+    ]
+    if track:
+        lines.append(f"[bold]Track:[/bold] {track}")
+    lines.append(f"[dim]Memory ID: {entry_id[:8]}[/dim]")
+
+    console.print(Panel("\n".join(lines), title="Dispatch Report", border_style="cyan"))
+
+    # Post to Slack if configured
+    _post_report_to_slack(status, message, project, agent, task_id, track)
+
+
+def _post_report_to_slack(
+    status: str,
+    message: str,
+    project: str,
+    agent: str,
+    task_id: str,
+    track: Optional[str],
+) -> None:
+    """Post a dispatch report to #nebulus-ops via Slack."""
+    import asyncio
+    import os
+
+    bot_token = os.environ.get("SLACK_BOT_TOKEN")
+    app_token = os.environ.get("SLACK_APP_TOKEN")
+    channel_id = os.environ.get("SLACK_CHANNEL_ID")
+
+    if not all([bot_token, app_token, channel_id]):
+        console.print("[dim]Slack not configured — skipping notification.[/dim]")
+        return
+
+    from nebulus_swarm.overlord.slack_bot import SlackBot
+
+    status_emoji = {
+        "started": ":rocket:",
+        "in_progress": ":construction:",
+        "blocked": ":warning:",
+        "completed": ":white_check_mark:",
+    }
+    emoji = status_emoji.get(status, ":memo:")
+    track_line = f"\n*Track:* {track}" if track else ""
+    text = (
+        f"{emoji} *Dispatch Report*\n"
+        f"*Status:* {status.upper()}\n"
+        f"*Project:* {project}\n"
+        f"*Agent:* {agent}{track_line}\n"
+        f"> {message}"
+    )
+
+    try:
+        bot = SlackBot(
+            bot_token=bot_token,
+            app_token=app_token,
+            channel_id=channel_id,
+        )
+        asyncio.run(bot.post_message(text))
+        console.print("[dim]Posted to #nebulus-ops.[/dim]")
+    except Exception as e:
+        console.print(f"[yellow]Slack notification failed: {e}[/yellow]")
+
+
+@overlord_app.command("board")
+def board(
+    sync: bool = typer.Option(False, "--sync", help="Write to OVERLORD.md"),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", "-n", help="Preview sync without writing"
+    ),
+    days: int = typer.Option(7, "--days", help="Show entries from last N days"),
+    all_entries: bool = typer.Option(False, "--all", help="Include completed entries"),
+) -> None:
+    """Show or sync the Dispatch Board."""
+    registry = _load_registry_or_exit()
+    if registry is None:
+        return
+
+    mem = OverlordMemory()
+    entries = mem.search("", category="dispatch", limit=200)
+
+    # Filter by time window
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    cutoff_iso = cutoff.isoformat()
+    entries = [e for e in entries if e.timestamp >= cutoff_iso]
+
+    # Separate active vs completed
+    active = []
+    completed = []
+    for entry in entries:
+        entry_status = entry.metadata.get("status", "")
+        if entry_status == "completed":
+            completed.append(entry)
+        else:
+            active.append(entry)
+
+    display_entries = active + completed if all_entries else active
+
+    # Build and display table
+    table = Table(title="Dispatch Board")
+    table.add_column("Track / Task", style="bold")
+    table.add_column("Project")
+    table.add_column("Agent")
+    table.add_column("Status")
+    table.add_column("Started", max_width=16)
+
+    for entry in display_entries:
+        entry_track = entry.metadata.get("track", "")
+        entry_task_id = entry.metadata.get("task_id", "")
+        label = entry_track if entry_track else entry_task_id
+        entry_status = entry.metadata.get("status", "unknown")
+        agent_name = entry.metadata.get("agent_name", "")
+        started = entry.timestamp[:16].replace("T", " ")
+
+        status_style = {
+            "started": "[cyan]Started[/cyan]",
+            "in_progress": "[yellow]In Progress[/yellow]",
+            "blocked": "[red]Blocked[/red]",
+            "completed": "[green]Completed[/green]",
+        }
+
+        table.add_row(
+            label,
+            entry.project or "",
+            agent_name,
+            status_style.get(entry_status, entry_status),
+            started,
+        )
+
+    console.print(table)
+
+    # Build agent roster
+    agents: dict[str, list[str]] = {}
+    for entry in active:
+        agent_name = entry.metadata.get("agent_name", "Unknown")
+        proj = entry.project or "unknown"
+        entry_track = entry.metadata.get("track", "")
+        desc = f"{proj} ({entry_track})" if entry_track else proj
+        agents.setdefault(agent_name, []).append(desc)
+
+    if agents:
+        console.print("\n[bold]Agent Roster[/bold]")
+        for agent_name, assignments in sorted(agents.items()):
+            console.print(f"  - [bold]{agent_name}[/bold]: {', '.join(assignments)}")
+
+    if not display_entries:
+        console.print("[dim]No dispatch entries found.[/dim]")
+
+    # Sync to OVERLORD.md
+    if sync or dry_run:
+        _sync_overlord_md(registry, active, completed, agents, dry_run)
+
+
+def _sync_overlord_md(
+    registry: "OverlordConfig",
+    active: list,
+    completed: list,
+    agents: dict[str, list[str]],
+    dry_run: bool,
+) -> None:
+    """Rewrite the Dispatch Board and Agent Roster between markers in OVERLORD.md."""
+    if not registry.workspace_root:
+        console.print("[red]workspace_root not set in config — cannot sync.[/red]")
+        return
+
+    md_path = registry.workspace_root / "OVERLORD.md"
+    if not md_path.exists():
+        console.print(f"[red]OVERLORD.md not found at {md_path}[/red]")
+        return
+
+    content = md_path.read_text()
+
+    # Build dispatch board markdown
+    board_lines = [
+        "| Track / Task | Project | Assigned Agent | Status | Started |",
+        "| :--- | :--- | :--- | :--- | :--- |",
+    ]
+    for entry in active + completed:
+        entry_track = entry.metadata.get("track", "")
+        entry_task_id = entry.metadata.get("task_id", "")
+        label = entry_track if entry_track else entry_task_id
+        entry_status = entry.metadata.get("status", "unknown").capitalize()
+        agent_name = entry.metadata.get("agent_name", "")
+        started = entry.timestamp[:10]
+        board_lines.append(
+            f"| {label} | {entry.project or ''} | {agent_name} | {entry_status} | {started} |"
+        )
+    board_md = "\n".join(board_lines) + "\n"
+
+    # Build agent roster markdown
+    roster_lines = []
+    for agent_name, assignments in sorted(agents.items()):
+        roster_lines.append(f"- **{agent_name}**: {', '.join(assignments)}")
+    if not roster_lines:
+        roster_lines.append("- *(no active agents)*")
+    roster_md = "\n".join(roster_lines) + "\n"
+
+    # Replace between markers
+    new_content = content
+    board_pattern = r"(<!-- DISPATCH_BOARD_START -->\n).*?(<!-- DISPATCH_BOARD_END -->)"
+    roster_pattern = r"(<!-- AGENT_ROSTER_START -->\n).*?(<!-- AGENT_ROSTER_END -->)"
+
+    if not re.search(board_pattern, new_content, re.DOTALL):
+        console.print("[red]DISPATCH_BOARD markers not found in OVERLORD.md[/red]")
+        return
+    if not re.search(roster_pattern, new_content, re.DOTALL):
+        console.print("[red]AGENT_ROSTER markers not found in OVERLORD.md[/red]")
+        return
+
+    new_content = re.sub(
+        board_pattern, rf"\g<1>{board_md}\2", new_content, flags=re.DOTALL
+    )
+    new_content = re.sub(
+        roster_pattern, rf"\g<1>{roster_md}\2", new_content, flags=re.DOTALL
+    )
+
+    if dry_run:
+        console.print("\n[bold cyan]--- Dry Run: OVERLORD.md changes ---[/bold cyan]")
+        if content == new_content:
+            console.print("[dim]No changes.[/dim]")
+        else:
+            console.print(new_content)
+        return
+
+    # Create backup and write
+    backup_path = md_path.with_suffix(".md.bak")
+    backup_path.write_text(content)
+    md_path.write_text(new_content)
+    console.print(f"[green]OVERLORD.md synced. Backup at {backup_path}[/green]")
 
 
 def _render_scope(scope: ActionScope, verdict: ScopeVerdict, autonomy: str) -> None:
