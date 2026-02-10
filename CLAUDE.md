@@ -61,7 +61,7 @@ When you update user-facing features, version numbers, or key metrics:
 
 ## Overlord Status
 
-Cross-project meta-orchestrator for the Nebulus ecosystem (v2.6.0, 632 Overlord tests).
+Cross-project meta-orchestrator for the Nebulus ecosystem (v2.6.0, 679 Overlord tests).
 
 | Phase | Scope | Status |
 |-------|-------|--------|
@@ -75,8 +75,9 @@ Cross-project meta-orchestrator for the Nebulus ecosystem (v2.6.0, 632 Overlord 
 - Phase 1: `registry.py`, `scanner.py`, `graph.py`, `action_scope.py`, `memory.py`
 - Phase 2: `autonomy.py`, `dispatch.py`, `model_router.py`, `release.py`, `task_parser.py`, `worker_claude.py`
 - Phase 3: `slack_commands.py`, `proposal_manager.py`, `overlord_daemon.py`, `detectors.py`, `notifications.py`
+- Local Orchestrator: `workers/` (base, claude, gemini, local), `work_queue.py`, `queue_sync.py`, `mirrors.py`, `dispatcher.py`, `mission_brief.py`
 
-**CLI**: `overlord status|scan|config|discover|graph|memory|scope|daemon|worker`
+**CLI**: `overlord status|scan|config|discover|graph|memory|scope|daemon|worker`, `queue list|triage|sync|log`, `dispatch run|cleanup`
 
 ## Key Features
 - **Context Manager**: Pin files to active context for awareness.
