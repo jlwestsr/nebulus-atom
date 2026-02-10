@@ -7,6 +7,7 @@ approve → execute → notify.
 from __future__ import annotations
 
 import asyncio
+import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -194,8 +195,14 @@ class TestDaemonIntegration:
             await asyncio.sleep(0.05)
             daemon._shutdown_event.set()
 
-        asyncio.create_task(stop_soon())
-        await daemon.run()
+        env_patch = {
+            "SLACK_BOT_TOKEN": "",
+            "SLACK_APP_TOKEN": "",
+            "SLACK_CHANNEL_ID": "",
+        }
+        with patch.dict(os.environ, env_patch):
+            asyncio.create_task(stop_soon())
+            await daemon.run()
         assert not daemon.is_running
 
     @pytest.mark.asyncio

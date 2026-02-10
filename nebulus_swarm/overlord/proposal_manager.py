@@ -384,6 +384,94 @@ class ProposalManager:
             logger.info("Expired %d proposals", count)
         return count
 
+    async def reconcile_pending_proposals(
+        self, batch_size: int = 5, backoff_seconds: float = 1.0
+    ) -> dict[str, int]:
+        """Reconcile pending proposals by scanning Slack threads for missed replies.
+
+        When the daemon restarts, Socket Mode may have missed approval/denial
+        replies. This method checks each pending proposal's thread for human
+        replies and applies the latest matching action.
+
+        Args:
+            batch_size: Number of proposals to process per batch.
+            backoff_seconds: Seconds to sleep between batches.
+
+        Returns:
+            Dict with counts: scanned, approved, denied, skipped.
+        """
+        counts = {"scanned": 0, "approved": 0, "denied": 0, "skipped": 0}
+
+        if self.slack_bot is None:
+            return counts
+
+        pending = await asyncio.to_thread(self.store.list_pending)
+        # Only reconcile proposals that have a Slack thread
+        pending = [p for p in pending if p.thread_ts]
+
+        approve_keywords = {"approve", "approved", "yes", "lgtm"}
+        deny_keywords = {"deny", "denied", "no", "reject"}
+
+        for i, proposal in enumerate(pending):
+            # Rate-limit: sleep between batches
+            if i > 0 and i % batch_size == 0:
+                await asyncio.sleep(backoff_seconds)
+
+            counts["scanned"] += 1
+
+            try:
+                replies = await self.slack_bot.get_thread_history(proposal.thread_ts)
+                # Sort by ts ascending, scan in reverse for latest action
+                replies.sort(key=lambda r: r.get("ts", ""))
+
+                action = None
+                for reply in reversed(replies):
+                    word = reply.get("text", "").strip().lower()
+                    if word in approve_keywords:
+                        action = "approve"
+                        break
+                    elif word in deny_keywords:
+                        action = "deny"
+                        break
+
+                if action == "approve":
+                    self.store.update_state(proposal.id, ProposalState.APPROVED)
+                    await self.slack_bot.post_message(
+                        "Approved while daemon was offline. "
+                        "Plan lost on restart — please re-dispatch if still needed.",
+                        thread_ts=proposal.thread_ts,
+                    )
+                    counts["approved"] += 1
+                elif action == "deny":
+                    self.store.update_state(
+                        proposal.id,
+                        ProposalState.DENIED,
+                        result_summary="Denied while daemon was offline",
+                    )
+                    await self.slack_bot.post_message(
+                        "Denied (reconciled after daemon restart).",
+                        thread_ts=proposal.thread_ts,
+                    )
+                    counts["denied"] += 1
+                else:
+                    counts["skipped"] += 1
+
+            except Exception:
+                logger.exception("Error reconciling proposal %s", proposal.id)
+                counts["skipped"] += 1
+
+        if counts["approved"] or counts["denied"]:
+            logger.info(
+                "Reconciliation applied %d approvals, %d denials "
+                "(scanned=%d, skipped=%d)",
+                counts["approved"],
+                counts["denied"],
+                counts["scanned"],
+                counts["skipped"],
+            )
+
+        return counts
+
 
 def _format_proposal_message(proposal: Proposal) -> str:
     """Format a proposal for Slack posting."""

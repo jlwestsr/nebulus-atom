@@ -232,6 +232,34 @@ class SlackBot:
 
         await self.post_message(message)
 
+    async def get_thread_history(self, thread_ts: str) -> list[dict[str, str]]:
+        """Fetch human replies from a Slack thread.
+
+        Args:
+            thread_ts: Thread timestamp to read replies from.
+
+        Returns:
+            List of dicts with 'user', 'text', and 'ts' keys,
+            filtered to human-only messages (no bot replies).
+        """
+        try:
+            response = await self.app.client.conversations_replies(
+                channel=self.channel_id, ts=thread_ts
+            )
+            messages = response.get("messages", [])
+            return [
+                {
+                    "user": msg.get("user", "unknown"),
+                    "text": msg.get("text", ""),
+                    "ts": msg.get("ts", ""),
+                }
+                for msg in messages
+                if not msg.get("bot_id")
+            ]
+        except Exception as e:
+            logger.warning("Failed to fetch thread history for %s: %s", thread_ts, e)
+            return []
+
 
 async def test_connection(bot_token: str, app_token: str) -> bool:
     """Test Slack connection without starting the full bot.

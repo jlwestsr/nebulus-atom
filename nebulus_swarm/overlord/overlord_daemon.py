@@ -134,6 +134,19 @@ class OverlordDaemon:
             self.notifications.slack_bot = self.slack_bot
             tasks.append(asyncio.create_task(self._run_slack()))
             logger.info("Slack bot configured for channel %s", channel_id)
+
+            # Wait for Socket Mode to connect before reconciling
+            await asyncio.sleep(2)
+
+            # Reconcile any proposals that were approved/denied while offline
+            reconcile_result = await self.proposal_manager.reconcile_pending_proposals()
+            if reconcile_result["approved"] or reconcile_result["denied"]:
+                logger.info(
+                    "Startup reconciliation: %d approved, %d denied, %d skipped",
+                    reconcile_result["approved"],
+                    reconcile_result["denied"],
+                    reconcile_result["skipped"],
+                )
         else:
             logger.warning("Slack tokens not set — running without Slack integration")
 
