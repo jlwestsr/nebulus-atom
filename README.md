@@ -54,7 +54,7 @@ See the [Installation Guide](https://github.com/jlwestsr/nebulus-atom/wiki/Insta
 - **Health Scanner** - Git state monitoring, test health, and commit tracking across projects
 - **Dependency Graph** - DAG analysis, blast radius calculation, and impact assessment
 - **Action Scope** - Change categorization and autonomy suitability scoring
-- **Cross-Project Memory** - SQLite-backed observation store with search and pruning
+- **Cross-Project Memory** - SQLite-backed observation store with search and pruning (canonical in [nebulus-core](https://github.com/jlwestsr/nebulus-core), shim fallback for standalone installs)
 - **Autonomy Engine** - Confidence-based auto-dispatch with test health correlation
 
 **Slack + Background Mode (Phase 3)**
@@ -88,7 +88,7 @@ nebulus-atom/
 │   │   ├── registry.py         # Project discovery & dependencies
 │   │   ├── scanner.py          # Git state & health monitoring
 │   │   ├── graph.py            # Dependency graph & blast radius
-│   │   ├── memory.py           # Cross-project observations
+│   │   ├── memory.py           # Cross-project observations (shim → nebulus-core)
 │   │   ├── autonomy.py         # Confidence scoring & dispatch
 │   │   ├── slack_commands.py   # Multi-project Slack commands
 │   │   ├── proposal_manager.py # Approval workflow lifecycle
