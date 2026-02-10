@@ -61,7 +61,7 @@ When you update user-facing features, version numbers, or key metrics:
 
 ## Overlord Status
 
-Cross-project meta-orchestrator for the Nebulus ecosystem (v2.6.0, 776 Overlord tests).
+Cross-project meta-orchestrator for the Nebulus ecosystem (v2.6.0, 849 Overlord tests).
 
 | Phase | Scope | Status |
 |-------|-------|--------|
@@ -69,15 +69,17 @@ Cross-project meta-orchestrator for the Nebulus ecosystem (v2.6.0, 776 Overlord 
 | 2. Dispatch + Autonomy | Multi-repo dispatch, model router, autonomy engine, release coordination, Claude Code worker | Done (230 tests) |
 | 3. Slack + Background | Slack commands, proposals, daemon, detectors, notifications | Done (285 tests) |
 | 4. Gantry Integration | Visual control plane — dashboard, dispatch console, memory browser | Planned |
-| 5. Observability | Dispatch outcome tracking, performance dashboards, reporting | Planned |
+| 5. Focus & PM Mode | Focus context, governance engine, PM role, kill switch | Done (73 tests) |
+| 6. Observability | Dispatch outcome tracking, performance dashboards, reporting | Planned |
 
 **Overlord modules** (`nebulus_swarm/overlord/`):
 - Phase 1: `registry.py`, `scanner.py`, `graph.py`, `action_scope.py`, `memory.py`
 - Phase 2: `autonomy.py`, `dispatch.py`, `model_router.py`, `release.py`, `task_parser.py`, `worker_claude.py`
 - Phase 3: `slack_commands.py`, `proposal_manager.py`, `overlord_daemon.py`, `detectors.py`, `notifications.py`
+- Phase 5: `focus.py`, `governance.py`
 - Local Orchestrator: `workers/` (base, claude, gemini, local), `work_queue.py`, `queue_sync.py`, `mirrors.py`, `dispatcher.py`, `mission_brief.py`
 
-**CLI**: `overlord status|scan|config|discover|graph|memory|scope|daemon|worker`, `queue list|triage|sync|log`, `dispatch run|cleanup`
+**CLI**: `overlord status|scan|config|discover|graph|memory|scope|daemon|worker|halt`, `queue list|triage|sync|log`, `dispatch run|cleanup`, `focus query|show`
 
 ## Key Features
 - **Context Manager**: Pin files to active context for awareness.
