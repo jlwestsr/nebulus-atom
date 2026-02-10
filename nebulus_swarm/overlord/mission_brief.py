@@ -48,6 +48,13 @@ _BRIEF_TEMPLATE = """\
 - [ ] Changes are committed to a feature branch
 """
 
+_PM_ROLE_SECTION = """\
+
+## Role: Project Manager
+Prioritize: sequencing, dependency analysis, risk assessment, business alignment.
+Deprioritize: code generation, implementation details, file-level changes.
+"""
+
 
 def generate_mission_brief(ctx: DispatchContext) -> Path:
     """Generate and write MISSION_BRIEF.md to the worktree root.
@@ -79,6 +86,16 @@ def generate_mission_brief(ctx: DispatchContext) -> Path:
         dependencies=", ".join(pc.depends_on) if pc.depends_on else "none",
         worktree_path=ctx.worktree_path,
     )
+
+    # Append PM role section when role is "pm"
+    role = getattr(ctx, "role", None)
+    if role == "pm":
+        content += _PM_ROLE_SECTION
+
+    # Append focus context if provided
+    focus_context = getattr(ctx, "focus_context", None)
+    if focus_context:
+        content += f"\n## Ecosystem Context\n{focus_context}\n"
 
     brief_path = ctx.worktree_path / BRIEF_FILENAME
     brief_path.write_text(content)
