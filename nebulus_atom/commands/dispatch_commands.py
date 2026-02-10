@@ -48,7 +48,14 @@ def dispatch_run(
         )
         raise typer.Exit(1)
 
-    dispatcher = Dispatcher(queue, config, mirrors, workers)
+    dispatcher = Dispatcher(
+        queue,
+        config,
+        mirrors,
+        workers,
+        daily_ceiling_usd=config.cost_controls.daily_ceiling_usd,
+        warning_threshold_pct=config.cost_controls.warning_threshold_pct,
+    )
 
     try:
         result = dispatcher.dispatch_task(
@@ -61,6 +68,8 @@ def dispatch_run(
         console.print(f"  Worker: {result.worker_id}")
         console.print(f"  Branch: {result.branch_name}")
         console.print(f"  Review: {result.review_status}")
+        if result.tokens_used:
+            console.print(f"  Tokens: {result.tokens_used:,}")
         if dry_run:
             console.print(f"  Brief: {result.mission_brief_path}")
     except ValueError as e:

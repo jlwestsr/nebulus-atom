@@ -1376,3 +1376,105 @@ def _render_scope(scope: ActionScope, verdict: ScopeVerdict, autonomy: str) -> N
 
     border = "green" if verdict.approved else "red"
     console.print(Panel("\n".join(lines), title="Blast Radius", border_style=border))
+
+
+# --- Budget commands ---
+
+budget_app = typer.Typer(help="Manage cost controls and budget.")
+overlord_app.add_typer(budget_app, name="budget")
+
+
+@budget_app.command("status")
+def budget_status() -> None:
+    """Show current daily budget usage."""
+    from nebulus_swarm.overlord.work_queue import WorkQueue
+
+    queue = WorkQueue()
+    usage = queue.get_daily_usage()
+
+    if not usage:
+        console.print("[dim]No token usage recorded today.[/dim]")
+        return
+
+    ceiling = usage["ceiling_usd"]
+    spent = usage["estimated_cost_usd"]
+    pct = (spent / ceiling * 100) if ceiling > 0 else 0.0
+
+    color = "green" if pct < 80 else "yellow" if pct < 100 else "red"
+
+    table = Table(title="Daily Budget Status")
+    table.add_column("Metric", style="bold")
+    table.add_column("Value", justify="right")
+
+    table.add_row("Date", usage["date"])
+    table.add_row("Input tokens", f"{usage['tokens_input']:,}")
+    table.add_row("Output tokens", f"{usage['tokens_output']:,}")
+    table.add_row("Estimated cost", f"${spent:.4f}")
+    table.add_row("Ceiling", f"${ceiling:.2f}")
+    table.add_row("Usage", f"[{color}]{pct:.1f}%[/{color}]")
+
+    console.print(table)
+
+
+@budget_app.command("set-ceiling")
+def budget_set_ceiling(
+    amount: float = typer.Argument(..., help="Daily ceiling in USD"),
+) -> None:
+    """Set the daily budget ceiling."""
+
+    if amount < 0:
+        console.print("[red]Ceiling must be non-negative.[/red]")
+        return
+
+    console.print(
+        f"[green]Daily ceiling set to ${amount:.2f}[/green]\n"
+        f"[dim]Note: Update overlord.yml cost_controls.daily_ceiling_usd "
+        f"to persist this value.[/dim]"
+    )
+
+
+@budget_app.command("history")
+def budget_history(
+    days: int = typer.Option(7, "--days", "-d", help="Number of days to show"),
+) -> None:
+    """Show budget usage history."""
+    from datetime import timedelta
+
+    from nebulus_swarm.overlord.work_queue import WorkQueue
+
+    queue = WorkQueue()
+
+    table = Table(title=f"Budget History (last {days} days)")
+    table.add_column("Date", style="bold")
+    table.add_column("Input", justify="right")
+    table.add_column("Output", justify="right")
+    table.add_column("Cost", justify="right")
+    table.add_column("Ceiling", justify="right")
+    table.add_column("Usage %", justify="right")
+
+    today = datetime.now(timezone.utc).date()
+    found = 0
+
+    for i in range(days):
+        date = (today - timedelta(days=i)).isoformat()
+        usage = queue.get_daily_usage(date)
+        if usage:
+            found += 1
+            ceiling = usage["ceiling_usd"]
+            spent = usage["estimated_cost_usd"]
+            pct = (spent / ceiling * 100) if ceiling > 0 else 0.0
+            color = "green" if pct < 80 else "yellow" if pct < 100 else "red"
+            table.add_row(
+                date,
+                f"{usage['tokens_input']:,}",
+                f"{usage['tokens_output']:,}",
+                f"${spent:.4f}",
+                f"${ceiling:.2f}",
+                f"[{color}]{pct:.1f}%[/{color}]",
+            )
+
+    if found == 0:
+        console.print(f"[dim]No usage data found in the last {days} days.[/dim]")
+        return
+
+    console.print(table)

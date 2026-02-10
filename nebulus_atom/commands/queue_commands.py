@@ -121,6 +121,9 @@ def queue_triage(
     reason: Optional[str] = typer.Option(
         None, "--reason", "-r", help="Reason for transition"
     ),
+    token_budget: Optional[int] = typer.Option(
+        None, "--token-budget", help="Set per-task token budget"
+    ),
 ) -> None:
     """Transition a task to a new status."""
     queue = _load_queue()
@@ -133,6 +136,9 @@ def queue_triage(
         return
 
     try:
+        if token_budget is not None:
+            queue.update_task(full_id, token_budget=token_budget)
+            console.print(f"[green]Set token budget: {token_budget:,} tokens[/green]")
         task = queue.transition(full_id, status, "cli-user", reason=reason)
         color = STATUS_COLORS.get(task.status, "white")
         console.print(
@@ -150,6 +156,9 @@ def queue_sync(
     label: str = typer.Option(
         "nebulus-ready", "--label", help="GitHub label to filter"
     ),
+    token_budget: Optional[int] = typer.Option(
+        None, "--token-budget", help="Default token budget for synced tasks"
+    ),
 ) -> None:
     """Sync GitHub issues into the work queue."""
     from nebulus_swarm.overlord.queue_sync import sync_github_issues
@@ -165,7 +174,13 @@ def queue_sync(
         console.print(f"[red]Config error: {e}[/red]")
         return
 
-    result = sync_github_issues(queue, config, label=label, project_filter=project)
+    result = sync_github_issues(
+        queue,
+        config,
+        label=label,
+        project_filter=project,
+        token_budget=token_budget,
+    )
 
     console.print(
         f"[green]Sync complete:[/green] "

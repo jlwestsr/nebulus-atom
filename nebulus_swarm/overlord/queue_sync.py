@@ -34,6 +34,7 @@ def sync_github_issues(
     *,
     label: str = "nebulus-ready",
     project_filter: Optional[str] = None,
+    token_budget: Optional[int] = None,
 ) -> SyncResult:
     """Sync GitHub issues into the work queue.
 
@@ -84,6 +85,7 @@ def sync_github_issues(
                     project=name,
                     description=body,
                     priority=priority,
+                    token_budget=token_budget,
                 )
                 if is_new:
                     result.new_count += 1

@@ -36,6 +36,9 @@ class WorkerResult:
     duration: float = 0.0
     model_used: str = ""
     worker_type: str = ""
+    tokens_input: int = 0
+    tokens_output: int = 0
+    tokens_total: int = 0
 
 
 class BaseWorker(ABC):

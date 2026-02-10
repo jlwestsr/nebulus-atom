@@ -72,6 +72,9 @@ class Dispatcher:
         config: Overlord configuration with project registry.
         mirrors: Mirror manager for worktree provisioning.
         workers: Dict mapping worker name to BaseWorker instance.
+        daily_ceiling_usd: Daily budget ceiling in USD (0 = unlimited).
+        warning_threshold_pct: Percentage at which to emit a budget warning.
+        notification_manager: Optional NotificationManager for budget alerts.
     """
 
     def __init__(
@@ -80,11 +83,17 @@ class Dispatcher:
         config: OverlordConfig,
         mirrors: MirrorManager,
         workers: dict[str, BaseWorker],
+        daily_ceiling_usd: float = 10.0,
+        warning_threshold_pct: float = 80.0,
+        notification_manager: Optional[object] = None,
     ) -> None:
         self.queue = queue
         self.config = config
         self.mirrors = mirrors
         self.workers = workers
+        self.daily_ceiling_usd = daily_ceiling_usd
+        self.warning_threshold_pct = warning_threshold_pct
+        self.notification_manager = notification_manager
 
     def dispatch_task(
         self,
@@ -165,6 +174,22 @@ class Dispatcher:
             # 5. Generate brief
             ctx.brief_path = generate_mission_brief(ctx)
 
+            # 5b. Pre-dispatch budget check
+            if not dry_run and self.daily_ceiling_usd > 0:
+                available, pct = self.queue.check_budget_available(
+                    self.daily_ceiling_usd
+                )
+                if not available:
+                    return self._fail_task(
+                        task_id,
+                        selected_name,
+                        ctx,
+                        None,
+                        reason="Global daily budget exceeded",
+                    )
+                if pct >= self.warning_threshold_pct:
+                    self._notify_budget_warning(pct)
+
             # 6. Execute
             exec_result: Optional[WorkerResult] = None
             if not dry_run:
@@ -177,6 +202,19 @@ class Dispatcher:
                         ctx,
                         exec_result,
                         reason=f"Worker execution failed: {exec_result.error}",
+                    )
+
+                # 6b. Per-task token budget enforcement
+                if task.token_budget and exec_result.tokens_total > task.token_budget:
+                    return self._fail_task(
+                        task_id,
+                        selected_name,
+                        ctx,
+                        exec_result,
+                        reason=(
+                            f"Token budget exceeded: "
+                            f"{exec_result.tokens_total} > {task.token_budget}"
+                        ),
                     )
 
                 # 7. Review — always transition through in_review for state machine
@@ -204,6 +242,14 @@ class Dispatcher:
 
             # 8. Record success
             review_status = "skipped" if (dry_run or skip_review) else "passed"
+            tokens_used = exec_result.tokens_total if exec_result else 0
+            usage_stats = {}
+            if exec_result:
+                usage_stats = {
+                    "tokens_input": exec_result.tokens_input,
+                    "tokens_output": exec_result.tokens_output,
+                    "tokens_total": exec_result.tokens_total,
+                }
             result = DispatchResultRecord(
                 task_id=task_id,
                 worker_id=selected_name,
@@ -211,9 +257,27 @@ class Dispatcher:
                 branch_name=f"atom/{task_id[:8]}",
                 mission_brief_path=str(ctx.brief_path) if ctx.brief_path else "",
                 review_status=review_status,
+                usage_stats=usage_stats,
                 output_log=exec_result.output if exec_result else "dry-run",
+                tokens_used=tokens_used,
             )
             self.queue.record_dispatch_result(result)
+
+            # Record token usage in cost ledger
+            if exec_result and exec_result.tokens_total > 0:
+                from nebulus_swarm.overlord.workers.sdk_factory import estimate_cost
+
+                cost = estimate_cost(
+                    exec_result.tokens_input,
+                    exec_result.tokens_output,
+                    exec_result.model_used,
+                )
+                self.queue.record_token_usage(
+                    tokens_input=exec_result.tokens_input,
+                    tokens_output=exec_result.tokens_output,
+                    estimated_cost_usd=cost,
+                    ceiling_usd=self.daily_ceiling_usd,
+                )
 
             if not dry_run:
                 self.queue.transition(
@@ -394,6 +458,32 @@ class Dispatcher:
             return "cloud-heavy"
         return "cloud-fast"
 
+    def _notify_budget_warning(self, pct: float) -> None:
+        """Send a budget warning notification.
+
+        Args:
+            pct: Current usage percentage.
+        """
+        message = (
+            f"Budget warning: daily spend at {pct:.0f}% "
+            f"of ${self.daily_ceiling_usd:.2f} ceiling"
+        )
+        logger.warning(message)
+
+        if self.notification_manager:
+            try:
+                import asyncio
+
+                mgr = self.notification_manager
+                if hasattr(mgr, "send_urgent"):
+                    loop = asyncio.get_event_loop()
+                    if loop.is_running():
+                        asyncio.ensure_future(mgr.send_urgent(message))
+                    else:
+                        loop.run_until_complete(mgr.send_urgent(message))
+            except Exception:
+                logger.debug("Failed to send budget warning notification")
+
     def _fail_task(
         self,
         task_id: str,
@@ -416,6 +506,14 @@ class Dispatcher:
         Returns:
             DispatchResultRecord for the failed dispatch.
         """
+        tokens_used = exec_result.tokens_total if exec_result else 0
+        usage_stats = {}
+        if exec_result:
+            usage_stats = {
+                "tokens_input": exec_result.tokens_input,
+                "tokens_output": exec_result.tokens_output,
+                "tokens_total": exec_result.tokens_total,
+            }
         result = DispatchResultRecord(
             task_id=task_id,
             worker_id=worker_id,
@@ -423,7 +521,9 @@ class Dispatcher:
             branch_name=f"atom/{task_id[:8]}",
             mission_brief_path=str(ctx.brief_path) if ctx.brief_path else "",
             review_status=review_status,
+            usage_stats=usage_stats,
             output_log=exec_result.output if exec_result else "",
+            tokens_used=tokens_used,
         )
         self.queue.record_dispatch_result(result)
         self.queue.transition(

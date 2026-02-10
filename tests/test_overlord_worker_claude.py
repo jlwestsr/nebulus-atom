@@ -2,17 +2,16 @@
 
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-
-from nebulus_swarm.overlord.worker_claude import (
+from nebulus_swarm.overlord.workers.claude import (
     ClaudeWorker,
     ClaudeWorkerConfig,
     ClaudeWorkerResult,
     load_worker_config,
 )
+from nebulus_swarm.overlord.workers.sdk_factory import LLMResponse
 
 
 # --- Config defaults and parsing ---
@@ -28,6 +27,8 @@ class TestClaudeWorkerConfig:
         assert cfg.default_model == "sonnet"
         assert cfg.model_overrides == {}
         assert cfg.timeout == 600
+        assert cfg.api_key is None
+        assert cfg.api_key_env == "ANTHROPIC_API_KEY"
 
     def test_custom_values(self) -> None:
         cfg = ClaudeWorkerConfig(
@@ -36,12 +37,16 @@ class TestClaudeWorkerConfig:
             default_model="opus",
             model_overrides={"architecture": "opus"},
             timeout=900,
+            api_key="sk-test",
+            api_key_env="CUSTOM_KEY",
         )
         assert cfg.enabled is True
         assert cfg.binary_path == "/usr/local/bin/claude"
         assert cfg.default_model == "opus"
         assert cfg.model_overrides == {"architecture": "opus"}
         assert cfg.timeout == 900
+        assert cfg.api_key == "sk-test"
+        assert cfg.api_key_env == "CUSTOM_KEY"
 
 
 class TestClaudeWorkerResult:
@@ -54,6 +59,9 @@ class TestClaudeWorkerResult:
         assert result.error is None
         assert result.duration == 0.0
         assert result.model_used == ""
+        assert result.tokens_input == 0
+        assert result.tokens_output == 0
+        assert result.tokens_total == 0
 
     def test_full_result(self) -> None:
         result = ClaudeWorkerResult(
@@ -87,6 +95,8 @@ class TestLoadWorkerConfig:
                 "default_model": "sonnet",
                 "model_overrides": {"architecture": "opus", "planning": "opus"},
                 "timeout": 300,
+                "api_key": "sk-test",
+                "api_key_env": "MY_KEY",
             }
         }
         cfg = load_worker_config(raw)
@@ -96,6 +106,8 @@ class TestLoadWorkerConfig:
         assert cfg.default_model == "sonnet"
         assert cfg.model_overrides == {"architecture": "opus", "planning": "opus"}
         assert cfg.timeout == 300
+        assert cfg.api_key == "sk-test"
+        assert cfg.api_key_env == "MY_KEY"
 
     def test_uses_defaults_for_missing_keys(self) -> None:
         raw = {"claude": {"enabled": True}}
@@ -104,34 +116,40 @@ class TestLoadWorkerConfig:
         assert cfg.binary_path == "claude"
         assert cfg.default_model == "sonnet"
         assert cfg.timeout == 600
+        assert cfg.api_key is None
+        assert cfg.api_key_env == "ANTHROPIC_API_KEY"
 
 
-# --- Binary validation ---
+# --- API key validation ---
 
 
 class TestClaudeWorkerInit:
-    """Tests for ClaudeWorker initialization and binary discovery."""
+    """Tests for ClaudeWorker initialization and API key discovery."""
 
-    @patch("shutil.which", return_value="/usr/local/bin/claude")
-    def test_enabled_with_binary_found(self, mock_which: MagicMock) -> None:
-        cfg = ClaudeWorkerConfig(enabled=True, binary_path="claude")
+    def test_enabled_with_api_key_in_config(self) -> None:
+        cfg = ClaudeWorkerConfig(enabled=True, api_key="sk-test")
         worker = ClaudeWorker(cfg)
         assert worker.available is True
-        mock_which.assert_called_once_with("claude")
 
-    @patch("shutil.which", return_value=None)
-    def test_enabled_binary_not_found(self, mock_which: MagicMock) -> None:
-        cfg = ClaudeWorkerConfig(enabled=True, binary_path="claude")
+    @patch.dict("os.environ", {"ANTHROPIC_API_KEY": "env-key"})
+    def test_enabled_with_env_key(self) -> None:
+        cfg = ClaudeWorkerConfig(enabled=True)
+        worker = ClaudeWorker(cfg)
+        assert worker.available is True
+
+    @patch.dict("os.environ", {}, clear=True)
+    def test_enabled_no_key(self) -> None:
+        cfg = ClaudeWorkerConfig(enabled=True)
         worker = ClaudeWorker(cfg)
         assert worker.available is False
 
-    def test_disabled_skips_binary_check(self) -> None:
+    def test_disabled_skips_key_check(self) -> None:
         cfg = ClaudeWorkerConfig(enabled=False)
         worker = ClaudeWorker(cfg)
         assert worker.available is False
 
-    @patch("shutil.which", return_value=None)
-    def test_execute_when_unavailable(self, _mock: MagicMock) -> None:
+    @patch.dict("os.environ", {}, clear=True)
+    def test_execute_when_unavailable(self) -> None:
         cfg = ClaudeWorkerConfig(enabled=True)
         worker = ClaudeWorker(cfg)
         result = worker.execute("test", Path("/tmp"), "feature")
@@ -145,20 +163,20 @@ class TestClaudeWorkerInit:
 class TestModelSelection:
     """Tests for _select_model priority chain."""
 
-    @patch("shutil.which", return_value="/usr/bin/claude")
-    def test_explicit_override_wins(self, _mock: MagicMock) -> None:
+    def test_explicit_override_wins(self) -> None:
         cfg = ClaudeWorkerConfig(
             enabled=True,
+            api_key="sk-test",
             default_model="sonnet",
             model_overrides={"architecture": "opus"},
         )
         worker = ClaudeWorker(cfg)
         assert worker._select_model("architecture", explicit="haiku") == "haiku"
 
-    @patch("shutil.which", return_value="/usr/bin/claude")
-    def test_task_type_override(self, _mock: MagicMock) -> None:
+    def test_task_type_override(self) -> None:
         cfg = ClaudeWorkerConfig(
             enabled=True,
+            api_key="sk-test",
             default_model="sonnet",
             model_overrides={"architecture": "opus", "planning": "opus"},
         )
@@ -166,10 +184,10 @@ class TestModelSelection:
         assert worker._select_model("architecture") == "opus"
         assert worker._select_model("planning") == "opus"
 
-    @patch("shutil.which", return_value="/usr/bin/claude")
-    def test_falls_back_to_default(self, _mock: MagicMock) -> None:
+    def test_falls_back_to_default(self) -> None:
         cfg = ClaudeWorkerConfig(
             enabled=True,
+            api_key="sk-test",
             default_model="sonnet",
             model_overrides={"architecture": "opus"},
         )
@@ -178,124 +196,88 @@ class TestModelSelection:
         assert worker._select_model("review") == "sonnet"
 
 
-# --- Subprocess execution ---
+# --- SDK execution ---
 
 
 class TestClaudeWorkerExecute:
-    """Tests for execute() subprocess handling."""
+    """Tests for execute() SDK-based execution."""
 
-    @patch("shutil.which", return_value="/usr/bin/claude")
-    @patch("subprocess.run")
-    def test_successful_execution(
-        self, mock_run: MagicMock, _mock_which: MagicMock, tmp_path: Path
-    ) -> None:
-        mock_run.return_value = MagicMock(
-            returncode=0,
-            stdout="Task completed successfully",
-            stderr="",
+    @patch("nebulus_swarm.overlord.workers.sdk_factory.call_anthropic")
+    def test_successful_execution(self, mock_call: MagicMock, tmp_path: Path) -> None:
+        mock_call.return_value = LLMResponse(
+            content="Task completed successfully",
+            tokens_input=500,
+            tokens_output=200,
+            model="claude-sonnet-4-20250514",
+            provider="anthropic",
         )
-        cfg = ClaudeWorkerConfig(enabled=True, default_model="sonnet")
+        cfg = ClaudeWorkerConfig(
+            enabled=True, api_key="sk-test", default_model="sonnet"
+        )
         worker = ClaudeWorker(cfg)
         result = worker.execute("fix the bug", tmp_path, "fix")
 
         assert result.success is True
         assert result.output == "Task completed successfully"
-        assert result.model_used == "sonnet"
+        assert result.model_used == "claude-sonnet-4-20250514"
         assert result.duration > 0
+        assert result.tokens_input == 500
+        assert result.tokens_output == 200
+        assert result.tokens_total == 700
 
-        # Verify subprocess was called correctly
-        call_args = mock_run.call_args
-        cmd = call_args[0][0]
-        assert cmd[0] == "/usr/bin/claude"
-        assert "-p" in cmd
-        assert "fix the bug" in cmd
-        assert "--model" in cmd
-        assert "sonnet" in cmd
-        assert "--print" in cmd
-
-    @patch("shutil.which", return_value="/usr/bin/claude")
-    @patch("subprocess.run")
-    def test_failed_execution(
-        self, mock_run: MagicMock, _mock_which: MagicMock, tmp_path: Path
-    ) -> None:
-        mock_run.return_value = MagicMock(
-            returncode=1,
-            stdout="partial output",
-            stderr="Error: something went wrong",
-        )
-        cfg = ClaudeWorkerConfig(enabled=True)
+    @patch("nebulus_swarm.overlord.workers.sdk_factory.call_anthropic")
+    def test_api_error(self, mock_call: MagicMock, tmp_path: Path) -> None:
+        mock_call.side_effect = RuntimeError("Anthropic API error: rate limit")
+        cfg = ClaudeWorkerConfig(enabled=True, api_key="sk-test")
         worker = ClaudeWorker(cfg)
         result = worker.execute("bad task", tmp_path, "feature")
 
         assert result.success is False
-        assert result.error == "Error: something went wrong"
-        assert result.output == "partial output"
+        assert "Anthropic API error" in result.error
 
-    @patch("shutil.which", return_value="/usr/bin/claude")
-    @patch(
-        "subprocess.run",
-        side_effect=subprocess.TimeoutExpired(cmd="claude", timeout=10),
-    )
-    def test_timeout(
-        self, _mock_run: MagicMock, _mock_which: MagicMock, tmp_path: Path
-    ) -> None:
-        cfg = ClaudeWorkerConfig(enabled=True, timeout=10)
-        worker = ClaudeWorker(cfg)
-        result = worker.execute("slow task", tmp_path, "feature")
-
-        assert result.success is False
-        assert "Timed out" in result.error
-
-    @patch("shutil.which", return_value="/usr/bin/claude")
-    @patch("subprocess.run", side_effect=OSError("No such file"))
-    def test_os_error(
-        self, _mock_run: MagicMock, _mock_which: MagicMock, tmp_path: Path
-    ) -> None:
-        cfg = ClaudeWorkerConfig(enabled=True)
+    @patch("nebulus_swarm.overlord.workers.sdk_factory.call_anthropic")
+    def test_value_error(self, mock_call: MagicMock, tmp_path: Path) -> None:
+        mock_call.side_effect = ValueError("No API key")
+        cfg = ClaudeWorkerConfig(enabled=True, api_key="sk-test")
         worker = ClaudeWorker(cfg)
         result = worker.execute("task", tmp_path, "feature")
 
         assert result.success is False
-        assert "Failed to launch" in result.error
+        assert "No API key" in result.error
 
-    @patch("shutil.which", return_value="/usr/bin/claude")
-    @patch("subprocess.run")
-    def test_uses_project_path_as_cwd(
-        self, mock_run: MagicMock, _mock_which: MagicMock, tmp_path: Path
-    ) -> None:
-        mock_run.return_value = MagicMock(returncode=0, stdout="ok", stderr="")
-        cfg = ClaudeWorkerConfig(enabled=True)
+    @patch("nebulus_swarm.overlord.workers.sdk_factory.call_anthropic")
+    def test_passes_model_and_key(self, mock_call: MagicMock, tmp_path: Path) -> None:
+        mock_call.return_value = LLMResponse(
+            content="ok",
+            tokens_input=10,
+            tokens_output=5,
+            model="claude-sonnet-4-20250514",
+            provider="anthropic",
+        )
+        cfg = ClaudeWorkerConfig(
+            enabled=True, api_key="sk-my-key", default_model="sonnet"
+        )
         worker = ClaudeWorker(cfg)
         worker.execute("task", tmp_path, "feature")
 
-        call_kwargs = mock_run.call_args[1]
-        assert call_kwargs["cwd"] == str(tmp_path)
+        mock_call.assert_called_once()
+        call_kwargs = mock_call.call_args[1]
+        assert call_kwargs["model"] == "sonnet"
+        assert call_kwargs["api_key"] == "sk-my-key"
 
-    @patch("shutil.which", return_value="/usr/bin/claude")
-    @patch("subprocess.run")
-    def test_nonexistent_path_uses_none_cwd(
-        self, mock_run: MagicMock, _mock_which: MagicMock
-    ) -> None:
-        mock_run.return_value = MagicMock(returncode=0, stdout="ok", stderr="")
-        cfg = ClaudeWorkerConfig(enabled=True)
+    @patch("nebulus_swarm.overlord.workers.sdk_factory.call_anthropic")
+    def test_worker_type_set(self, mock_call: MagicMock, tmp_path: Path) -> None:
+        mock_call.return_value = LLMResponse(
+            content="ok",
+            tokens_input=1,
+            tokens_output=1,
+            model="m",
+            provider="anthropic",
+        )
+        cfg = ClaudeWorkerConfig(enabled=True, api_key="sk-test")
         worker = ClaudeWorker(cfg)
-        worker.execute("task", Path("/nonexistent/path"), "feature")
-
-        call_kwargs = mock_run.call_args[1]
-        assert call_kwargs["cwd"] is None
-
-    @patch("shutil.which", return_value="/usr/bin/claude")
-    @patch("subprocess.run")
-    def test_exit_code_nonzero_no_stderr(
-        self, mock_run: MagicMock, _mock_which: MagicMock, tmp_path: Path
-    ) -> None:
-        mock_run.return_value = MagicMock(returncode=2, stdout="", stderr="")
-        cfg = ClaudeWorkerConfig(enabled=True)
-        worker = ClaudeWorker(cfg)
-        result = worker.execute("task", tmp_path, "feature")
-
-        assert result.success is False
-        assert "Exit code 2" in result.error
+        result = worker.execute("task", tmp_path)
+        assert result.worker_type == "claude"
 
 
 # --- Dispatch integration ---
@@ -357,22 +339,23 @@ class TestDispatchIntegration:
                     "enabled": True,
                     "binary_path": "claude",
                     "default_model": "sonnet",
+                    "api_key": "sk-test",
                 }
             },
         )
 
-        with patch("shutil.which", return_value="/usr/bin/claude"):
-            engine = DispatchEngine(
-                config,
-                AutonomyEngine(config),
-                DependencyGraph(config),
-                ModelRouter(config),
-            )
-        # Worker should be initialized (binary "found" by mock)
+        engine = DispatchEngine(
+            config,
+            AutonomyEngine(config),
+            DependencyGraph(config),
+            ModelRouter(config),
+        )
+        # Worker should be initialized (API key provided)
         assert engine.claude_worker is not None
         assert engine.claude_worker.available is True
 
-    def test_engine_worker_binary_missing_falls_back(self, tmp_path: Path) -> None:
+    @patch.dict("os.environ", {}, clear=True)
+    def test_engine_worker_no_key_falls_back(self, tmp_path: Path) -> None:
         from nebulus_swarm.overlord.autonomy import AutonomyEngine
         from nebulus_swarm.overlord.dispatch import DispatchEngine
         from nebulus_swarm.overlord.graph import DependencyGraph
@@ -404,5 +387,5 @@ class TestDispatchIntegration:
         engine = DispatchEngine(
             config, AutonomyEngine(config), DependencyGraph(config), ModelRouter(config)
         )
-        # Worker should be None since binary not found
+        # Worker should be None since no API key
         assert engine.claude_worker is None

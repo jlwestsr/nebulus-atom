@@ -1,8 +1,7 @@
-"""Tests for the Gemini CLI worker module."""
+"""Tests for the Gemini worker module."""
 
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -11,6 +10,7 @@ from nebulus_swarm.overlord.workers.gemini import (
     GeminiWorkerConfig,
     load_gemini_worker_config,
 )
+from nebulus_swarm.overlord.workers.sdk_factory import LLMResponse
 
 
 # --- Config defaults and parsing ---
@@ -26,17 +26,23 @@ class TestGeminiWorkerConfig:
         assert cfg.default_model == "gemini-2.5-pro"
         assert cfg.model_overrides == {}
         assert cfg.timeout == 600
+        assert cfg.api_key is None
+        assert cfg.api_key_env == "GOOGLE_API_KEY"
 
     def test_custom_values(self) -> None:
         cfg = GeminiWorkerConfig(
             enabled=True,
             binary_path="/usr/local/bin/gemini",
-            default_model="gemini-2.0-flash",
+            default_model="gemini-2.5-flash",
             model_overrides={"review": "gemini-2.5-pro"},
             timeout=300,
+            api_key="goog-key",
+            api_key_env="MY_GOOGLE_KEY",
         )
         assert cfg.enabled is True
-        assert cfg.default_model == "gemini-2.0-flash"
+        assert cfg.default_model == "gemini-2.5-flash"
+        assert cfg.api_key == "goog-key"
+        assert cfg.api_key_env == "MY_GOOGLE_KEY"
 
 
 class TestLoadGeminiWorkerConfig:
@@ -59,6 +65,8 @@ class TestLoadGeminiWorkerConfig:
                 "default_model": "gemini-2.5-pro",
                 "model_overrides": {"architecture": "gemini-2.5-pro"},
                 "timeout": 300,
+                "api_key": "goog-key",
+                "api_key_env": "MY_KEY",
             }
         }
         cfg = load_gemini_worker_config(raw)
@@ -66,6 +74,8 @@ class TestLoadGeminiWorkerConfig:
         assert cfg.enabled is True
         assert cfg.binary_path == "/usr/bin/gemini"
         assert cfg.timeout == 300
+        assert cfg.api_key == "goog-key"
+        assert cfg.api_key_env == "MY_KEY"
 
     def test_uses_defaults_for_missing_keys(self) -> None:
         raw = {"gemini": {"enabled": True}}
@@ -73,35 +83,41 @@ class TestLoadGeminiWorkerConfig:
         assert cfg is not None
         assert cfg.binary_path == "gemini"
         assert cfg.default_model == "gemini-2.5-pro"
+        assert cfg.api_key is None
+        assert cfg.api_key_env == "GOOGLE_API_KEY"
 
 
-# --- Binary validation ---
+# --- API key validation ---
 
 
 class TestGeminiWorkerInit:
-    """Tests for GeminiWorker initialization and binary discovery."""
+    """Tests for GeminiWorker initialization and API key discovery."""
 
-    @patch("shutil.which", return_value="/usr/local/bin/gemini")
-    def test_enabled_with_binary_found(self, mock_which: MagicMock) -> None:
-        cfg = GeminiWorkerConfig(enabled=True)
+    def test_enabled_with_api_key_in_config(self) -> None:
+        cfg = GeminiWorkerConfig(enabled=True, api_key="goog-key")
         worker = GeminiWorker(cfg)
         assert worker.available is True
         assert worker.worker_type == "gemini"
-        mock_which.assert_called_once_with("gemini")
 
-    @patch("shutil.which", return_value=None)
-    def test_enabled_binary_not_found(self, mock_which: MagicMock) -> None:
+    @patch.dict("os.environ", {"GOOGLE_API_KEY": "env-key"})
+    def test_enabled_with_env_key(self) -> None:
+        cfg = GeminiWorkerConfig(enabled=True)
+        worker = GeminiWorker(cfg)
+        assert worker.available is True
+
+    @patch.dict("os.environ", {}, clear=True)
+    def test_enabled_no_key(self) -> None:
         cfg = GeminiWorkerConfig(enabled=True)
         worker = GeminiWorker(cfg)
         assert worker.available is False
 
-    def test_disabled_skips_binary_check(self) -> None:
+    def test_disabled_skips_key_check(self) -> None:
         cfg = GeminiWorkerConfig(enabled=False)
         worker = GeminiWorker(cfg)
         assert worker.available is False
 
-    @patch("shutil.which", return_value=None)
-    def test_execute_when_unavailable(self, _mock: MagicMock) -> None:
+    @patch.dict("os.environ", {}, clear=True)
+    def test_execute_when_unavailable(self) -> None:
         cfg = GeminiWorkerConfig(enabled=True)
         worker = GeminiWorker(cfg)
         result = worker.execute("test", Path("/tmp"), "feature")
@@ -115,51 +131,49 @@ class TestGeminiWorkerInit:
 class TestGeminiModelSelection:
     """Tests for model selection in GeminiWorker."""
 
-    @patch("shutil.which", return_value="/usr/bin/gemini")
-    def test_explicit_override_wins(self, _mock: MagicMock) -> None:
+    def test_explicit_override_wins(self) -> None:
         cfg = GeminiWorkerConfig(
             enabled=True,
+            api_key="goog-key",
             model_overrides={"architecture": "gemini-2.5-pro"},
         )
         worker = GeminiWorker(cfg)
         assert (
-            worker._select_model("architecture", explicit="gemini-2.0-flash")
-            == "gemini-2.0-flash"
+            worker._select_model("architecture", explicit="gemini-2.5-flash")
+            == "gemini-2.5-flash"
         )
 
-    @patch("shutil.which", return_value="/usr/bin/gemini")
-    def test_task_type_override(self, _mock: MagicMock) -> None:
+    def test_task_type_override(self) -> None:
         cfg = GeminiWorkerConfig(
             enabled=True,
+            api_key="goog-key",
             model_overrides={"architecture": "gemini-2.5-pro"},
         )
         worker = GeminiWorker(cfg)
         assert worker._select_model("architecture") == "gemini-2.5-pro"
 
-    @patch("shutil.which", return_value="/usr/bin/gemini")
-    def test_falls_back_to_default(self, _mock: MagicMock) -> None:
-        cfg = GeminiWorkerConfig(enabled=True)
+    def test_falls_back_to_default(self) -> None:
+        cfg = GeminiWorkerConfig(enabled=True, api_key="goog-key")
         worker = GeminiWorker(cfg)
         assert worker._select_model("feature") == "gemini-2.5-pro"
 
 
-# --- Subprocess execution ---
+# --- SDK execution ---
 
 
 class TestGeminiWorkerExecute:
-    """Tests for execute() subprocess handling."""
+    """Tests for execute() SDK-based execution."""
 
-    @patch("shutil.which", return_value="/usr/bin/gemini")
-    @patch("subprocess.run")
-    def test_successful_execution(
-        self, mock_run: MagicMock, _mock_which: MagicMock, tmp_path: Path
-    ) -> None:
-        mock_run.return_value = MagicMock(
-            returncode=0,
-            stdout="Task completed",
-            stderr="",
+    @patch("nebulus_swarm.overlord.workers.sdk_factory.call_google")
+    def test_successful_execution(self, mock_call: MagicMock, tmp_path: Path) -> None:
+        mock_call.return_value = LLMResponse(
+            content="Task completed",
+            tokens_input=300,
+            tokens_output=150,
+            model="gemini-2.5-pro",
+            provider="google",
         )
-        cfg = GeminiWorkerConfig(enabled=True)
+        cfg = GeminiWorkerConfig(enabled=True, api_key="goog-key")
         worker = GeminiWorker(cfg)
         result = worker.execute("describe the code", tmp_path, "review")
 
@@ -167,92 +181,60 @@ class TestGeminiWorkerExecute:
         assert result.output == "Task completed"
         assert result.worker_type == "gemini"
         assert result.duration > 0
+        assert result.tokens_input == 300
+        assert result.tokens_output == 150
+        assert result.tokens_total == 450
 
-        cmd = mock_run.call_args[0][0]
-        assert cmd[0] == "/usr/bin/gemini"
-        assert "-p" in cmd
-        assert "describe the code" in cmd
-
-    @patch("shutil.which", return_value="/usr/bin/gemini")
-    @patch("subprocess.run")
-    def test_failed_execution(
-        self, mock_run: MagicMock, _mock_which: MagicMock, tmp_path: Path
-    ) -> None:
-        mock_run.return_value = MagicMock(
-            returncode=1,
-            stdout="partial",
-            stderr="Error occurred",
-        )
-        cfg = GeminiWorkerConfig(enabled=True)
+    @patch("nebulus_swarm.overlord.workers.sdk_factory.call_google")
+    def test_api_error(self, mock_call: MagicMock, tmp_path: Path) -> None:
+        mock_call.side_effect = RuntimeError("Google API error: quota exceeded")
+        cfg = GeminiWorkerConfig(enabled=True, api_key="goog-key")
         worker = GeminiWorker(cfg)
         result = worker.execute("bad task", tmp_path)
 
         assert result.success is False
-        assert result.error == "Error occurred"
+        assert "Google API error" in result.error
 
-    @patch("shutil.which", return_value="/usr/bin/gemini")
-    @patch(
-        "subprocess.run",
-        side_effect=subprocess.TimeoutExpired(cmd="gemini", timeout=10),
-    )
-    def test_timeout(
-        self, _mock_run: MagicMock, _mock_which: MagicMock, tmp_path: Path
-    ) -> None:
-        cfg = GeminiWorkerConfig(enabled=True, timeout=10)
-        worker = GeminiWorker(cfg)
-        result = worker.execute("slow task", tmp_path)
-
-        assert result.success is False
-        assert "Timed out" in result.error
-
-    @patch("shutil.which", return_value="/usr/bin/gemini")
-    @patch("subprocess.run", side_effect=OSError("No such file"))
-    def test_os_error(
-        self, _mock_run: MagicMock, _mock_which: MagicMock, tmp_path: Path
-    ) -> None:
-        cfg = GeminiWorkerConfig(enabled=True)
+    @patch("nebulus_swarm.overlord.workers.sdk_factory.call_google")
+    def test_value_error(self, mock_call: MagicMock, tmp_path: Path) -> None:
+        mock_call.side_effect = ValueError("No API key")
+        cfg = GeminiWorkerConfig(enabled=True, api_key="goog-key")
         worker = GeminiWorker(cfg)
         result = worker.execute("task", tmp_path)
 
         assert result.success is False
-        assert "Failed to launch" in result.error
+        assert "No API key" in result.error
 
-    @patch("shutil.which", return_value="/usr/bin/gemini")
-    @patch("subprocess.run")
-    def test_uses_project_path_as_cwd(
-        self, mock_run: MagicMock, _mock_which: MagicMock, tmp_path: Path
-    ) -> None:
-        mock_run.return_value = MagicMock(returncode=0, stdout="ok", stderr="")
-        cfg = GeminiWorkerConfig(enabled=True)
+    @patch("nebulus_swarm.overlord.workers.sdk_factory.call_google")
+    def test_passes_model_and_key(self, mock_call: MagicMock, tmp_path: Path) -> None:
+        mock_call.return_value = LLMResponse(
+            content="ok",
+            tokens_input=10,
+            tokens_output=5,
+            model="gemini-2.5-pro",
+            provider="google",
+        )
+        cfg = GeminiWorkerConfig(
+            enabled=True, api_key="goog-key", default_model="gemini-2.5-pro"
+        )
         worker = GeminiWorker(cfg)
         worker.execute("task", tmp_path)
 
-        call_kwargs = mock_run.call_args[1]
-        assert call_kwargs["cwd"] == str(tmp_path)
+        mock_call.assert_called_once()
+        call_kwargs = mock_call.call_args[1]
+        assert call_kwargs["model"] == "gemini-2.5-pro"
+        assert call_kwargs["api_key"] == "goog-key"
 
-    @patch("shutil.which", return_value="/usr/bin/gemini")
-    @patch("subprocess.run")
-    def test_nonexistent_path_uses_none_cwd(
-        self, mock_run: MagicMock, _mock_which: MagicMock
-    ) -> None:
-        mock_run.return_value = MagicMock(returncode=0, stdout="ok", stderr="")
-        cfg = GeminiWorkerConfig(enabled=True)
+    @patch("nebulus_swarm.overlord.workers.sdk_factory.call_google")
+    def test_worker_type_set(self, mock_call: MagicMock, tmp_path: Path) -> None:
+        mock_call.return_value = LLMResponse(
+            content="ok",
+            tokens_input=1,
+            tokens_output=1,
+            model="m",
+            provider="google",
+        )
+        cfg = GeminiWorkerConfig(enabled=True, api_key="goog-key")
         worker = GeminiWorker(cfg)
-        worker.execute("task", Path("/nonexistent/path"))
-
-        call_kwargs = mock_run.call_args[1]
-        assert call_kwargs["cwd"] is None
-
-    @patch("shutil.which", return_value="/usr/bin/gemini")
-    @patch("subprocess.run")
-    def test_command_includes_model_flag(
-        self, mock_run: MagicMock, _mock_which: MagicMock, tmp_path: Path
-    ) -> None:
-        mock_run.return_value = MagicMock(returncode=0, stdout="ok", stderr="")
-        cfg = GeminiWorkerConfig(enabled=True, default_model="gemini-2.5-pro")
-        worker = GeminiWorker(cfg)
-        worker.execute("task", tmp_path)
-
-        cmd = mock_run.call_args[0][0]
-        assert "--model" in cmd
-        assert "gemini-2.5-pro" in cmd
+        result = worker.execute("task", tmp_path)
+        assert result.worker_type == "gemini"

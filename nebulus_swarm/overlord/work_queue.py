@@ -57,6 +57,7 @@ class Task:
     locked_at: Optional[str] = None
     retry_count: int = 0
     mirror_path: Optional[str] = None
+    token_budget: Optional[int] = None
     created_at: str = ""
     updated_at: str = ""
 
@@ -87,6 +88,7 @@ class DispatchResultRecord:
     review_status: str = ""
     usage_stats: dict = field(default_factory=dict)
     output_log: str = ""
+    tokens_used: int = 0
     created_at: str = ""
 
 
@@ -183,10 +185,31 @@ class WorkQueue:
                     review_status TEXT NOT NULL DEFAULT '',
                     usage_stats TEXT DEFAULT '{}',
                     output_log TEXT DEFAULT '',
+                    tokens_used INTEGER NOT NULL DEFAULT 0,
                     created_at TEXT NOT NULL,
                     FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
                 )
             """)
+
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS cost_ledger (
+                    date TEXT PRIMARY KEY,
+                    tokens_input INTEGER NOT NULL DEFAULT 0,
+                    tokens_output INTEGER NOT NULL DEFAULT 0,
+                    estimated_cost_usd REAL NOT NULL DEFAULT 0.0,
+                    ceiling_usd REAL NOT NULL DEFAULT 10.0,
+                    updated_at TEXT NOT NULL
+                )
+            """)
+
+            # Idempotent column additions for schema migration
+            self._add_column_if_missing(cursor, "tasks", "token_budget", "INTEGER")
+            self._add_column_if_missing(
+                cursor,
+                "dispatch_results",
+                "tokens_used",
+                "INTEGER NOT NULL DEFAULT 0",
+            )
 
             # Indexes
             cursor.execute("""
@@ -206,8 +229,29 @@ class WorkQueue:
                 ON task_log(task_id)
             """)
 
+    @staticmethod
+    def _add_column_if_missing(
+        cursor: sqlite3.Cursor,
+        table: str,
+        column: str,
+        col_type: str,
+    ) -> None:
+        """Add a column to a table if it doesn't already exist.
+
+        Args:
+            cursor: Active database cursor.
+            table: Table name.
+            column: Column name.
+            col_type: Column type definition.
+        """
+        info = cursor.execute(f"PRAGMA table_info({table})").fetchall()
+        existing = {row["name"] for row in info}
+        if column not in existing:
+            cursor.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
+
     def _row_to_task(self, row: sqlite3.Row) -> Task:
         """Convert a database row to a Task."""
+        keys = row.keys()
         return Task(
             id=row["id"],
             title=row["title"],
@@ -222,6 +266,7 @@ class WorkQueue:
             locked_at=row["locked_at"],
             retry_count=row["retry_count"],
             mirror_path=row["mirror_path"],
+            token_budget=row["token_budget"] if "token_budget" in keys else None,
             created_at=row["created_at"],
             updated_at=row["updated_at"],
         )
@@ -240,6 +285,7 @@ class WorkQueue:
 
     def _row_to_dispatch_result(self, row: sqlite3.Row) -> DispatchResultRecord:
         """Convert a database row to a DispatchResultRecord."""
+        keys = row.keys()
         return DispatchResultRecord(
             id=row["id"],
             task_id=row["task_id"],
@@ -250,6 +296,7 @@ class WorkQueue:
             review_status=row["review_status"],
             usage_stats=json.loads(row["usage_stats"]) if row["usage_stats"] else {},
             output_log=row["output_log"],
+            tokens_used=row["tokens_used"] if "tokens_used" in keys else 0,
             created_at=row["created_at"],
         )
 
@@ -264,6 +311,7 @@ class WorkQueue:
         external_id: Optional[str] = None,
         external_source: Optional[str] = None,
         mirror_path: Optional[str] = None,
+        token_budget: Optional[int] = None,
     ) -> str:
         """Create a new task in backlog status.
 
@@ -276,6 +324,7 @@ class WorkQueue:
             external_id: External tracker ID (e.g. GitHub issue number).
             external_source: External tracker source (e.g. "github:owner/repo").
             mirror_path: Path to mirror clone for this task.
+            token_budget: Optional per-task token budget limit.
 
         Returns:
             The UUID of the created task.
@@ -289,8 +338,8 @@ class WorkQueue:
                 INSERT INTO tasks (
                     id, title, project, description, status, priority,
                     complexity, external_id, external_source, mirror_path,
-                    retry_count, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, 'backlog', ?, ?, ?, ?, ?, 0, ?, ?)
+                    token_budget, retry_count, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, 'backlog', ?, ?, ?, ?, ?, ?, 0, ?, ?)
                 """,
                 (
                     task_id,
@@ -302,6 +351,7 @@ class WorkQueue:
                     external_id,
                     external_source,
                     mirror_path,
+                    token_budget,
                     now,
                     now,
                 ),
@@ -324,6 +374,41 @@ class WorkQueue:
                 "SELECT * FROM tasks WHERE id = ?", (task_id,)
             ).fetchone()
             return self._row_to_task(row) if row else None
+
+    def update_task(
+        self,
+        task_id: str,
+        *,
+        token_budget: Optional[int] = None,
+    ) -> None:
+        """Update mutable fields on a task.
+
+        Args:
+            task_id: UUID of the task.
+            token_budget: New per-task token budget (None = no change).
+
+        Raises:
+            ValueError: If the task does not exist.
+        """
+        updates: list[str] = []
+        params: list[object] = []
+
+        if token_budget is not None:
+            updates.append("token_budget = ?")
+            params.append(token_budget)
+
+        if not updates:
+            return
+
+        updates.append("updated_at = ?")
+        params.append(datetime.now(timezone.utc).isoformat())
+        params.append(task_id)
+
+        sql = f"UPDATE tasks SET {', '.join(updates)} WHERE id = ?"
+        with self._get_connection() as conn:
+            cursor = conn.execute(sql, params)
+            if cursor.rowcount == 0:
+                raise ValueError(f"Task not found: {task_id}")
 
     def list_tasks(
         self,
@@ -610,8 +695,8 @@ class WorkQueue:
                 INSERT INTO dispatch_results (
                     task_id, worker_id, model_id, branch_name,
                     mission_brief_path, review_status, usage_stats,
-                    output_log, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    output_log, tokens_used, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     result.task_id,
@@ -622,6 +707,7 @@ class WorkQueue:
                     result.review_status,
                     json.dumps(result.usage_stats),
                     result.output_log,
+                    result.tokens_used,
                     now,
                 ),
             )
@@ -644,6 +730,112 @@ class WorkQueue:
             ).fetchall()
             return [self._row_to_dispatch_result(row) for row in rows]
 
+    def record_token_usage(
+        self,
+        tokens_input: int,
+        tokens_output: int,
+        estimated_cost_usd: float,
+        ceiling_usd: float = 10.0,
+    ) -> None:
+        """Record token usage for today in the cost ledger.
+
+        Args:
+            tokens_input: Number of input tokens used.
+            tokens_output: Number of output tokens used.
+            estimated_cost_usd: Estimated cost for this usage.
+            ceiling_usd: Daily ceiling in USD.
+        """
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        now = datetime.now(timezone.utc).isoformat()
+
+        with self._get_connection() as conn:
+            existing = conn.execute(
+                "SELECT * FROM cost_ledger WHERE date = ?", (today,)
+            ).fetchone()
+
+            if existing:
+                conn.execute(
+                    """
+                    UPDATE cost_ledger
+                    SET tokens_input = tokens_input + ?,
+                        tokens_output = tokens_output + ?,
+                        estimated_cost_usd = estimated_cost_usd + ?,
+                        ceiling_usd = ?,
+                        updated_at = ?
+                    WHERE date = ?
+                    """,
+                    (
+                        tokens_input,
+                        tokens_output,
+                        estimated_cost_usd,
+                        ceiling_usd,
+                        now,
+                        today,
+                    ),
+                )
+            else:
+                conn.execute(
+                    """
+                    INSERT INTO cost_ledger
+                        (date, tokens_input, tokens_output,
+                         estimated_cost_usd, ceiling_usd, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        today,
+                        tokens_input,
+                        tokens_output,
+                        estimated_cost_usd,
+                        ceiling_usd,
+                        now,
+                    ),
+                )
+
+    def get_daily_usage(self, date: Optional[str] = None) -> Optional[dict]:
+        """Get token usage for a given date.
+
+        Args:
+            date: Date string (YYYY-MM-DD). Defaults to today.
+
+        Returns:
+            Dict with usage data, or None if no records for the date.
+        """
+        if date is None:
+            date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+        with self._get_connection() as conn:
+            row = conn.execute(
+                "SELECT * FROM cost_ledger WHERE date = ?", (date,)
+            ).fetchone()
+            if not row:
+                return None
+            return {
+                "date": row["date"],
+                "tokens_input": row["tokens_input"],
+                "tokens_output": row["tokens_output"],
+                "estimated_cost_usd": row["estimated_cost_usd"],
+                "ceiling_usd": row["ceiling_usd"],
+                "updated_at": row["updated_at"],
+            }
+
+    def check_budget_available(self, ceiling_usd: float = 10.0) -> tuple[bool, float]:
+        """Check if daily budget is still available.
+
+        Args:
+            ceiling_usd: Daily ceiling in USD to check against.
+
+        Returns:
+            Tuple of (is_available, usage_percentage).
+            is_available is False when usage >= ceiling.
+        """
+        usage = self.get_daily_usage()
+        if not usage:
+            return True, 0.0
+
+        spent = usage["estimated_cost_usd"]
+        pct = (spent / ceiling_usd * 100) if ceiling_usd > 0 else 100.0
+        return spent < ceiling_usd, pct
+
     def upsert_from_github(
         self,
         external_id: str,
@@ -653,6 +845,7 @@ class WorkQueue:
         *,
         description: Optional[str] = None,
         priority: str = "medium",
+        token_budget: Optional[int] = None,
     ) -> tuple[str, bool]:
         """Insert or update a task from GitHub issue data.
 
@@ -697,8 +890,8 @@ class WorkQueue:
                     INSERT INTO tasks (
                         id, external_id, external_source, project, title,
                         description, status, priority, complexity,
-                        retry_count, created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, 'backlog', ?, 'medium', 0, ?, ?)
+                        retry_count, token_budget, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, 'backlog', ?, 'medium', 0, ?, ?, ?)
                     """,
                     (
                         task_id,
@@ -708,6 +901,7 @@ class WorkQueue:
                         title,
                         description,
                         priority,
+                        token_budget,
                         now,
                         now,
                     ),

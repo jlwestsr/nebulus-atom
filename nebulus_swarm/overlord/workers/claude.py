@@ -1,14 +1,13 @@
-"""Claude Code worker — subprocess-based LLM dispatch via Claude CLI.
+"""Claude worker — native SDK-based LLM dispatch via Anthropic API.
 
-Refactored to inherit from BaseWorker. Enables Overlord to delegate
-code tasks to Claude Code running as a subprocess with full tool access.
+Uses the Anthropic Python SDK for direct API calls with token tracking,
+replacing the previous subprocess-based CLI execution.
 """
 
 from __future__ import annotations
 
 import logging
-import shutil
-import subprocess
+import os
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -21,13 +20,15 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ClaudeWorkerConfig(WorkerConfig):
-    """Configuration for the Claude Code worker."""
+    """Configuration for the Claude worker."""
 
     enabled: bool = False
     binary_path: str = "claude"
     default_model: str = "sonnet"
     model_overrides: dict[str, str] = field(default_factory=dict)
     timeout: int = 600
+    api_key: Optional[str] = None
+    api_key_env: str = "ANTHROPIC_API_KEY"
 
 
 # Backward-compatible alias
@@ -35,7 +36,7 @@ ClaudeWorkerResult = WorkerResult
 
 
 class ClaudeWorker(BaseWorker):
-    """Dispatches tasks to Claude Code CLI as a subprocess worker.
+    """Dispatches tasks to Anthropic API via native SDK.
 
     Args:
         config: Worker configuration.
@@ -45,23 +46,23 @@ class ClaudeWorker(BaseWorker):
 
     def __init__(self, config: ClaudeWorkerConfig) -> None:
         super().__init__(config)
-        self._binary: Optional[str] = None
         self._available = False
+        self._api_key: Optional[str] = None
 
         if config.enabled:
-            self._binary = shutil.which(config.binary_path)
-            if self._binary:
+            self._api_key = config.api_key or os.environ.get(config.api_key_env)
+            if self._api_key:
                 self._available = True
-                logger.info(f"Claude worker initialized: {self._binary}")
+                logger.info("Claude worker initialized via SDK")
             else:
                 logger.warning(
-                    f"Claude binary not found at '{config.binary_path}'. "
-                    "Worker disabled — falling back to ModelRouter."
+                    f"No API key found (checked config.api_key and "
+                    f"${config.api_key_env}). Worker disabled."
                 )
 
     @property
     def available(self) -> bool:
-        """Whether the worker is enabled and the binary is accessible."""
+        """Whether the worker is enabled and an API key is available."""
         return self._available
 
     def execute(
@@ -71,16 +72,16 @@ class ClaudeWorker(BaseWorker):
         task_type: str = "feature",
         model: Optional[str] = None,
     ) -> WorkerResult:
-        """Execute a prompt via Claude Code CLI.
+        """Execute a prompt via the Anthropic SDK.
 
         Args:
             prompt: The task prompt to send to Claude.
-            project_path: Working directory for the subprocess.
+            project_path: Working directory context.
             task_type: Task category for model selection.
             model: Explicit model override (highest priority).
 
         Returns:
-            WorkerResult with output and metadata.
+            WorkerResult with output, token counts, and metadata.
         """
         if not self._available:
             return WorkerResult(
@@ -89,76 +90,51 @@ class ClaudeWorker(BaseWorker):
                 worker_type=self.worker_type,
             )
 
+        from nebulus_swarm.overlord.workers.sdk_factory import call_anthropic
+
         selected_model = self._select_model(task_type, model)
-        cmd = self._build_command(prompt, selected_model)
-        cwd = str(project_path) if project_path.exists() else None
 
         start = time.monotonic()
         try:
-            result = subprocess.run(
-                cmd,
-                cwd=cwd,
-                capture_output=True,
-                text=True,
+            response = call_anthropic(
+                prompt=prompt,
+                model=selected_model,
+                api_key=self._api_key,
+                max_tokens=4096,
                 timeout=self.config.timeout,
             )
             duration = time.monotonic() - start
 
-            if result.returncode == 0:
-                return WorkerResult(
-                    success=True,
-                    output=result.stdout.strip(),
-                    duration=duration,
-                    model_used=selected_model,
-                    worker_type=self.worker_type,
-                )
-            else:
-                return WorkerResult(
-                    success=False,
-                    output=result.stdout.strip(),
-                    error=result.stderr.strip() or f"Exit code {result.returncode}",
-                    duration=duration,
-                    model_used=selected_model,
-                    worker_type=self.worker_type,
-                )
+            tokens_total = response.tokens_input + response.tokens_output
+            return WorkerResult(
+                success=True,
+                output=response.content.strip(),
+                duration=duration,
+                model_used=response.model,
+                worker_type=self.worker_type,
+                tokens_input=response.tokens_input,
+                tokens_output=response.tokens_output,
+                tokens_total=tokens_total,
+            )
 
-        except subprocess.TimeoutExpired:
+        except ValueError as e:
             duration = time.monotonic() - start
             return WorkerResult(
                 success=False,
-                error=f"Timed out after {self.config.timeout}s",
+                error=str(e),
                 duration=duration,
                 model_used=selected_model,
                 worker_type=self.worker_type,
             )
-        except OSError as e:
+        except RuntimeError as e:
             duration = time.monotonic() - start
             return WorkerResult(
                 success=False,
-                error=f"Failed to launch Claude: {e}",
+                error=str(e),
                 duration=duration,
                 model_used=selected_model,
                 worker_type=self.worker_type,
             )
-
-    def _build_command(self, prompt: str, model: str) -> list[str]:
-        """Build the Claude CLI command list.
-
-        Args:
-            prompt: The task prompt.
-            model: Selected model identifier.
-
-        Returns:
-            Command list for subprocess.run.
-        """
-        return [
-            self._binary,  # type: ignore[list-item]
-            "-p",
-            prompt,
-            "--model",
-            model,
-            "--print",
-        ]
 
 
 def load_worker_config(raw_workers: dict) -> Optional[ClaudeWorkerConfig]:
@@ -182,4 +158,6 @@ def load_worker_config(raw_workers: dict) -> Optional[ClaudeWorkerConfig]:
             str(k): str(v) for k, v in claude_raw.get("model_overrides", {}).items()
         },
         timeout=int(claude_raw.get("timeout", 600)),
+        api_key=claude_raw.get("api_key"),
+        api_key_env=str(claude_raw.get("api_key_env", "ANTHROPIC_API_KEY")),
     )

@@ -94,6 +94,15 @@ class NotificationConfig:
 
 
 @dataclass
+class CostControlConfig:
+    """Configuration for cost controls and budget enforcement."""
+
+    daily_ceiling_usd: float = 10.0
+    warning_threshold_pct: float = 80.0
+    default_task_budget_tokens: int = 100000
+
+
+@dataclass
 class OverlordConfig:
     """Top-level Overlord configuration."""
 
@@ -106,6 +115,7 @@ class OverlordConfig:
     schedule: ScheduleConfig = field(default_factory=ScheduleConfig)
     notifications: NotificationConfig = field(default_factory=NotificationConfig)
     workers: dict[str, dict[str, object]] = field(default_factory=dict)
+    cost_controls: CostControlConfig = field(default_factory=CostControlConfig)
 
 
 def load_config(path: Optional[Path] = None) -> OverlordConfig:
@@ -188,6 +198,20 @@ def load_config(path: Optional[Path] = None) -> OverlordConfig:
     raw_workers = raw.get("workers", {})
     workers = dict(raw_workers) if isinstance(raw_workers, dict) else {}
 
+    # Parse cost controls
+    raw_cc = raw.get("cost_controls", {})
+    cost_controls = (
+        CostControlConfig(
+            daily_ceiling_usd=float(raw_cc.get("daily_ceiling_usd", 10.0)),
+            warning_threshold_pct=float(raw_cc.get("warning_threshold_pct", 80.0)),
+            default_task_budget_tokens=int(
+                raw_cc.get("default_task_budget_tokens", 100000)
+            ),
+        )
+        if isinstance(raw_cc, dict)
+        else CostControlConfig()
+    )
+
     # Parse workspace_root — explicit from YAML or auto-detected from project paths
     raw_ws = raw.get("workspace_root")
     if raw_ws:
@@ -216,6 +240,7 @@ def load_config(path: Optional[Path] = None) -> OverlordConfig:
         schedule=schedule,
         notifications=notifications,
         workers=workers,
+        cost_controls=cost_controls,
     )
 
 

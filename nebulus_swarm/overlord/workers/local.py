@@ -111,12 +111,18 @@ class LocalWorker(BaseWorker):
             if response.status_code == 200:
                 data = response.json()
                 content = data["choices"][0]["message"]["content"]
+                usage = data.get("usage", {})
+                tokens_in = usage.get("prompt_tokens", 0)
+                tokens_out = usage.get("completion_tokens", 0)
                 return WorkerResult(
                     success=True,
                     output=content.strip(),
                     duration=duration,
                     model_used=selected_model,
                     worker_type=self.worker_type,
+                    tokens_input=tokens_in,
+                    tokens_output=tokens_out,
+                    tokens_total=tokens_in + tokens_out,
                 )
             else:
                 return WorkerResult(
