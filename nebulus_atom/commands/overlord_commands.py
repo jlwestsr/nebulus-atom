@@ -963,6 +963,12 @@ def daemon(
         action = "start"
 
     if action == "start":
+        import os
+
+        from dotenv import load_dotenv
+
+        from nebulus_swarm.logging import configure_logging
+
         if OverlordDaemon.check_running():
             pid = OverlordDaemon.read_pid()
             console.print(
@@ -970,6 +976,32 @@ def daemon(
                 "Use 'overlord daemon restart' to restart."
             )
             return
+
+        # Auto-load .env from current working directory
+        env_path = os.path.join(os.getcwd(), ".env")
+        loaded = load_dotenv(env_path)
+        if loaded:
+            console.print(f"[green]Loaded .env from {env_path}[/green]")
+        else:
+            console.print(f"[yellow]No .env found at {env_path}[/yellow]")
+
+        # Show env var detection status
+        slack_bot = "yes" if os.environ.get("SLACK_BOT_TOKEN") else "no"
+        slack_app = "yes" if os.environ.get("SLACK_APP_TOKEN") else "no"
+        slack_channel = "yes" if os.environ.get("SLACK_CHANNEL_ID") else "no"
+        console.print(
+            f"[dim]SLACK_BOT_TOKEN: {slack_bot} | "
+            f"SLACK_APP_TOKEN: {slack_app} | "
+            f"SLACK_CHANNEL_ID: {slack_channel}[/dim]"
+        )
+
+        # Configure logging for daemon mode
+        log_dir = os.path.expanduser("~/.atom/overlord")
+        os.makedirs(log_dir, exist_ok=True)
+        log_file = os.path.join(log_dir, "daemon.log")
+        log_level = os.environ.get("LOG_LEVEL", "INFO")
+        configure_logging(level=log_level, log_file=log_file)
+        console.print(f"[dim]Logging to {log_file} (level={log_level})[/dim]")
 
         registry = _load_registry_or_exit()
         if registry is None:
@@ -991,7 +1023,9 @@ def daemon(
                 )
             console.print(table)
         else:
-            console.print("[dim]Using default schedule[/dim]")
+            console.print(
+                "[dim]No scheduled tasks configured — scheduler will idle[/dim]"
+            )
 
         d = OverlordDaemon(registry)
         try:

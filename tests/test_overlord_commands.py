@@ -668,3 +668,127 @@ class TestDaemonCommand:
             result = runner.invoke(overlord_app, ["daemon", "bogus"])
         assert "unknown" in result.output.lower()
         assert "bogus" in result.output
+
+    def test_start_loads_dotenv(self, temp_git_repo: Path, tmp_path: Path) -> None:
+        """Daemon start auto-loads .env and reports env var status."""
+        config_file = _make_config_file(
+            tmp_path,
+            {
+                "my-project": {
+                    "path": str(temp_git_repo),
+                    "remote": "test/my-project",
+                    "role": "tooling",
+                    "branch_model": "develop-main",
+                    "depends_on": [],
+                },
+            },
+        )
+        # Create a .env file in the "cwd"
+        env_file = tmp_path / ".env"
+        env_file.write_text("SLACK_BOT_TOKEN=xoxb-test\n")
+
+        mock_daemon_cls = MagicMock()
+        mock_daemon_cls.check_running.return_value = False
+        mock_instance = MagicMock()
+        mock_daemon_cls.return_value = mock_instance
+        mock_instance.run = MagicMock(return_value=None)
+
+        with (
+            patch(
+                "nebulus_swarm.overlord.overlord_daemon.OverlordDaemon",
+                mock_daemon_cls,
+            ),
+            patch(
+                "nebulus_atom.commands.overlord_commands.DEFAULT_CONFIG_PATH",
+                config_file,
+            ),
+            patch(
+                "nebulus_swarm.overlord.registry.DEFAULT_CONFIG_PATH",
+                config_file,
+            ),
+            patch("os.getcwd", return_value=str(tmp_path)),
+        ):
+            result = runner.invoke(overlord_app, ["daemon", "start"])
+        assert "SLACK_BOT_TOKEN: yes" in result.output
+        assert "Loaded .env" in result.output
+
+    def test_start_configures_log_file(
+        self, temp_git_repo: Path, tmp_path: Path
+    ) -> None:
+        """Daemon start configures logging with a log file path."""
+        config_file = _make_config_file(
+            tmp_path,
+            {
+                "my-project": {
+                    "path": str(temp_git_repo),
+                    "remote": "test/my-project",
+                    "role": "tooling",
+                    "branch_model": "develop-main",
+                    "depends_on": [],
+                },
+            },
+        )
+
+        mock_daemon_cls = MagicMock()
+        mock_daemon_cls.check_running.return_value = False
+        mock_instance = MagicMock()
+        mock_daemon_cls.return_value = mock_instance
+        mock_instance.run = MagicMock(return_value=None)
+
+        with (
+            patch(
+                "nebulus_swarm.overlord.overlord_daemon.OverlordDaemon",
+                mock_daemon_cls,
+            ),
+            patch(
+                "nebulus_atom.commands.overlord_commands.DEFAULT_CONFIG_PATH",
+                config_file,
+            ),
+            patch(
+                "nebulus_swarm.overlord.registry.DEFAULT_CONFIG_PATH",
+                config_file,
+            ),
+        ):
+            result = runner.invoke(overlord_app, ["daemon", "start"])
+        assert "daemon.log" in result.output
+        assert "Logging to" in result.output
+
+    def test_start_shows_idle_schedule(
+        self, temp_git_repo: Path, tmp_path: Path
+    ) -> None:
+        """Daemon start shows idle message when no scheduled tasks."""
+        config_file = _make_config_file(
+            tmp_path,
+            {
+                "my-project": {
+                    "path": str(temp_git_repo),
+                    "remote": "test/my-project",
+                    "role": "tooling",
+                    "branch_model": "develop-main",
+                    "depends_on": [],
+                },
+            },
+        )
+
+        mock_daemon_cls = MagicMock()
+        mock_daemon_cls.check_running.return_value = False
+        mock_instance = MagicMock()
+        mock_daemon_cls.return_value = mock_instance
+        mock_instance.run = MagicMock(return_value=None)
+
+        with (
+            patch(
+                "nebulus_swarm.overlord.overlord_daemon.OverlordDaemon",
+                mock_daemon_cls,
+            ),
+            patch(
+                "nebulus_atom.commands.overlord_commands.DEFAULT_CONFIG_PATH",
+                config_file,
+            ),
+            patch(
+                "nebulus_swarm.overlord.registry.DEFAULT_CONFIG_PATH",
+                config_file,
+            ),
+        ):
+            result = runner.invoke(overlord_app, ["daemon", "start"])
+        assert "no scheduled tasks configured" in result.output.lower()

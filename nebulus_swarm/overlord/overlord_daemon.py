@@ -92,7 +92,24 @@ class OverlordDaemon:
     async def run(self) -> None:
         """Start the daemon: Slack bot + scheduler loop."""
         self._running = True
-        logger.info("Overlord daemon starting...")
+
+        # Startup banner
+        bot_token = os.environ.get("SLACK_BOT_TOKEN")
+        app_token = os.environ.get("SLACK_APP_TOKEN")
+        channel_id = os.environ.get("SLACK_CHANNEL_ID")
+        project_count = len(self.config.projects)
+        task_count = sum(1 for t in self.schedule.tasks if t.enabled and t.cron)
+        schedule_summary = f"{task_count} task(s)" if task_count else "idle"
+
+        logger.info(
+            "Overlord daemon starting — workspace=%s, projects=%d, "
+            "slack_bot_token=%s, slack_app_token=%s, schedule=%s",
+            self.config.workspace_root or "(not set)",
+            project_count,
+            "set" if bot_token else "MISSING",
+            "set" if app_token else "MISSING",
+            schedule_summary,
+        )
 
         # Write PID file
         self._write_pid_file()
@@ -105,10 +122,6 @@ class OverlordDaemon:
         tasks: list[asyncio.Task] = []
 
         # Start Slack bot if tokens are available
-        bot_token = os.environ.get("SLACK_BOT_TOKEN")
-        app_token = os.environ.get("SLACK_APP_TOKEN")
-        channel_id = os.environ.get("SLACK_CHANNEL_ID")
-
         if bot_token and app_token and channel_id:
             self.slack_bot = SlackBot(
                 bot_token=bot_token,
