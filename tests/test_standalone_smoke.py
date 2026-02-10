@@ -147,11 +147,19 @@ class TestNoCoreImports:
             )
 
     def test_no_nebulus_core_in_swarm_package(self):
-        """Scan all Python files in nebulus_swarm/ for nebulus_core imports."""
+        """Scan all Python files in nebulus_swarm/ for nebulus_core imports.
+
+        Allows try/except import shims (e.g. memory.py) that fall back to
+        a local copy when nebulus-core is not installed.
+        """
+        # Files that use try/except shims with nebulus-core fallback
+        shim_allowlist = {"memory.py"}
         swarm_dir = Path(__file__).parent.parent / "nebulus_swarm"
         if not swarm_dir.exists():
             pytest.skip("nebulus_swarm not present")
         for py_file in swarm_dir.rglob("*.py"):
+            if py_file.name in shim_allowlist:
+                continue
             content = py_file.read_text()
             assert "from nebulus_core" not in content, f"{py_file} imports nebulus_core"
             assert "import nebulus_core" not in content, (
