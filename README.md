@@ -1,11 +1,11 @@
 # Nebulus Atom
 
 ![Python Version](https://img.shields.io/badge/python-3.12+-blue.svg)
-![Version](https://img.shields.io/badge/version-2.3.0-green.svg)
-![Tests](https://img.shields.io/badge/tests-1247%20passing-brightgreen.svg)
+![Version](https://img.shields.io/badge/version-2.5.0-green.svg)
+![Tests](https://img.shields.io/badge/tests-1356%20passing-brightgreen.svg)
 ![License](https://img.shields.io/badge/license-proprietary-red.svg)
 
-> **v2.3.0** - A professional, autonomous AI engineer CLI powered by local LLMs for GitHub automation, code generation, and multi-agent orchestration.
+> **v2.5.0** - A professional, autonomous AI engineer CLI powered by local LLMs for GitHub automation, code generation, and multi-agent orchestration.
 
 Nebulus Atom is a privacy-first, self-hosted AI coding assistant and autonomous software engineering agent. It connects to local LLM servers (Nebulus Prime, Nebulus Edge, Ollama, TabbyAPI, vLLM) to provide intelligent code assistance, automated GitHub issue processing, and multi-agent task orchestration. Perfect for developers who want AI-powered coding tools without cloud dependencies.
 
@@ -99,7 +99,7 @@ nebulus-atom/
 │   ├── minion/              # Worker agents
 │   ├── dashboard/           # Streamlit monitoring
 │   └── reviewer/            # PR review
-└── tests/                   # 1247 tests
+└── tests/                   # 1356 tests
 ```
 
 ## Commands
@@ -159,7 +159,7 @@ nebulus-atom overlord daemon start
 | Swarm | Docker, Slack Bolt, aiohttp |
 | Dashboard | Streamlit |
 | Database | SQLite, ChromaDB |
-| Testing | pytest (1247 tests) |
+| Testing | pytest (1356 tests) |
 | CI/CD | pre-commit hooks, ruff |
 
 ## Documentation
