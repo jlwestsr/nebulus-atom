@@ -61,7 +61,7 @@ When you update user-facing features, version numbers, or key metrics:
 
 ## Overlord Status
 
-Cross-project meta-orchestrator for the Nebulus ecosystem (v2.5.0, 574 Overlord tests).
+Cross-project meta-orchestrator for the Nebulus ecosystem (v2.6.0, 574 Overlord tests).
 
 | Phase | Scope | Status |
 |-------|-------|--------|
