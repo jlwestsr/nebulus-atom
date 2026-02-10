@@ -18,6 +18,7 @@ from nebulus_swarm.overlord.registry import OverlordConfig
 logger = logging.getLogger(__name__)
 
 DEFAULT_MIRROR_ROOT = Path.home() / ".nebulus" / "mirrors"
+WORKTREE_ROOT = Path.home() / ".nebulus" / "worktrees"
 
 
 @dataclass
@@ -223,3 +224,141 @@ class MirrorManager:
         except (subprocess.TimeoutExpired, OSError):
             pass
         return 0
+
+    # --- Worktree operations ---
+
+    def provision_worktree(
+        self, project: str, task_id: str, branch: str = "develop"
+    ) -> Path:
+        """Create a git worktree from the bare mirror.
+
+        Creates: ~/.nebulus/worktrees/{project}/{task_id[:8]}/
+        Runs: git worktree add <path> -b atom/{task_id[:8]} <branch>
+
+        Args:
+            project: Project name from the registry.
+            task_id: Task UUID (first 8 chars used for naming).
+            branch: Base branch to create the worktree from.
+
+        Returns:
+            Path to the new worktree.
+
+        Raises:
+            RuntimeError: If the mirror is not initialized or git fails.
+        """
+        mirror_path = self._mirror_path(project)
+        if not mirror_path.exists():
+            raise RuntimeError(
+                f"Mirror not initialized for {project}. Run 'atom mirror init' first."
+            )
+
+        short_id = task_id[:8]
+        worktree_path = WORKTREE_ROOT / project / short_id
+        worktree_path.parent.mkdir(parents=True, exist_ok=True)
+
+        branch_name = f"atom/{short_id}"
+
+        try:
+            subprocess.run(
+                [
+                    "git",
+                    "worktree",
+                    "add",
+                    str(worktree_path),
+                    "-b",
+                    branch_name,
+                    branch,
+                ],
+                cwd=str(mirror_path),
+                capture_output=True,
+                text=True,
+                timeout=60,
+                check=True,
+            )
+            logger.info(
+                "Provisioned worktree for %s task %s at %s",
+                project,
+                short_id,
+                worktree_path,
+            )
+            return worktree_path
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(
+                f"Failed to create worktree for {project}/{short_id}: "
+                f"{e.stderr.strip()}"
+            ) from e
+
+    def cleanup_worktree(self, project: str, worktree_path: Path) -> bool:
+        """Remove a worktree and prune it from the mirror.
+
+        Args:
+            project: Project name from the registry.
+            worktree_path: Path to the worktree to remove.
+
+        Returns:
+            True on success, False on failure.
+        """
+        mirror_path = self._mirror_path(project)
+        if not mirror_path.exists():
+            logger.error("Mirror not found for %s", project)
+            return False
+
+        if not worktree_path.exists():
+            logger.warning("Worktree path does not exist: %s", worktree_path)
+            return False
+
+        try:
+            subprocess.run(
+                ["git", "worktree", "remove", str(worktree_path), "--force"],
+                cwd=str(mirror_path),
+                capture_output=True,
+                text=True,
+                timeout=30,
+                check=True,
+            )
+            logger.info("Removed worktree: %s", worktree_path)
+
+            # Clean up empty parent directory
+            parent = worktree_path.parent
+            if parent.exists() and not any(parent.iterdir()):
+                parent.rmdir()
+                logger.debug("Removed empty directory: %s", parent)
+
+            return True
+        except subprocess.CalledProcessError as e:
+            logger.error(
+                "Failed to remove worktree %s: %s",
+                worktree_path,
+                e.stderr.strip(),
+            )
+            return False
+
+    def list_worktrees(self, project: Optional[str] = None) -> dict[str, list[Path]]:
+        """List active worktrees per project.
+
+        Scans ~/.nebulus/worktrees/{project}/ directories.
+
+        Args:
+            project: Optional filter to list only one project's worktrees.
+
+        Returns:
+            Dict mapping project name to list of worktree paths.
+        """
+        result: dict[str, list[Path]] = {}
+
+        if not WORKTREE_ROOT.exists():
+            return result
+
+        if project:
+            project_dir = WORKTREE_ROOT / project
+            if project_dir.exists():
+                result[project] = sorted(p for p in project_dir.iterdir() if p.is_dir())
+            return result
+
+        for project_dir in sorted(WORKTREE_ROOT.iterdir()):
+            if project_dir.is_dir():
+                worktrees = sorted(p for p in project_dir.iterdir() if p.is_dir())
+                if worktrees:
+                    result[project_dir.name] = worktrees
+
+        return result
