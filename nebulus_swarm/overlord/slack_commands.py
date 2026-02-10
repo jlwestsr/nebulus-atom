@@ -55,7 +55,11 @@ _RE_GREETING = re.compile(
     re.IGNORECASE,
 )
 _RE_UPDATE = re.compile(
-    r"^(?:update|status\s+update|report|fyi|heads\s*up|completed?|shipped|deployed|pushed)\b",
+    r"(?:update|status\s+update|report|fyi|heads\s*up|completed?|shipped|deployed|pushed|merged|complete|done|finished)\b",
+    re.IGNORECASE,
+)
+_RE_AGENT_UPDATE = re.compile(
+    r"(?:agent\s*\d+|track\s*\d+|phase\s*[a-d]|gap[- ]?\d+)",
     re.IGNORECASE,
 )
 _RE_MEMORY_FILTER = re.compile(r"(cat|proj):(\S+)", re.IGNORECASE)
@@ -196,7 +200,11 @@ class SlackCommandRouter:
                     "Type `help` to see what I can do."
                 )
 
-            if _RE_UPDATE.match(text) or _RE_STRUCTURED_REPORT.search(text):
+            if (
+                _RE_AGENT_UPDATE.search(text)
+                or _RE_UPDATE.search(text)
+                or _RE_STRUCTURED_REPORT.search(text)
+            ):
                 return await self._handle_update(text)
 
             return await self._handle_llm_fallback(text, user_id, channel_id)
@@ -263,13 +271,34 @@ class SlackCommandRouter:
     async def _handle_update(self, text: str) -> str:
         """Log an update/notification to memory and acknowledge.
 
+        Extracts structured metadata (status, test counts) from agent
+        status messages for richer memory entries.
+
         Args:
             text: The update message text.
 
         Returns:
-            Short acknowledgment string.
+            Short acknowledgment string with status emoji.
         """
         project = self._infer_project(text)
+
+        # Infer status from keywords
+        status = "update"
+        if re.search(r"(?:complete|done|finished|green|passed)", text, re.IGNORECASE):
+            status = "completed"
+        elif re.search(r"(?:fail|error|red|blocked|broken)", text, re.IGNORECASE):
+            status = "failed"
+        elif re.search(
+            r"(?:in.?progress|working|active|underway)", text, re.IGNORECASE
+        ):
+            status = "in_progress"
+
+        # Extract test counts if present (handles "73 new tests", "407 total tests")
+        test_match = re.search(
+            r"(\d+)\s*(?:new\s+|total\s+)?tests?", text, re.IGNORECASE
+        )
+        test_count = int(test_match.group(1)) if test_match else None
+
         summary = text[:120].strip()
 
         await asyncio.to_thread(
@@ -280,7 +309,34 @@ class SlackCommandRouter:
         )
 
         proj_label = f" for *{project}*" if project else ""
-        return f"Logged{proj_label}. Noted: {summary}"
+        status_emoji = {"completed": "✅", "failed": "❌", "in_progress": "🔄"}.get(
+            status, "📝"
+        )
+        test_note = f" ({test_count} tests)" if test_count else ""
+        return f"{status_emoji} Logged{proj_label}{test_note}. Noted: {summary}"
+
+    async def _get_llm_health_line(self) -> str:
+        """Check LLM fallback connectivity and return a status line.
+
+        Returns:
+            Formatted single-line string showing LLM health.
+        """
+        if not self._llm_enabled:
+            return "LLM Fallback: disabled"
+
+        try:
+            client = self._client
+            await asyncio.wait_for(
+                client.models.list(),
+                timeout=3.0,
+            )
+            return (
+                f"LLM Fallback: ✅ connected "
+                f"(`{self._llm_config.base_url}`) "
+                f"| Model: {self._llm_config.model}"
+            )
+        except Exception:
+            return f"LLM Fallback: ❌ unreachable (`{self._llm_config.base_url}`)"
 
     async def _handle_status(self, project: Optional[str]) -> str:
         """Show ecosystem or project health via scanner.
@@ -300,7 +356,10 @@ class SlackCommandRouter:
             return _format_project_status(result)
         else:
             results = await asyncio.to_thread(scan_ecosystem, self.config)
-            return _format_ecosystem_status(results)
+            status_text = _format_ecosystem_status(results)
+            # Append LLM fallback health
+            status_text += "\n" + await self._get_llm_health_line()
+            return status_text
 
     async def _handle_scan(self, project: Optional[str]) -> str:
         """Detailed scan with issue detection and proactive detectors.
@@ -700,7 +759,7 @@ class SlackCommandRouter:
 
             # Post buffered result back to Slack
             if self.slack_bot and hasattr(self.slack_bot, "post_message"):
-                await self.slack_bot.post_message(response, channel=channel_id)  # type: ignore[attr-defined]
+                await self.slack_bot.post_message(response)  # type: ignore[attr-defined]
             else:
                 logger.info("Investigation result (no Slack bot): %s", response[:200])
 
@@ -901,15 +960,18 @@ class SlackCommandRouter:
             return self._command_validator.annotate_response(content)
 
         except asyncio.TimeoutError:
-            logger.warning("LLM chat fallback timed out for: %s", text)
+            logger.warning("LLM chat fallback timed out for: %s", text[:100])
             return (
-                "I couldn't process that in time. Try `help` to see available commands."
+                f"⏱️ LLM timed out ({self._llm_config.timeout}s). "
+                f"Endpoint: `{self._llm_config.base_url}`\n"
+                "Check if your LLM service is running. Type `help` for commands."
             )
         except Exception as e:
             logger.warning("LLM chat fallback failed: %s", e)
             return (
-                "I couldn't process that right now. "
-                "Try `help` to see available commands."
+                f"⚠️ LLM unavailable: `{type(e).__name__}`\n"
+                f"Endpoint: `{self._llm_config.base_url}`\n"
+                "Type `help` for available commands."
             )
 
     async def _handle_help(self) -> str:

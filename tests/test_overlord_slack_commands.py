@@ -13,6 +13,7 @@ from nebulus_swarm.overlord.slack_commands import (
     KNOWN_COMMANDS,
     CommandValidator,
     SlackCommandRouter,
+    _RE_AGENT_UPDATE,
     _RE_STRUCTURED_REPORT,
     _RE_UPDATE,
     _format_ecosystem_status,
@@ -105,7 +106,15 @@ class TestCommandParsing:
     @pytest.mark.asyncio
     async def test_status_routes_correctly(self, tmp_path: Path) -> None:
         router = _make_router(tmp_path)
-        with patch("nebulus_swarm.overlord.slack_commands.scan_ecosystem") as mock_scan:
+        with (
+            patch("nebulus_swarm.overlord.slack_commands.scan_ecosystem") as mock_scan,
+            patch.object(
+                router,
+                "_get_llm_health_line",
+                new_callable=AsyncMock,
+                return_value="LLM Fallback: disabled",
+            ),
+        ):
             mock_scan.return_value = []
             await router.handle("status", "U123", "C456")
             mock_scan.assert_called_once()
@@ -141,9 +150,17 @@ class TestHandlerExecution:
             branch="develop", clean=True, last_commit="test commit", ahead=0
         )
 
-        with patch(
-            "nebulus_swarm.overlord.slack_commands.scan_ecosystem",
-            return_value=[mock_status],
+        with (
+            patch(
+                "nebulus_swarm.overlord.slack_commands.scan_ecosystem",
+                return_value=[mock_status],
+            ),
+            patch.object(
+                router,
+                "_get_llm_health_line",
+                new_callable=AsyncMock,
+                return_value="LLM Fallback: disabled",
+            ),
         ):
             result = await router.handle("status", "U123", "C456")
             assert "Ecosystem Status" in result
@@ -301,7 +318,15 @@ class TestAsyncWrapping:
     @pytest.mark.asyncio
     async def test_scan_runs_in_thread(self, tmp_path: Path) -> None:
         router = _make_router(tmp_path)
-        with patch("nebulus_swarm.overlord.slack_commands.scan_ecosystem") as mock_scan:
+        with (
+            patch("nebulus_swarm.overlord.slack_commands.scan_ecosystem") as mock_scan,
+            patch.object(
+                router,
+                "_get_llm_health_line",
+                new_callable=AsyncMock,
+                return_value="LLM Fallback: disabled",
+            ),
+        ):
             mock_scan.return_value = []
             await router.handle("status", "U123", "C456")
             # Verify scan_ecosystem was called (via to_thread)
@@ -492,8 +517,8 @@ class TestLLMFallback:
         assert "Unknown command" in result
 
     @pytest.mark.asyncio
-    async def test_llm_timeout_returns_graceful_error(self, tmp_path: Path) -> None:
-        """LLM timeout returns a graceful fallback message."""
+    async def test_llm_timeout_returns_diagnostic_error(self, tmp_path: Path) -> None:
+        """LLM timeout returns a diagnostic message with endpoint info."""
         router = _make_router(tmp_path)
 
         with (
@@ -509,12 +534,12 @@ class TestLLMFallback:
             router._llm_client = mock_client
 
             result = await router.handle("Tell me something", "U123", "C456")
-            assert "couldn't process that" in result
-            assert "help" in result
+            assert "timed out" in result
+            assert "help" in result.lower()
 
     @pytest.mark.asyncio
-    async def test_llm_exception_returns_graceful_error(self, tmp_path: Path) -> None:
-        """LLM exception returns a graceful fallback message."""
+    async def test_llm_exception_returns_diagnostic_error(self, tmp_path: Path) -> None:
+        """LLM exception returns a diagnostic message with error type."""
         router = _make_router(tmp_path)
 
         with (
@@ -530,8 +555,8 @@ class TestLLMFallback:
             router._llm_client = mock_client
 
             result = await router.handle("Tell me something", "U123", "C456")
-            assert "couldn't process that" in result
-            assert "help" in result
+            assert "RuntimeError" in result
+            assert "help" in result.lower()
 
     @pytest.mark.asyncio
     async def test_context_includes_project_data(self, tmp_path: Path) -> None:
@@ -600,14 +625,20 @@ class TestLLMFallback:
         """Known commands like 'status' bypass LLM entirely."""
         router = _make_router(tmp_path)
 
-        with patch(
-            "nebulus_swarm.overlord.slack_commands.scan_ecosystem",
-            return_value=[],
+        with (
+            patch(
+                "nebulus_swarm.overlord.slack_commands.scan_ecosystem",
+                return_value=[],
+            ),
+            patch.object(
+                router,
+                "_get_llm_health_line",
+                new_callable=AsyncMock,
+                return_value="LLM Fallback: disabled",
+            ),
         ):
             result = await router.handle("status", "U123", "C456")
             assert "Ecosystem Status" in result
-            # LLM client should never have been initialized
-            assert router._llm_client is None
 
     @pytest.mark.asyncio
     async def test_greeting_handled_without_llm(self, tmp_path: Path) -> None:
@@ -642,7 +673,7 @@ class TestUpdatePatterns:
         ],
     )
     def test_re_update_positive(self, text: str) -> None:
-        assert _RE_UPDATE.match(text), f"Expected match for: {text!r}"
+        assert _RE_UPDATE.search(text), f"Expected match for: {text!r}"
 
     @pytest.mark.parametrize(
         "text",
@@ -656,7 +687,7 @@ class TestUpdatePatterns:
         ],
     )
     def test_re_update_negative(self, text: str) -> None:
-        assert not _RE_UPDATE.match(text), f"Unexpected match for: {text!r}"
+        assert not _RE_UPDATE.search(text), f"Unexpected match for: {text!r}"
 
     @pytest.mark.parametrize(
         "text",
@@ -702,12 +733,14 @@ class TestHandleUpdate:
 
     @pytest.mark.asyncio
     async def test_update_returns_acknowledgment(self, tmp_path: Path) -> None:
-        """Update handler returns a short acknowledgment."""
+        """Update handler returns a short acknowledgment with status emoji."""
         router = _make_router(tmp_path)
         with patch.object(router.memory, "remember"):
             result = await router.handle("FYI deployed edge", "U123", "C456")
             assert "Logged" in result
             assert "edge" in result
+            # Should have a status emoji prefix
+            assert result[0] in "✅❌🔄📝"
 
     @pytest.mark.asyncio
     async def test_update_no_project_match(self, tmp_path: Path) -> None:
@@ -1228,3 +1261,263 @@ class TestInvestigationTask:
         task = parser.parse_investigation("How does Python GIL work?")
         assert task.project is None
         assert task.tags == []
+
+
+# --- Agent Update Pattern Tests ---
+
+
+class TestAgentUpdatePatterns:
+    """Tests for _RE_AGENT_UPDATE and Slack-formatted update recognition."""
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "*Track 6 Phase B — Situation Map Sidebar: Complete*",
+            # "_Cross-Repo Integration Validation Complete_" matches via _RE_UPDATE (complete)
+            "_Agent 3 — Status Update: Forge Wiki v2_",
+            "_GAP-1 & GAP-2 Fix Complete — Dispatch Bridge Merged_",
+            "Agent 2 — nebulus-prime P0 Security Remediation Complete",
+            "Track 5 Phase A done",
+            "Phase B integration shipped",
+        ],
+    )
+    def test_agent_update_regex_positive(self, text: str) -> None:
+        assert _RE_AGENT_UPDATE.search(text), f"Expected match for: {text!r}"
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "status",
+            "help",
+            "What should I work on?",
+            "hello world",
+        ],
+    )
+    def test_agent_update_regex_negative(self, text: str) -> None:
+        assert not _RE_AGENT_UPDATE.search(text), f"Unexpected match for: {text!r}"
+
+    @pytest.mark.asyncio
+    async def test_slack_formatted_update_hits_update_path(
+        self, tmp_path: Path
+    ) -> None:
+        """Messages with Slack bold/italic formatting are routed to update handler."""
+        router = _make_router(tmp_path)
+        with patch.object(router.memory, "remember"):
+            result = await router.handle("*Track 6 Phase B — Complete*", "U123", "C456")
+            assert "Logged" in result
+            assert router._llm_client is None
+
+    @pytest.mark.asyncio
+    async def test_agent_update_bypasses_llm(self, tmp_path: Path) -> None:
+        """Agent-formatted messages do not fall through to LLM."""
+        router = _make_router(tmp_path)
+        with patch.object(router.memory, "remember"):
+            result = await router.handle(
+                "_Agent 3 — Forge Wiki v2 deployed_", "U123", "C456"
+            )
+            assert "Logged" in result
+            assert router._llm_client is None
+
+
+# --- Structured Update Parsing Tests ---
+
+
+class TestStructuredUpdateParsing:
+    """Tests for status extraction and test count parsing in _handle_update."""
+
+    @pytest.mark.asyncio
+    async def test_completed_status_emoji(self, tmp_path: Path) -> None:
+        router = _make_router(tmp_path)
+        with patch.object(router.memory, "remember"):
+            result = await router.handle(
+                "Agent 2 — Security Remediation Complete", "U123", "C456"
+            )
+            assert "✅" in result
+
+    @pytest.mark.asyncio
+    async def test_failed_status_emoji(self, tmp_path: Path) -> None:
+        router = _make_router(tmp_path)
+        with patch.object(router.memory, "remember"):
+            result = await router.handle(
+                "Agent 1 — Track 3 build failed", "U123", "C456"
+            )
+            assert "❌" in result
+
+    @pytest.mark.asyncio
+    async def test_in_progress_status_emoji(self, tmp_path: Path) -> None:
+        router = _make_router(tmp_path)
+        with patch.object(router.memory, "remember"):
+            result = await router.handle("Track 2 Phase A in progress", "U123", "C456")
+            assert "🔄" in result
+
+    @pytest.mark.asyncio
+    async def test_generic_update_emoji(self, tmp_path: Path) -> None:
+        router = _make_router(tmp_path)
+        with patch.object(router.memory, "remember"):
+            result = await router.handle(
+                "FYI pushed new branch for core", "U123", "C456"
+            )
+            assert "📝" in result
+
+    @pytest.mark.asyncio
+    async def test_test_count_extraction(self, tmp_path: Path) -> None:
+        router = _make_router(tmp_path)
+        with patch.object(router.memory, "remember"):
+            result = await router.handle(
+                "Agent 2 — 73 new tests passing, Phase 5 complete",
+                "U123",
+                "C456",
+            )
+            assert "73 tests" in result
+            assert "✅" in result
+
+    @pytest.mark.asyncio
+    async def test_test_count_total_passing(self, tmp_path: Path) -> None:
+        router = _make_router(tmp_path)
+        with patch.object(router.memory, "remember"):
+            result = await router.handle(
+                "407 total tests pass, zero regressions",
+                "U123",
+                "C456",
+            )
+            assert "407 tests" in result
+
+    @pytest.mark.asyncio
+    async def test_project_inference_in_update(self, tmp_path: Path) -> None:
+        router = _make_router(tmp_path)
+        with patch.object(router.memory, "remember") as mock_remember:
+            result = await router.handle(
+                "Agent 1 — core migration complete", "U123", "C456"
+            )
+            assert "*core*" in result
+            call_args = mock_remember.call_args
+            assert call_args[1]["project"] == "core"
+
+
+# --- LLM Fallback Diagnostic Tests ---
+
+
+class TestLLMFallbackDiagnostics:
+    """Tests for improved LLM error messages showing endpoint and error type."""
+
+    @pytest.mark.asyncio
+    async def test_timeout_shows_endpoint(self, tmp_path: Path) -> None:
+        router = _make_router(tmp_path)
+
+        with (
+            patch.object(
+                router, "_get_ecosystem", new_callable=AsyncMock, return_value=[]
+            ),
+            patch.object(router.memory, "search", return_value=[]),
+        ):
+            mock_client = AsyncMock()
+            mock_client.chat.completions.create = AsyncMock(
+                side_effect=asyncio.TimeoutError()
+            )
+            router._llm_client = mock_client
+
+            result = await router.handle("Tell me something", "U123", "C456")
+            assert "timed out" in result
+            assert self._get_base_url(router) in result
+            assert "help" in result.lower()
+
+    @pytest.mark.asyncio
+    async def test_exception_shows_error_type(self, tmp_path: Path) -> None:
+        router = _make_router(tmp_path)
+
+        with (
+            patch.object(
+                router, "_get_ecosystem", new_callable=AsyncMock, return_value=[]
+            ),
+            patch.object(router.memory, "search", return_value=[]),
+        ):
+            mock_client = AsyncMock()
+            mock_client.chat.completions.create = AsyncMock(
+                side_effect=ConnectionError("refused")
+            )
+            router._llm_client = mock_client
+
+            result = await router.handle("Tell me something", "U123", "C456")
+            assert "ConnectionError" in result
+            assert self._get_base_url(router) in result
+            assert "help" in result.lower()
+
+    @staticmethod
+    def _get_base_url(router: SlackCommandRouter) -> str:
+        return router._llm_config.base_url
+
+
+# --- LLM Health in Status Tests ---
+
+
+class TestLLMHealthInStatus:
+    """Tests for LLM health line in ecosystem status output."""
+
+    @pytest.mark.asyncio
+    async def test_status_includes_llm_health(self, tmp_path: Path) -> None:
+        router = _make_router(tmp_path)
+        with (
+            patch(
+                "nebulus_swarm.overlord.slack_commands.scan_ecosystem",
+                return_value=[],
+            ),
+            patch.object(
+                router,
+                "_get_llm_health_line",
+                new_callable=AsyncMock,
+                return_value="LLM Fallback: ❌ unreachable (`http://localhost:5000/v1`)",
+            ),
+        ):
+            result = await router.handle("status", "U123", "C456")
+            assert "LLM Fallback" in result
+
+    @pytest.mark.asyncio
+    async def test_status_project_no_llm_health(self, tmp_path: Path) -> None:
+        """Per-project status does NOT include LLM health line."""
+        router = _make_router(tmp_path)
+        mock_status = MagicMock()
+        mock_status.name = "core"
+        mock_status.issues = []
+        mock_status.git = MagicMock(
+            branch="develop", clean=True, last_commit="test", ahead=0
+        )
+        with patch(
+            "nebulus_swarm.overlord.slack_commands.scan_project",
+            return_value=mock_status,
+        ):
+            result = await router.handle("status core", "U123", "C456")
+            assert "LLM Fallback" not in result
+
+
+# --- Post Message Fix Tests ---
+
+
+class TestPostMessageFix:
+    """Tests for the post_message parameter fix."""
+
+    @pytest.mark.asyncio
+    async def test_investigation_posts_without_channel_kwarg(
+        self, tmp_path: Path
+    ) -> None:
+        """_run_investigation calls post_message without channel= kwarg."""
+        router = _make_router(tmp_path)
+        mock_bot = AsyncMock()
+        router.slack_bot = mock_bot
+
+        mock_result = MagicMock()
+        mock_result.success = True
+        mock_result.output = "Found the issue."
+        mock_result.duration = 1.5
+
+        mock_worker = MagicMock()
+        mock_worker.execute.return_value = mock_result
+        router._claude_worker = mock_worker
+
+        await router._run_investigation(
+            "test prompt", Path("/tmp"), "C456", "test query"
+        )
+
+        mock_bot.post_message.assert_called_once()
+        call_args = mock_bot.post_message.call_args
+        # Should NOT have channel= kwarg
+        assert "channel" not in (call_args.kwargs or {})
