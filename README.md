@@ -2,7 +2,7 @@
 
 ![Python Version](https://img.shields.io/badge/python-3.12+-blue.svg)
 ![Version](https://img.shields.io/badge/version-2.6.0-green.svg)
-![Tests](https://img.shields.io/badge/tests-1378%20passing-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-1392%20passing-brightgreen.svg)
 ![License](https://img.shields.io/badge/license-proprietary-red.svg)
 
 > **v2.6.0** - A professional, autonomous AI engineer CLI powered by local LLMs for GitHub automation, code generation, and multi-agent orchestration.
@@ -99,7 +99,7 @@ nebulus-atom/
 │   ├── minion/              # Worker agents
 │   ├── dashboard/           # Streamlit monitoring
 │   └── reviewer/            # PR review
-└── tests/                   # 1378 tests
+└── tests/                   # 1392 tests
 ```
 
 ## Commands
@@ -159,7 +159,7 @@ nebulus-atom overlord daemon start
 | Swarm | Docker, Slack Bolt, aiohttp |
 | Dashboard | Streamlit |
 | Database | SQLite, ChromaDB |
-| Testing | pytest (1378 tests) |
+| Testing | pytest (1392 tests) |
 | CI/CD | pre-commit hooks, ruff |
 
 ## Documentation
