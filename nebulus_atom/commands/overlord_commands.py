@@ -660,6 +660,61 @@ def _render_memory_entries(entries: list) -> None:
     console.print(table)
 
 
+def _load_queue_for_halt():
+    """Load the work queue for the halt command."""
+    from nebulus_swarm.overlord.work_queue import WorkQueue
+
+    return WorkQueue()
+
+
+@overlord_app.command("halt")
+def halt() -> None:
+    """Emergency stop — cancel all dispatches and stop the daemon."""
+    from nebulus_swarm.overlord.overlord_daemon import OverlordDaemon
+
+    queue = _load_queue_for_halt()
+    halted = 0
+
+    # Cancel dispatched tasks
+    dispatched = queue.list_tasks(status="dispatched")
+    for task in dispatched:
+        try:
+            queue.transition(
+                task.id, "failed", changed_by="human", reason="Halted by user"
+            )
+            halted += 1
+        except Exception as e:
+            console.print(f"[red]Failed to halt {task.id[:8]}: {e}[/red]")
+
+    # Cancel active tasks with locks (in-flight work)
+    active = queue.list_tasks(status="active")
+    for task in active:
+        if task.locked_by:
+            try:
+                queue.transition(
+                    task.id, "failed", changed_by="human", reason="Halted by user"
+                )
+                halted += 1
+            except Exception as e:
+                console.print(f"[red]Failed to halt {task.id[:8]}: {e}[/red]")
+
+    # Stop daemon
+    daemon_stopped = False
+    if OverlordDaemon.check_running():
+        daemon_stopped = OverlordDaemon.stop_daemon(timeout=5.0)
+        if daemon_stopped:
+            console.print("[green]Daemon stopped.[/green]")
+        else:
+            console.print("[red]Failed to stop daemon within timeout.[/red]")
+    else:
+        console.print("[dim]Daemon was not running.[/dim]")
+
+    console.print(
+        f"[bold]Halt complete:[/bold] {halted} task(s) cancelled"
+        + (", daemon stopped" if daemon_stopped else "")
+    )
+
+
 @overlord_app.command("worker")
 def show_worker() -> None:
     """Show Claude Code worker status and configuration."""

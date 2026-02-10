@@ -22,6 +22,7 @@ def dispatch_run(
     skip_review: bool = typer.Option(
         False, "--skip-review", help="Skip the review step"
     ),
+    role: str = typer.Option("default", "--role", help="Dispatch role: pm or default"),
 ) -> None:
     """Dispatch a single task through the full lifecycle."""
     from nebulus_swarm.overlord.dispatcher import Dispatcher
@@ -63,6 +64,7 @@ def dispatch_run(
             dry_run=dry_run,
             worker_name=worker,
             skip_review=skip_review,
+            role=role,
         )
         console.print(f"[green]Dispatch complete:[/green] {task_id[:8]}")
         console.print(f"  Worker: {result.worker_id}")

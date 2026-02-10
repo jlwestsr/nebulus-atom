@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from nebulus_swarm.overlord.mirrors import MirrorManager
 from nebulus_swarm.overlord.mission_brief import (
@@ -24,6 +24,9 @@ from nebulus_swarm.overlord.work_queue import (
     WorkQueue,
 )
 from nebulus_swarm.overlord.workers.base import BaseWorker, WorkerResult
+
+if TYPE_CHECKING:
+    from nebulus_swarm.overlord.governance import GovernanceEngine, GovernanceResult
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +65,8 @@ class DispatchContext:
     brief_path: Optional[Path] = None
     model: Optional[str] = None
     dry_run: bool = False
+    role: Optional[str] = None
+    focus_context: Optional[str] = None
 
 
 class Dispatcher:
@@ -86,6 +91,7 @@ class Dispatcher:
         daily_ceiling_usd: float = 10.0,
         warning_threshold_pct: float = 80.0,
         notification_manager: Optional[object] = None,
+        governance: Optional[GovernanceEngine] = None,
     ) -> None:
         self.queue = queue
         self.config = config
@@ -94,6 +100,7 @@ class Dispatcher:
         self.daily_ceiling_usd = daily_ceiling_usd
         self.warning_threshold_pct = warning_threshold_pct
         self.notification_manager = notification_manager
+        self.governance = governance
 
     def dispatch_task(
         self,
@@ -102,12 +109,16 @@ class Dispatcher:
         dry_run: bool = False,
         worker_name: Optional[str] = None,
         skip_review: bool = False,
+        role: str = "default",
     ) -> DispatchResultRecord:
         """Full lifecycle for one task.
 
         Steps:
         1. Load task, validate status is active
         2. Lock task, transition active → dispatched
+        2a. Governance pre-check (skip if dry_run)
+        2b. Pre-dispatch health scan (skip if dry_run)
+        2c. Conflict detection (skip if dry_run)
         3. Analyze: select_worker
         4. Brief: generate_mission_brief
         5. Provision: create worktree
@@ -120,6 +131,7 @@ class Dispatcher:
             dry_run: If True, generate brief and provision but skip execution.
             worker_name: Explicit worker override.
             skip_review: If True, skip the review step.
+            role: Dispatch role — "pm" for Project Manager mode, "default" otherwise.
 
         Returns:
             DispatchResultRecord with execution details.
@@ -153,16 +165,108 @@ class Dispatcher:
                 reason=f"Dispatched to worker={selected_name}",
             )
 
+            # 2a. Governance pre-check
+            if not dry_run and self.governance:
+                gov_result = self._run_governance_check(task, project_config)
+                if not gov_result.approved:
+                    return self._fail_task(
+                        task_id,
+                        selected_name,
+                        DispatchContext(
+                            task=task,
+                            project_config=project_config,
+                            worker=worker_obj,
+                        ),
+                        None,
+                        reason=f"Governance: {gov_result.violations[0].message}",
+                    )
+
+            # 2b. Pre-dispatch health scan
+            if not dry_run:
+                scan_issues = self._run_pre_dispatch_scan(project_config)
+                if scan_issues:
+                    return self._fail_task(
+                        task_id,
+                        selected_name,
+                        DispatchContext(
+                            task=task,
+                            project_config=project_config,
+                            worker=worker_obj,
+                        ),
+                        None,
+                        reason=f"Repo unhealthy: {'; '.join(scan_issues)}",
+                    )
+
+            # 2c. Conflict detection
+            if not dry_run and self.governance:
+                active_dispatched = self.queue.list_tasks(status="dispatched")
+                conflict = self.governance.check_conflict(task, active_dispatched)
+                if conflict:
+                    self.queue.transition(
+                        task_id,
+                        "failed",
+                        changed_by="dispatcher",
+                        reason=f"Conflict: {conflict.message}",
+                    )
+                    if self.notification_manager:
+                        try:
+                            import asyncio
+
+                            mgr = self.notification_manager
+                            if hasattr(mgr, "send_urgent"):
+                                loop = asyncio.get_event_loop()
+                                if loop.is_running():
+                                    asyncio.ensure_future(
+                                        mgr.send_urgent(conflict.message)
+                                    )
+                                else:
+                                    loop.run_until_complete(
+                                        mgr.send_urgent(conflict.message)
+                                    )
+                        except Exception:
+                            logger.debug("Failed to send conflict notification")
+                    return self._fail_task(
+                        task_id,
+                        selected_name,
+                        DispatchContext(
+                            task=task,
+                            project_config=project_config,
+                            worker=worker_obj,
+                        ),
+                        None,
+                        reason=f"Conflict: {conflict.message}",
+                    )
+
+            # 2d. Dependency ripple awareness for nebulus-core changes
+            if task.project == "nebulus-core" and not dry_run:
+                self._log_downstream_impact(task)
+
             # 3. Build context
             model = (
                 CLOUD_HEAVY_MODEL if self._infer_tier(task) == "cloud-heavy" else None
             )
+
+            # Build focus context for PM role
+            focus_context_str: Optional[str] = None
+            if role == "pm":
+                try:
+                    from nebulus_swarm.overlord.focus import build_focus_context
+
+                    workspace = self.config.workspace_root
+                    if workspace:
+                        fc = build_focus_context(workspace)
+                        focus_context_str = fc.format_for_prompt()
+                except Exception:
+                    logger.debug("Failed to build focus context for PM role")
+
             ctx = DispatchContext(
                 task=task,
                 project_config=project_config,
                 worker=worker_obj,
                 model=model,
                 dry_run=dry_run,
+                role=role if role != "default" else None,
+                focus_context=focus_context_str,
             )
 
             # 4. Provision worktree
@@ -457,6 +561,65 @@ class Dispatcher:
         if task.complexity in ("high",):
             return "cloud-heavy"
         return "cloud-fast"
+
+    def _run_governance_check(
+        self, task: Task, project_config: ProjectConfig
+    ) -> GovernanceResult:
+        """Run governance pre-dispatch checks.
+
+        Args:
+            task: The task to check.
+            project_config: Project configuration.
+
+        Returns:
+            GovernanceResult with approval status and violations.
+        """
+        if not self.governance:
+            from nebulus_swarm.overlord.governance import GovernanceResult
+
+            return GovernanceResult(approved=True)
+        return self.governance.pre_dispatch_check(task, project_config)
+
+    def _run_pre_dispatch_scan(self, project_config: ProjectConfig) -> list[str]:
+        """Run a health scan on the project before dispatch.
+
+        Args:
+            project_config: Project configuration to scan.
+
+        Returns:
+            List of issue strings. Empty means healthy.
+        """
+        try:
+            from nebulus_swarm.overlord.scanner import scan_project
+
+            status = scan_project(project_config)
+            return status.issues
+        except Exception:
+            logger.debug(
+                "Pre-dispatch scan failed for %s", project_config.name, exc_info=True
+            )
+            return []
+
+    def _log_downstream_impact(self, task: Task) -> None:
+        """Log downstream impact when dispatching to nebulus-core.
+
+        Args:
+            task: The nebulus-core task being dispatched.
+        """
+        try:
+            from nebulus_swarm.overlord.graph import DependencyGraph
+
+            graph = DependencyGraph(self.config)
+            affected = graph.get_affected_by(task.project)
+            if len(affected) > 1:
+                downstream = [p for p in affected if p != task.project]
+                logger.info(
+                    "Downstream impact for %s: %s",
+                    task.project,
+                    ", ".join(downstream),
+                )
+        except Exception:
+            logger.debug("Failed to compute downstream impact", exc_info=True)
 
     def _notify_budget_warning(self, pct: float) -> None:
         """Send a budget warning notification.
