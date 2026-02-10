@@ -15,6 +15,130 @@ from nebulus_atom.commands.overlord_commands import overlord_app
 app = typer.Typer(invoke_without_command=True)
 app.add_typer(overlord_app, name="overlord")
 
+# --- Mirror subcommand group ---
+mirror_app = typer.Typer(help="Manage bare-clone mirrors of ecosystem repos.")
+app.add_typer(mirror_app, name="mirror")
+
+
+@mirror_app.command("init")
+def mirror_init(
+    project: Optional[str] = typer.Option(
+        None, "--project", "-p", help="Init a single project mirror"
+    ),
+) -> None:
+    """Initialize bare-clone mirrors for ecosystem repos."""
+    from nebulus_swarm.overlord.mirrors import MirrorManager
+    from nebulus_swarm.overlord.registry import load_config
+
+    console = Console()
+    try:
+        config = load_config()
+    except ValueError as e:
+        console.print(f"[red]Config error: {e}[/red]")
+        return
+
+    if not config.projects:
+        console.print("[yellow]No projects registered.[/yellow]")
+        return
+
+    mgr = MirrorManager(config)
+
+    if project:
+        if project not in config.projects:
+            console.print(f"[red]Unknown project: {project}[/red]")
+            return
+        ok = mgr.init_project(project)
+        status = "[green]done[/green]" if ok else "[red]failed[/red]"
+        console.print(f"Mirror init {project}: {status}")
+    else:
+        results = mgr.init_all()
+        for name, ok in results.items():
+            status = "[green]done[/green]" if ok else "[red]failed[/red]"
+            console.print(f"  {name}: {status}")
+
+
+@mirror_app.command("sync")
+def mirror_sync(
+    project: Optional[str] = typer.Option(
+        None, "--project", "-p", help="Sync a single project mirror"
+    ),
+) -> None:
+    """Fetch updates for ecosystem mirror clones."""
+    from nebulus_swarm.overlord.mirrors import MirrorManager
+    from nebulus_swarm.overlord.registry import load_config
+
+    console = Console()
+    try:
+        config = load_config()
+    except ValueError as e:
+        console.print(f"[red]Config error: {e}[/red]")
+        return
+
+    if not config.projects:
+        console.print("[yellow]No projects registered.[/yellow]")
+        return
+
+    mgr = MirrorManager(config)
+
+    if project:
+        if project not in config.projects:
+            console.print(f"[red]Unknown project: {project}[/red]")
+            return
+        ok = mgr.sync_project(project)
+        status = "[green]done[/green]" if ok else "[red]failed[/red]"
+        console.print(f"Mirror sync {project}: {status}")
+    else:
+        results = mgr.sync_all()
+        for name, ok in results.items():
+            status = "[green]done[/green]" if ok else "[red]failed[/red]"
+            console.print(f"  {name}: {status}")
+
+
+@mirror_app.command("status")
+def mirror_status() -> None:
+    """Show the state of all ecosystem mirror clones."""
+    from rich.table import Table
+
+    from nebulus_swarm.overlord.mirrors import MirrorManager
+    from nebulus_swarm.overlord.registry import load_config
+
+    console = Console()
+    try:
+        config = load_config()
+    except ValueError as e:
+        console.print(f"[red]Config error: {e}[/red]")
+        return
+
+    if not config.projects:
+        console.print("[yellow]No projects registered.[/yellow]")
+        return
+
+    mgr = MirrorManager(config)
+    states = mgr.status()
+
+    table = Table(title="Mirror Status")
+    table.add_column("Project", style="bold")
+    table.add_column("Exists")
+    table.add_column("Last Fetch")
+    table.add_column("Refs")
+
+    for name, state in states.items():
+        if state.exists:
+            exists_str = "[green]yes[/green]"
+            fetch_str = (
+                state.last_fetch.strftime("%Y-%m-%d %H:%M")
+                if state.last_fetch
+                else "[dim]unknown[/dim]"
+            )
+            refs_str = str(state.ref_count)
+        else:
+            exists_str = "[red]no[/red]"
+            fetch_str = "-"
+            refs_str = "-"
+        table.add_row(name, exists_str, fetch_str, refs_str)
+
+    console.print(table)
+
 
 @app.callback()
 def main(ctx: typer.Context):
